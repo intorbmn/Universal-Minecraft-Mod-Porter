@@ -20,6 +20,12 @@ pub struct MinecraftVersion {
     pub patch: u32,
 }
 
+impl std::fmt::Display for MinecraftVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JavaVersion {
     pub major: u32,

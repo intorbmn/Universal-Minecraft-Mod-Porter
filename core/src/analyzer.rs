@@ -42,6 +42,55 @@ pub struct AnalysisReport {
     pub compatibility: CompatibilityMatrix,
 }
 
+impl AnalysisReport {
+    /// Machine-readable JSON export.
+    pub fn to_json(&self) -> Result<String, AnalyzerError> {
+        serde_json::to_string_pretty(self).map_err(|e| AnalyzerError::Parse(e.to_string()))
+    }
+
+    /// Human-readable summary text.
+    pub fn to_text(&self) -> String {
+        let mut out = String::new();
+        out.push_str("=== Analysis Report ===\n");
+        if let Some(ref bs) = self.build_system {
+            out.push_str(&format!(
+                "Build system: {:?} ({})\n",
+                bs.kind,
+                bs.file.display()
+            ));
+        }
+        if !self.languages.is_empty() {
+            out.push_str(&format!("Languages: {}\n", self.languages.join(", ")));
+        }
+        out.push_str(&format!("Mods: {}\n", self.mods.len()));
+        for m in &self.mods {
+            out.push_str(&format!(
+                "  - {} {} [{:?}] mc={:?} java={:?}\n",
+                m.metadata.name,
+                m.metadata.version,
+                m.detected_loader,
+                m.metadata.minecraft,
+                m.detected_java
+            ));
+        }
+        out.push_str(&format!(
+            "Dependency graph: {} nodes, {} edges\n",
+            self.dependency_graph.nodes.len(),
+            self.dependency_graph.edges.len()
+        ));
+        if !self.compatibility.issues.is_empty() {
+            out.push_str("Compatibility issues:\n");
+            for i in &self.compatibility.issues {
+                out.push_str(&format!(
+                    "  [{:?}] {}: {}\n",
+                    i.severity, i.mod_id, i.message
+                ));
+            }
+        }
+        out
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModAnalysis {
     pub metadata: ModMetadata,
@@ -209,7 +258,8 @@ fn inspect_jar(jar_path: &Path, fs: &dyn FileSystem) -> Result<ModAnalysis, Anal
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let name = file.name().to_string();
+        // Normalize Windows backslashes to forward slashes (zip spec uses /)
+        let name = file.name().to_string().replace('\\', "/");
         let mut content = String::new();
         file.read_to_string(&mut content)?;
 
@@ -289,54 +339,79 @@ fn parse_jar_metadata(
         ));
     }
 
-    // Try Forge/NeoForge (mods.toml)
+    // Try Forge/NeoForge (mods.toml) — supports both flat and [[mods]] array formats
     if !mods_toml.is_empty() {
         let v: toml::Value = mods_toml
             .parse()
             .map_err(|e: toml::de::Error| AnalyzerError::Parse(e.to_string()))?;
-        if let Some(mods) = v["mods"].as_array() {
-            if let Some(first) = mods.first() {
-                let mod_id = first["modId"].as_str().unwrap_or("unknown").to_string();
-                let version = first["version"].as_str().unwrap_or("0.0.0").to_string();
-                let name = first["displayName"].as_str().unwrap_or(&mod_id).to_string();
-                let loader_str = first["loader"].as_str().unwrap_or("FORGE");
-                let loader = match loader_str {
-                    "NEOFORGE" => Loader::NeoForge,
-                    "FORGE" => Loader::Forge,
-                    _ => Loader::Unknown(loader_str.to_string()),
-                };
 
-                let minecraft_str = first["minecraft"].as_str().unwrap_or("1.20.1");
-                let (major, minor, patch) = parse_version(minecraft_str);
+        // Get the entry: prefer [[mods]] first element, fall back to flat table
+        let first = if let Some(mods_arr) = v.get("mods").and_then(|v| v.as_array()) {
+            mods_arr.first()
+        } else {
+            // Flat format: modId/version/etc are at root level
+            Some(&v)
+        };
 
-                let mut dependencies = Vec::new();
-                if let Some(deps) = first["dependencies"].as_array() {
-                    for dep in deps {
-                        dependencies.push(ModDependency {
-                            mod_id: dep["modId"].as_str().unwrap_or("").to_string(),
-                            version: dep["versionRange"].as_str().unwrap_or("*").to_string(),
-                            optional: dep["mandatory"].as_bool().unwrap_or(true) == false,
-                        });
-                    }
+        if let Some(entry) = first {
+            let mod_id = entry
+                .get("modId")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let version = entry
+                .get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0.0.0")
+                .to_string();
+            let name = entry
+                .get("displayName")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&mod_id)
+                .to_string();
+            let loader_str = entry
+                .get("loader")
+                .and_then(|v| v.as_str())
+                .unwrap_or("FORGE");
+            let loader = match loader_str {
+                "NEOFORGE" => Loader::NeoForge,
+                "FORGE" => Loader::Forge,
+                _ => Loader::Unknown(loader_str.to_string()),
+            };
+
+            let minecraft_str = entry
+                .get("minecraft")
+                .and_then(|v| v.as_str())
+                .unwrap_or("1.20.1");
+            let (major, minor, patch) = parse_version(minecraft_str);
+
+            let mut dependencies = Vec::new();
+            if let Some(deps) = entry.get("dependencies").and_then(|v| v.as_array()) {
+                for dep in deps {
+                    dependencies.push(ModDependency {
+                        mod_id: dep["modId"].as_str().unwrap_or("").to_string(),
+                        version: dep["versionRange"].as_str().unwrap_or("*").to_string(),
+                        optional: dep["mandatory"].as_bool().unwrap_or(true) == false,
+                    });
                 }
-
-                return Ok((
-                    loader.clone(),
-                    ModMetadata {
-                        mod_id,
-                        version,
-                        name,
-                        loader,
-                        minecraft: MinecraftVersion {
-                            major,
-                            minor,
-                            patch,
-                        },
-                        java: None,
-                        dependencies,
-                    },
-                ));
             }
+
+            return Ok((
+                loader.clone(),
+                ModMetadata {
+                    mod_id,
+                    version,
+                    name,
+                    loader,
+                    minecraft: MinecraftVersion {
+                        major,
+                        minor,
+                        patch,
+                    },
+                    java: None,
+                    dependencies,
+                },
+            ));
         }
     }
 
@@ -526,13 +601,43 @@ pub struct DependencyGraphBuilder;
 impl IAnalyzer for DependencyGraphBuilder {
     fn analyze(
         &self,
-        _project_root: &Path,
-        _fs: &Arc<dyn FileSystem>,
+        project_root: &Path,
+        fs: &Arc<dyn FileSystem>,
     ) -> Result<AnalysisReport, AnalyzerError> {
         let mut report = AnalysisReport::default();
-        // Dependency graph built from mod metadata in other detectors
-        // This analyzer just ensures the structure exists
-        report.dependency_graph = DependencyGraph::default();
+        let jars = find_jars(project_root, fs.as_ref())?;
+        let mut seen = std::collections::HashSet::new();
+
+        for jar_path in &jars {
+            let analysis = inspect_jar(jar_path, fs.as_ref())?;
+            let id = analysis.metadata.mod_id.clone();
+            if !seen.insert(id.clone()) {
+                continue;
+            }
+            report.dependency_graph.nodes.push(DependencyNode {
+                id: id.clone(),
+                label: analysis.metadata.name.clone(),
+                kind: DependencyKind::Mod,
+            });
+            for dep in &analysis.metadata.dependencies {
+                report.dependency_graph.edges.push(DependencyEdge {
+                    from: id.clone(),
+                    to: dep.mod_id.clone(),
+                    kind: if dep.optional {
+                        EdgeKind::Optional
+                    } else {
+                        EdgeKind::Requires
+                    },
+                });
+                if seen.insert(dep.mod_id.clone()) {
+                    report.dependency_graph.nodes.push(DependencyNode {
+                        id: dep.mod_id.clone(),
+                        label: dep.mod_id.clone(),
+                        kind: DependencyKind::Library,
+                    });
+                }
+            }
+        }
         Ok(report)
     }
 }
@@ -596,5 +701,94 @@ mod tests {
         assert_eq!(parse_version("1.21"), (1, 21, 1));
         assert_eq!(parse_version("invalid"), (1, 20, 1));
         assert_eq!(parse_version("garbage"), (1, 20, 1));
+    }
+
+    #[test]
+    fn test_dependency_graph_builder_empty() {
+        let dir = tempdir().unwrap();
+        let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+        let detector = DependencyGraphBuilder;
+        let report = detector.analyze(dir.path(), &fs).unwrap();
+        assert!(report.dependency_graph.nodes.is_empty());
+        assert!(report.dependency_graph.edges.is_empty());
+    }
+
+    #[test]
+    fn test_report_export_json_and_text() {
+        let report = AnalysisReport::default();
+        let json = report.to_json().unwrap();
+        assert!(json.contains("\"mods\""));
+        let text = report.to_text();
+        assert!(text.contains("Analysis Report"));
+    }
+
+    /// Integration test over the fixture mod corpus (task 4.7).
+    /// Fixtures live at `../tests/fixtures` relative to the crate root.
+    #[test]
+    fn test_analyze_fixture_corpus() {
+        let fixtures = Path::new("../tests/fixtures");
+        let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+        let engine = AnalyzerEngine::default();
+        let report = engine.analyze(fixtures, &fs).unwrap();
+
+        // 7 fixture JARs (fabric-a/b/c, forge-a/b, neoforge-a, legacy-a, manifest-a, empty)
+        assert_eq!(report.mods.len(), 9, "expected 9 fixture mods");
+
+        let ids: Vec<&str> = report
+            .mods
+            .iter()
+            .map(|m| m.metadata.mod_id.as_str())
+            .collect();
+        for id in [
+            "fabrica",
+            "fabricb",
+            "fabricc",
+            "forgea",
+            "neoforgea",
+            "forgeb",
+            "legacya",
+            "manifestmod",
+        ] {
+            assert!(ids.contains(&id), "missing mod id: {id}");
+        }
+
+        // Loader detection
+        let loader = |id: &str| {
+            report
+                .mods
+                .iter()
+                .find(|m| m.metadata.mod_id == id)
+                .map(|m| m.detected_loader.clone())
+                .unwrap()
+        };
+        assert!(matches!(loader("fabrica"), Loader::Fabric));
+        assert!(matches!(loader("neoforgea"), Loader::NeoForge));
+        assert!(matches!(loader("forgea"), Loader::Forge));
+        assert!(matches!(loader("legacya"), Loader::Forge));
+        assert!(matches!(loader("manifestmod"), Loader::Unknown(_)));
+
+        // Java version from manifest
+        let manifestmod = report
+            .mods
+            .iter()
+            .find(|m| m.metadata.mod_id == "manifestmod")
+            .unwrap();
+        assert_eq!(
+            manifestmod.detected_java.as_ref().map(|j| j.major),
+            Some(17)
+        );
+
+        // Languages: kotlin-src has Example.kt
+        assert!(report.languages.contains(&"kotlin".to_string()));
+
+        // Dependency graph built from mod metadata
+        assert!(!report.dependency_graph.nodes.is_empty());
+        assert!(!report.dependency_graph.edges.is_empty());
+
+        // Exports work end-to-end
+        let _json = report.to_json().unwrap();
+        let text = report.to_text();
+        assert!(text.contains("Fabrica"));
+        assert!(text.contains("NeoForgeA"));
     }
 }
