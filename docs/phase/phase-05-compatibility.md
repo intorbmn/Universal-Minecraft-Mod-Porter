@@ -15,4 +15,4 @@
 | Risks | Low-quality community data; schema drift. |
 | Acceptance Criteria | Search returns correct mappings/recipes; schema migrations apply cleanly; seed data loads. |
 | Complexity | L |
-| Status | PLANNED |
+| Status | COMPLETED |

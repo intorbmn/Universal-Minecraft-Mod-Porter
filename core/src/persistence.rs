@@ -21,6 +21,8 @@ pub enum DbError {
     Serialize(String),
     #[error("deserialize: {0}")]
     Deserialize(String),
+    #[error("json: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 pub struct JobDb {
