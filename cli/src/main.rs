@@ -3,6 +3,7 @@ use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
+use ummp_core::adapter::{AdapterRegistry, Handling};
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
@@ -16,6 +17,7 @@ use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
+use ummp_core::port::{port, PortOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::scan::{scan_path, Severity};
 use uuid::Uuid;
@@ -60,6 +62,9 @@ enum Commands {
         /// Mappings below this confidence are reported, not applied.
         #[arg(long, default_value_t = 0.8)]
         min_confidence: f64,
+        /// Loader the mod uses now (default: detected). A different `--loader` converts it.
+        #[arg(long)]
+        from_loader: Option<String>,
         /// Write the changes (a checkpoint is taken first).
         #[arg(long)]
         apply: bool,
@@ -141,35 +146,45 @@ enum Commands {
     Build {
         /// Project root path (source tree with Gradle build files).
         path: PathBuf,
-        /// Build on this machine instead of GitHub.
-        #[arg(long)]
-        local: bool,
-        /// GitHub build repository `owner/name` (default: $UMMP_BUILD_REPO or
-        /// intorbmn/ummp-build-sandbox).
-        #[arg(long)]
-        repo: Option<String>,
-        /// Folder for build copies (default: D:\Claude\ummp-builds on Windows, ~/ummp-builds).
-        #[arg(long)]
-        workdir: Option<PathBuf>,
-        /// Comma-separated stages: build,test,server.
-        #[arg(long, value_delimiter = ',', default_value = "build,test,server")]
-        stages: Vec<String>,
-        /// Limit per stage, in seconds.
-        #[arg(long, default_value_t = 1800)]
-        timeout: u64,
-        /// Java major version (default: detected from the mod).
-        #[arg(long)]
-        java: Option<u32>,
-        /// Build a High-risk mod on this machine anyway.
-        #[arg(long)]
-        i_accept_risk: bool,
-        /// Build a Medium-risk mod on this machine without asking.
-        #[arg(long)]
-        yes: bool,
-        /// Also write the Markdown report here.
-        #[arg(long)]
-        report: Option<PathBuf>,
+        #[command(flatten)]
+        opts: BuildArgs,
     },
+    /// Port a mod's source: input folder or .zip in, ported source out (input untouched).
+    Port {
+        /// Source folder or .zip of the mod.
+        input: PathBuf,
+        /// Target Minecraft version.
+        #[arg(long)]
+        to: String,
+        /// Target loader (fabric, quilt, forge, neoforge); default: the mod's loader.
+        #[arg(long)]
+        loader: Option<String>,
+        /// Source Minecraft version; default: detected from the mod descriptor.
+        #[arg(long)]
+        from: Option<String>,
+        /// Output folder (default: D:\Claude\ummp-ports\<mod>-<mc>-<loader>-<time> on
+        /// Windows, ~/ummp-ports/... elsewhere). Must be empty or missing.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Also write <output>.zip.
+        #[arg(long)]
+        zip: bool,
+        /// Knowledge base SQLite file with API mappings.
+        #[arg(long, conflicts_with = "mappings")]
+        kb: Option<PathBuf>,
+        /// Mappings JSON (knowledge-base export format).
+        #[arg(long)]
+        mappings: Option<PathBuf>,
+        #[arg(long, default_value_t = 0.8)]
+        min_confidence: f64,
+        /// Build, test and start a server with the ported source (see `ummp build`).
+        #[arg(long)]
+        build: bool,
+        #[command(flatten)]
+        build_opts: BuildArgs,
+    },
+    /// List technology adapters and how far each one goes.
+    Adapters,
     /// Restore the project to a checkpoint taken by `migrate --apply`.
     Rollback {
         /// Project root path.
@@ -181,6 +196,38 @@ enum Commands {
         #[arg(long)]
         checkpoint: Option<Uuid>,
     },
+}
+
+#[derive(clap::Args)]
+struct BuildArgs {
+    /// Build on this machine instead of GitHub.
+    #[arg(long)]
+    local: bool,
+    /// GitHub build repository `owner/name` (default: $UMMP_BUILD_REPO or
+    /// intorbmn/ummp-build-sandbox).
+    #[arg(long)]
+    repo: Option<String>,
+    /// Folder for build copies (default: D:\Claude\ummp-builds on Windows, ~/ummp-builds).
+    #[arg(long)]
+    workdir: Option<PathBuf>,
+    /// Comma-separated stages: build,test,server.
+    #[arg(long, value_delimiter = ',', default_value = "build,test,server")]
+    stages: Vec<String>,
+    /// Limit per stage, in seconds.
+    #[arg(long, default_value_t = 1800)]
+    timeout: u64,
+    /// Java major version (default: detected from the mod).
+    #[arg(long)]
+    java: Option<u32>,
+    /// Build a High-risk mod on this machine anyway.
+    #[arg(long)]
+    i_accept_risk: bool,
+    /// Build a Medium-risk mod on this machine without asking.
+    #[arg(long)]
+    yes: bool,
+    /// Also write the Markdown report here.
+    #[arg(long)]
+    report: Option<PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -401,6 +448,91 @@ fn mod_identity(path: &Path) -> (String, Option<u32>) {
     (if name.is_empty() { "mod".into() } else { name }, java)
 }
 
+/// The loader named in the project's descriptor, lowercase (`fabric`, `neoforge`, ...).
+fn detected_loader(path: &Path) -> Option<String> {
+    let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+    let report = AnalyzerEngine::default().analyze(path, &fs).ok()?;
+    let loader = &report.mods.first()?.metadata.loader;
+    match loader {
+        ummp_core::metadata::Loader::Forge => Some("forge".into()),
+        ummp_core::metadata::Loader::Fabric => Some("fabric".into()),
+        ummp_core::metadata::Loader::NeoForge => Some("neoforge".into()),
+        ummp_core::metadata::Loader::Quilt => Some("quilt".into()),
+        _ => None,
+    }
+}
+
+/// Runs `ummp build`; `Ok(true)` when every stage that ran passed.
+fn run_build(path: &Path, a: BuildArgs) -> Result<bool, Box<dyn std::error::Error>> {
+    let BuildArgs {
+        local,
+        repo,
+        workdir,
+        stages,
+        timeout,
+        java,
+        i_accept_risk,
+        yes,
+        report,
+    } = a;
+    let path = path.to_path_buf();
+    if !path.is_dir() {
+        return Err(
+            "JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project"
+                .into(),
+        );
+    }
+    let scan = scan_path(&path)?;
+    print!("{}", scan.to_text());
+    check_risk(scan.risk(), local, i_accept_risk, yes)?;
+    let stages = stages
+        .iter()
+        .map(|s| match s.trim() {
+            "build" => Ok(Stage::Build),
+            "test" => Ok(Stage::Test),
+            "server" => Ok(Stage::Server),
+            other => Err(format!("unknown stage `{other}` (use build, test, server)")),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let (mod_name, detected_java) = mod_identity(&path);
+    let req = BuildRequest {
+        project: path,
+        mod_name,
+        stages,
+        java: java.or(detected_java),
+        timeout: std::time::Duration::from_secs(timeout),
+    };
+    let workdir = workdir.unwrap_or_else(default_workdir);
+    let outcome = if local {
+        LocalBackend {
+            workdir,
+            gradle: None,
+        }
+        .run(&req)?
+    } else {
+        let repo = repo
+            .or_else(|| std::env::var("UMMP_BUILD_REPO").ok())
+            .unwrap_or_else(|| "intorbmn/ummp-build-sandbox".into());
+        println!("Building on GitHub Actions in {repo} (this takes a few minutes)...");
+        GithubBackend {
+            repo,
+            gh: "gh".into(),
+            git: "git".into(),
+            poll: std::time::Duration::from_secs(15),
+            workdir,
+        }
+        .run(&req)?
+    };
+    let md = to_markdown(&outcome, &scan);
+    std::fs::write(outcome.workdir.join("ummp-report.md"), &md)?;
+    if let Some(p) = report {
+        std::fs::write(p, &md)?;
+    }
+    println!("\n{md}");
+    let (passed, run) = score(&outcome);
+    Ok(passed == run)
+}
+
 fn main() {
     tracing_subscriber::fmt::init();
     if let Err(e) = run(Cli::parse()) {
@@ -432,6 +564,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             kb,
             mappings,
             min_confidence,
+            from_loader,
             apply,
             snapshots,
             report,
@@ -443,6 +576,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target_minecraft: to,
                 target_loader: loader.to_lowercase(),
                 min_confidence,
+                source_loader: from_loader
+                    .map(|l| l.to_lowercase())
+                    .or_else(|| detected_loader(&project.root)),
             };
             let plan = MigrationPlanner::plan(&kb, &request)?;
             let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
@@ -490,6 +626,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target_minecraft: to,
                 target_loader: loader.to_lowercase(),
                 min_confidence,
+                source_loader: None,
             };
             let plan = MigrationPlanner::plan(&kb, &request)?;
             let stages: Vec<ClassMap> = plan
@@ -527,6 +664,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target_minecraft: to.clone(),
                 target_loader: loader.to_lowercase(),
                 min_confidence: 0.8,
+                source_loader: None,
             };
             let plan = MigrationPlanner::plan(&kb, &request)?;
             let snap_dir = ai
@@ -628,71 +766,67 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Commands::Build {
-            path,
-            local,
-            repo,
-            workdir,
-            stages,
-            timeout,
-            java,
-            i_accept_risk,
-            yes,
-            report,
-        } => {
-            if !path.is_dir() {
-                return Err("JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project".into());
-            }
-            let scan = scan_path(&path)?;
-            print!("{}", scan.to_text());
-            check_risk(scan.risk(), local, i_accept_risk, yes)?;
-            let stages = stages
-                .iter()
-                .map(|s| match s.trim() {
-                    "build" => Ok(Stage::Build),
-                    "test" => Ok(Stage::Test),
-                    "server" => Ok(Stage::Server),
-                    other => Err(format!("unknown stage `{other}` (use build, test, server)")),
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let (mod_name, detected_java) = mod_identity(&path);
-            let req = BuildRequest {
-                project: path,
-                mod_name,
-                stages,
-                java: java.or(detected_java),
-                timeout: std::time::Duration::from_secs(timeout),
-            };
-            let workdir = workdir.unwrap_or_else(default_workdir);
-            let outcome = if local {
-                LocalBackend {
-                    workdir,
-                    gradle: None,
-                }
-                .run(&req)?
-            } else {
-                let repo = repo
-                    .or_else(|| std::env::var("UMMP_BUILD_REPO").ok())
-                    .unwrap_or_else(|| "intorbmn/ummp-build-sandbox".into());
-                println!("Building on GitHub Actions in {repo} (this takes a few minutes)...");
-                GithubBackend {
-                    repo,
-                    gh: "gh".into(),
-                    git: "git".into(),
-                    poll: std::time::Duration::from_secs(15),
-                    workdir,
-                }
-                .run(&req)?
-            };
-            let md = to_markdown(&outcome, &scan);
-            std::fs::write(outcome.workdir.join("ummp-report.md"), &md)?;
-            if let Some(p) = report {
-                std::fs::write(p, &md)?;
-            }
-            println!("\n{md}");
-            let (passed, run) = score(&outcome);
-            if passed < run {
+        Commands::Build { path, opts } => {
+            if !run_build(&path, opts)? {
                 std::process::exit(1);
+            }
+        }
+
+        Commands::Port {
+            input,
+            to,
+            loader,
+            from,
+            output,
+            zip,
+            kb,
+            mappings,
+            min_confidence,
+            build,
+            build_opts,
+        } => {
+            let kb = if kb.is_none() && mappings.is_none() {
+                println!("No knowledge base given: structural migration only (descriptors, build files, loader conversion).");
+                KnowledgeBase::open(Path::new(":memory:"))?
+            } else {
+                open_kb(kb, mappings)?
+            };
+            let result = port(
+                &PortOptions {
+                    input,
+                    output,
+                    to,
+                    loader,
+                    from,
+                    zip,
+                    min_confidence,
+                },
+                &kb,
+            )?;
+            let r = &result.report;
+            let count = |h: Handling| r.technologies.iter().filter(|f| f.handling == h).count();
+            println!("Ported source: {}", result.output.display());
+            if let Some(z) = &result.zip {
+                println!("Zip: {}", z.display());
+            }
+            println!(
+                "Changed or new files: {}, deleted: {}; findings: {} auto, {} assisted, {} manual",
+                r.changes.len(),
+                r.deletes.len(),
+                count(Handling::Auto),
+                count(Handling::Assisted),
+                count(Handling::Manual)
+            );
+            println!("Report: {}", result.output.join("UMMP_REPORT.md").display());
+            if build && !run_build(&result.output, build_opts)? {
+                std::process::exit(1);
+            }
+        }
+
+        Commands::Adapters => {
+            println!("{:<20} level", "adapter");
+            for (id, level) in AdapterRegistry::default().list() {
+                println!("{id:<20} {level:?}");
             }
         }
 

@@ -130,6 +130,7 @@ fn request() -> MigrationRequest {
         target_minecraft: "1.17.1".into(),
         target_loader: "forge".into(),
         min_confidence: 0.8,
+        source_loader: None,
     }
 }
 
@@ -413,6 +414,7 @@ fn test_datapack_moves_pack_format_and_rollback() {
         target_minecraft: "1.21".into(),
         target_loader: "fabric".into(),
         min_confidence: 0.8,
+        source_loader: None,
     };
     let plan = MigrationPlanner::plan(&kb, &req).unwrap();
     assert!(plan.datapack_renames);
@@ -529,6 +531,7 @@ fn test_failed_move_rolls_back() {
         target_minecraft: "1.21".into(),
         target_loader: "fabric".into(),
         min_confidence: 0.8,
+        source_loader: None,
     };
     let plan = MigrationPlanner::plan(&kb, &req).unwrap();
     let project = Project {

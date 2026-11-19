@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-8 complete; Phase 9 (advanced adapters) is next. Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-9 complete; Phase 10 (modpacks) is next; rough designs for 10-14 in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -54,6 +54,11 @@ ummp scan path/to/mod-or.jar
 ummp build path/to/mod --repo you/ummp-build-sandbox
 # ...or on this machine, in a new folder under D:\Claude\ummp-builds (Windows) or ~/ummp-builds
 ummp build path/to/mod --local
+
+# Port a mod: source folder or .zip in, ported source out (the original is not touched).
+# Output goes to D:\Claude\ummp-ports\<mod>-<mc>-<loader>-<time> on Windows, ~/ummp-ports elsewhere.
+ummp port path/to/mod-src --to 1.21.1 --loader neoforge --zip
+ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 # local model: --provider openai --base-url http://localhost:11434/v1 ; settings: --ai-config ai.json
 ```
 `--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`

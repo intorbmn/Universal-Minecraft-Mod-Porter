@@ -12,6 +12,7 @@
 //! - Edits are applied only after a checkpoint is taken; any write failure
 //!   restores the checkpoint (ADR 0005, ADR 0006).
 
+use crate::adapter::{AdapterContext, AdapterRegistry};
 use crate::build_script::{migrate_build_file, required_java, BuildFile};
 use crate::checkpoint::{collect_files, CheckpointError, CheckpointStore};
 use crate::descriptor::{migrate_descriptor, DescriptorKind, DescriptorTarget};
@@ -19,7 +20,7 @@ use crate::filesystem::{resolve_within, FsError};
 use crate::knowledge::{BreakingChange, KnowledgeBase, Mapping};
 use crate::mixin::{
     count_method_targets, is_mixin_class, is_mixin_config, migrate_mixin_config,
-    migrate_mixin_strings,
+    migrate_mixin_members, migrate_mixin_strings,
 };
 use crate::persistence::DbError;
 use crate::project::Project;
@@ -66,6 +67,10 @@ pub struct MigrationRequest {
     pub target_loader: String,
     /// Mappings below this confidence are reported, not applied.
     pub min_confidence: f64,
+    /// Loader the mod uses today; when it differs from `target_loader` the loader
+    /// converter runs (Phase 9). `None` = same loader.
+    #[serde(default)]
+    pub source_loader: Option<String>,
 }
 
 /// One API rename taken from a knowledge-base [`Mapping`].
@@ -324,7 +329,7 @@ impl MigrationPlanner {
             recipes.push(outcome(true, note));
         }
 
-        let stages = by_version
+        let mut stages: Vec<Stage> = by_version
             .into_values()
             .filter(|(_, rules)| !rules.is_empty())
             .map(|(version, rules)| Stage {
@@ -332,6 +337,34 @@ impl MigrationPlanner {
                 rules: rules.into_values().collect(),
             })
             .collect();
+
+        // Loader conversion (Phase 9): KB rows with loader "<from>-><to>" form one last stage.
+        if let Some(from) = request
+            .source_loader
+            .as_deref()
+            .filter(|f| *f != request.target_loader)
+        {
+            let pair = format!("{from}->{}", request.target_loader);
+            let rules: Vec<RenameRule> = kb
+                .mappings_by_loader(&pair)?
+                .into_iter()
+                .filter(|m| m.from_api != m.to_api)
+                .filter(|m| m.confidence >= request.min_confidence)
+                .map(|m| RenameRule {
+                    from: m.from_api,
+                    to: m.to_api,
+                    kind: m.kind,
+                    confidence: m.confidence,
+                    version: pair.clone(),
+                })
+                .collect();
+            if !rules.is_empty() {
+                stages.push(Stage {
+                    version: pair,
+                    rules,
+                });
+            }
+        }
 
         // `search_breaking_changes("")` matches every row (LIKE '%%').
         let breaking_changes = kb
@@ -474,7 +507,7 @@ impl SourceTransformer for TokenRenameTransformer {
     fn applies_to(&self, path: &Path) -> bool {
         matches!(
             path.extension().and_then(|e| e.to_str()),
-            Some("java" | "kt")
+            Some("java" | "kt" | "groovy" | "scala")
         )
     }
 
@@ -514,7 +547,12 @@ impl SourceTransformer for TokenRenameTransformer {
                 continue;
             }
             if c == b'\'' {
-                i = skip_quoted(bytes, i, b'\'');
+                // Groovy triple-single-quoted strings span lines.
+                i = if bytes[i..].starts_with(b"'''") {
+                    find_seq(bytes, i + 3, b"'''").map_or(src_len, |p| p + 3)
+                } else {
+                    skip_quoted(bytes, i, b'\'')
+                };
                 prev_words = [None, None];
                 continue;
             }
@@ -652,6 +690,12 @@ pub struct MigrationReport {
     pub breaking_changes: Vec<BreakingChange>,
     pub recipes: Vec<RecipeOutcome>,
     pub warnings: Vec<String>,
+    /// Files removed (e.g. the old descriptor after a loader conversion).
+    #[serde(default)]
+    pub deletes: Vec<PathBuf>,
+    /// Technology findings from the adapters (Phase 9).
+    #[serde(default)]
+    pub technologies: Vec<crate::adapter::TechFinding>,
 }
 
 impl MigrationReport {
@@ -723,6 +767,18 @@ impl MigrationReport {
             }
             out.push('\n');
         }
+        if !self.technologies.is_empty() {
+            let _ = writeln!(out, "## Technologies\n");
+            out.push_str(&crate::adapter::findings_text(&self.technologies));
+            out.push('\n');
+        }
+        if !self.deletes.is_empty() {
+            let _ = writeln!(out, "## Deleted files\n");
+            for d in &self.deletes {
+                let _ = writeln!(out, "- `{}`", d.display());
+            }
+            out.push('\n');
+        }
         if !self.warnings.is_empty() {
             let _ = writeln!(out, "## Warnings\n");
             for w in &self.warnings {
@@ -763,18 +819,24 @@ pub struct RunOptions<'a> {
 pub struct EditSet {
     pub edits: Vec<FileEdit>,
     pub moves: Vec<FileMove>,
+    /// Files to delete (relative paths), e.g. a descriptor replaced by loader conversion.
+    pub deletes: Vec<PathBuf>,
+    /// Technology findings from the adapters (Phase 9).
+    pub technologies: Vec<crate::adapter::TechFinding>,
     pub files_scanned: usize,
     pub warnings: Vec<String>,
 }
 
 pub struct MigrationEngine {
     transformers: Vec<Box<dyn SourceTransformer>>,
+    adapters: AdapterRegistry,
 }
 
 impl Default for MigrationEngine {
     fn default() -> Self {
         Self {
             transformers: vec![Box::new(TokenRenameTransformer)],
+            adapters: AdapterRegistry::default(),
         }
     }
 }
@@ -790,7 +852,17 @@ enum Handler<'a> {
 
 impl MigrationEngine {
     pub fn new(transformers: Vec<Box<dyn SourceTransformer>>) -> Self {
-        Self { transformers }
+        Self {
+            transformers,
+            adapters: AdapterRegistry::default(),
+        }
+    }
+
+    /// Replaces the technology adapters (tests, plugins).
+    #[must_use]
+    pub fn with_adapters(mut self, adapters: AdapterRegistry) -> Self {
+        self.adapters = adapters;
+        self
     }
 
     fn handler(&self, rel: &Path) -> Option<Handler<'_>> {
@@ -820,6 +892,12 @@ impl MigrationEngine {
     ) -> Result<EditSet, MigrationError> {
         let mut set = EditSet::default();
         let files = collect_files(&project.root)?;
+        let cx = AdapterContext {
+            root: &project.root,
+            files: &files,
+            plan: Some(plan),
+            source_loader: plan.request.source_loader.clone(),
+        };
 
         if plan.datapack_renames {
             let existing: std::collections::HashSet<&PathBuf> = files.iter().collect();
@@ -841,7 +919,10 @@ impl MigrationEngine {
             }
         }
 
-        for rel in files {
+        for rel in files.iter().cloned() {
+            if self.adapters.owns(&cx, &rel) {
+                continue;
+            }
             let Some(handler) = self.handler(&rel) else {
                 continue;
             };
@@ -905,8 +986,11 @@ impl MigrationEngine {
                         if mixin {
                             let r = migrate_mixin_strings(&current, &stage.rules);
                             take(r, &mut current, &mut replacements);
+                            let r = migrate_mixin_members(&current, &stage.rules);
+                            take(r, &mut current, &mut replacements);
                         }
                     }
+                    current = self.adapters.rewrite(&cx, &rel, &current);
                     if mixin {
                         let n = count_method_targets(&original);
                         if n > 0 {
@@ -928,6 +1012,18 @@ impl MigrationEngine {
                 });
             }
         }
+        for adapter in self.adapters.adapters() {
+            let extra = adapter.edits(&cx)?;
+            for e in extra.edits {
+                // An adapter edit replaces any generic edit of the same file.
+                set.edits.retain(|x| x.path != e.path);
+                set.edits.push(e);
+            }
+            set.moves.extend(extra.moves);
+            set.deletes.extend(extra.deletes);
+            set.warnings.extend(extra.warnings);
+        }
+        set.technologies = self.adapters.findings(&cx);
         Ok(set)
     }
 
@@ -959,6 +1055,11 @@ impl MigrationEngine {
             })();
             moved.map_err(|e| (m.from.clone(), e))?;
         }
+        for path in &set.deletes {
+            resolve_within(&project.root, path)
+                .and_then(|abs| project.fs.remove(&abs))
+                .map_err(|e| (path.clone(), e))?;
+        }
         Ok(())
     }
 
@@ -972,7 +1073,7 @@ impl MigrationEngine {
         store: &mut CheckpointStore,
         opts: &RunOptions<'_>,
     ) -> Result<Option<Uuid>, MigrationError> {
-        if set.edits.is_empty() && set.moves.is_empty() {
+        if set.edits.is_empty() && set.moves.is_empty() && set.deletes.is_empty() {
             return Ok(None);
         }
         let cp = store.snapshot(
@@ -1027,6 +1128,8 @@ impl MigrationEngine {
             breaking_changes: plan.breaking_changes.clone(),
             recipes: plan.recipes.clone(),
             warnings: set.warnings,
+            deletes: set.deletes,
+            technologies: set.technologies,
         })
     }
 }
@@ -1127,11 +1230,35 @@ mod tests {
     }
 
     #[test]
-    fn test_applies_to_java_and_kotlin_only() {
+    fn test_applies_to_jvm_sources_only() {
         let t = TokenRenameTransformer;
         assert!(t.applies_to(Path::new("src/A.java")));
         assert!(t.applies_to(Path::new("src/A.kt")));
+        assert!(t.applies_to(Path::new("src/A.groovy")));
+        assert!(t.applies_to(Path::new("src/A.scala")));
         assert!(!t.applies_to(Path::new("build.gradle.kts")));
+        assert!(!t.applies_to(Path::new("build.gradle")));
         assert!(!t.applies_to(Path::new("assets/lang/en_us.json")));
+    }
+
+    #[test]
+    fn groovy_and_scala_renamed_not_in_triple_strings() {
+        let rules = [
+            rule("com.example.old.DemoWidget", "com.example.next.DemoGadget"),
+            rule("DemoWidget", "DemoGadget"),
+        ];
+        let groovy = "import com.example.old.DemoWidget\n\
+                      def w = new DemoWidget()\n\
+                      def doc = '''\nDemoWidget stays here\n'''\n";
+        let out = rewrite(groovy, &rules);
+        assert!(out.contains("import com.example.next.DemoGadget"), "{out}");
+        assert!(out.contains("new DemoGadget()"), "{out}");
+        assert!(out.contains("DemoWidget stays here"), "{out}");
+        let scala = "import com.example.old.DemoWidget\n\
+                     val doc = \"\"\"\nDemoWidget stays\n\"\"\"\n\
+                     val w: DemoWidget = new DemoWidget\n";
+        let out = rewrite(scala, &rules);
+        assert!(out.contains("val w: DemoGadget = new DemoGadget"), "{out}");
+        assert!(out.contains("DemoWidget stays"), "{out}");
     }
 }

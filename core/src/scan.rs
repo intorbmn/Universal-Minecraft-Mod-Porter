@@ -243,6 +243,19 @@ impl Scanner {
                     .unwrap_or(&path)
                     .to_string_lossy()
                     .replace('\\', "/");
+                if rel == "gradle/wrapper/gradle-wrapper.jar" {
+                    // The Gradle wrapper downloads and runs Gradle by design, so content rules
+                    // would always fire. Its integrity is a checksum question instead.
+                    self.add(
+                        "gradle-wrapper",
+                        Severity::Medium,
+                        &rel,
+                        "Gradle wrapper JAR: not inspected; verify it against Gradle's published \
+                         wrapper checksums (GitHub builds run gradle/actions/wrapper-validation)"
+                            .into(),
+                    );
+                    continue;
+                }
                 let e = ext(&name);
                 if e == "class"
                     || e == "jar"

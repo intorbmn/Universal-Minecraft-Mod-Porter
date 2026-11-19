@@ -270,3 +270,34 @@ fn obfuscated_jar_is_medium() {
     assert!(has(&r, "obfuscation", Severity::Medium), "{:?}", r.findings);
     assert_eq!(r.risk(), Some(Severity::Medium));
 }
+
+#[test]
+fn gradle_wrapper_jar_is_one_medium_finding() {
+    if !have_javac() {
+        eprintln!("skipped: no javac");
+        return;
+    }
+    let src = "package org.gradle.wrapper;\npublic class Install {\n\
+        public void go() throws Exception {\n\
+        new java.net.URL(\"https://services.gradle.org/x\").openStream();\n\
+        new ProcessBuilder(\"sh\").start(); } }\n";
+    let d = tempfile::tempdir().unwrap();
+    let wrapper = d.path().join("gradle/wrapper");
+    fs::create_dir_all(&wrapper).unwrap();
+    fs::write(
+        wrapper.join("gradle-wrapper.jar"),
+        jar_bytes(&compile(&[("org/gradle/wrapper/Install.java", src)])),
+    )
+    .unwrap();
+    let r = scan_path(d.path()).unwrap();
+    assert_eq!(r.findings.len(), 1, "{:?}", r.findings);
+    assert_eq!(r.findings[0].rule, "gradle-wrapper");
+    assert_eq!(r.risk(), Some(Severity::Medium));
+    // The same JAR anywhere else is inspected normally.
+    fs::rename(
+        wrapper.join("gradle-wrapper.jar"),
+        d.path().join("libs.jar"),
+    )
+    .unwrap();
+    assert_eq!(scan_path(d.path()).unwrap().risk(), Some(Severity::High));
+}

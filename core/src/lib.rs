@@ -3,6 +3,7 @@
 //! Layered modular monolith: Domain → Application → Infrastructure.
 //! No GUI, AI provider, or Minecraft loader dependency.
 
+pub mod adapter;
 pub mod ai;
 pub mod analyzer;
 pub mod build;
@@ -19,6 +20,7 @@ pub mod metadata;
 pub mod migration;
 pub mod mixin;
 pub mod persistence;
+pub mod port;
 pub mod project;
 pub mod resources;
 pub mod scan;

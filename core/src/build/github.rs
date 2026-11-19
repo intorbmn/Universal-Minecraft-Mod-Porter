@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      # Fails the run if gradle/wrapper/gradle-wrapper.jar is not an official Gradle wrapper.
+      - uses: gradle/actions/wrapper-validation@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,7 +42,11 @@ jobs:
             if [ "$status" != passed ]; then
               echo "{\"stage\":\"$name\",\"status\":\"skipped\"}" >> ummp-out/stages.jsonl; return
             fi
-            if "$@" > "ummp-out/$name.log" 2>&1; then s=passed; else s=failed; status=failed; fi
+            if "$@" > "ummp-out/$name.log" 2>&1; then s=passed; else
+              s=failed; status=failed
+              # Artifact storage can be unreachable for the caller; keep the error in the job log.
+              echo "UMMP-LOG-BEGIN $name"; tail -n 80 "ummp-out/$name.log"; echo "UMMP-LOG-END $name"
+            fi
             echo "{\"stage\":\"$name\",\"status\":\"$s\"}" >> ummp-out/stages.jsonl
           }
           server() {
@@ -162,7 +168,9 @@ fn stages_line(log: &str) -> Option<String> {
 }
 
 impl GithubBackend {
-    fn stages_from_job_log(&self, run_id: &str, dir: &Path) -> Option<String> {
+    /// Stage results from the job log; the log is saved as `<art>/job.log` (it holds the
+    /// tail of each failed stage's log).
+    fn stages_from_job_log(&self, run_id: &str, dir: &Path, art: &Path) -> Option<String> {
         let jobs = tool(
             &self.gh,
             &[
@@ -182,6 +190,10 @@ impl GithubBackend {
             dir,
         )
         .ok()?;
+        if std::fs::create_dir_all(art).is_ok() {
+            // Best effort: without the saved log, failed stages just have no error details.
+            let _ = std::fs::write(art.join("job.log"), &log);
+        }
         stages_line(&log)
     }
 
@@ -316,7 +328,7 @@ impl BuildBackend for GithubBackend {
             // stage results, though not the per-stage logs.
             Err(e) => {
                 eprintln!("warning: artifact download failed, reading stage results from the job log: {e}");
-                self.stages_from_job_log(&id, &dir)
+                self.stages_from_job_log(&id, &dir, &art)
             }
         }
         .ok_or_else(|| {
@@ -335,7 +347,11 @@ impl BuildBackend for GithubBackend {
                     .iter()
                     .find(|l| l.stage == stage.name())
                     .map_or(StageStatus::Skipped, |l| status_of(&l.status));
-                let log = art.join(format!("{}.log", stage.name()));
+                let mut log = art.join(format!("{}.log", stage.name()));
+                let job_log = art.join("job.log");
+                if !log.exists() && status == StageStatus::Failed && job_log.exists() {
+                    log = job_log;
+                }
                 let errors = std::fs::read_to_string(&log)
                     .map(|t| analyze_log(&t))
                     .unwrap_or_default();
