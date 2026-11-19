@@ -31,5 +31,7 @@ migration (Phase 6.B/6.C).
 **Phase 7 (2026-11-19):** AI agents done (`ummp ai-assist`, `ummp ai-debug`); see
 `docs/phase/phase-07-ai.md`.
 
+**Phases 9–14:** rough drafts in [docs/drafts/](drafts/README.md) (not approved designs).
+
 ## Detailed plans
 See `docs/phase/` per phase (created on execution).
