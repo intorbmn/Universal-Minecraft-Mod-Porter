@@ -962,6 +962,36 @@ impl MigrationEngine {
         Ok(())
     }
 
+    /// Apply an edit set (from the rules or from approved AI proposals):
+    /// checkpoint first, write, and restore the checkpoint if anything fails.
+    /// Returns the checkpoint id, or `None` when there was nothing to apply.
+    pub fn apply_edit_set(
+        &self,
+        set: &EditSet,
+        project: &Project,
+        store: &mut CheckpointStore,
+        opts: &RunOptions<'_>,
+    ) -> Result<Option<Uuid>, MigrationError> {
+        if set.edits.is_empty() && set.moves.is_empty() {
+            return Ok(None);
+        }
+        let cp = store.snapshot(
+            opts.session_id,
+            "pre-transform",
+            &project.root,
+            opts.snapshot_root,
+        )?;
+        if let Err((path, e)) = Self::apply(set, project) {
+            let rolled_back = store.restore(cp.id, &project.root).is_ok();
+            return Err(MigrationError::ApplyFailed {
+                path,
+                cause: e.to_string(),
+                rolled_back,
+            });
+        }
+        Ok(Some(cp.id))
+    }
+
     /// Run Transform (+ Apply unless `dry_run`). On apply, a checkpoint is
     /// taken first; if any write or move fails the project is restored from it.
     pub fn run(
@@ -972,25 +1002,11 @@ impl MigrationEngine {
         opts: &RunOptions<'_>,
     ) -> Result<MigrationReport, MigrationError> {
         let set = self.compute_edits(plan, project)?;
-
-        let mut checkpoint_id = None;
-        if !opts.dry_run && (!set.edits.is_empty() || !set.moves.is_empty()) {
-            let cp = store.snapshot(
-                opts.session_id,
-                "pre-transform",
-                &project.root,
-                opts.snapshot_root,
-            )?;
-            checkpoint_id = Some(cp.id);
-            if let Err((path, e)) = Self::apply(&set, project) {
-                let rolled_back = store.restore(cp.id, &project.root).is_ok();
-                return Err(MigrationError::ApplyFailed {
-                    path,
-                    cause: e.to_string(),
-                    rolled_back,
-                });
-            }
-        }
+        let checkpoint_id = if opts.dry_run {
+            None
+        } else {
+            self.apply_edit_set(&set, project, store, opts)?
+        };
 
         Ok(MigrationReport {
             request: plan.request.clone(),

@@ -28,5 +28,8 @@ Import a Forge/Fabric mod project, detect version+loader+deps, produce an analys
 Missing for a useful real-world port: a real mapping dataset in the KB, and descriptor/build
 migration (Phase 6.B/6.C).
 
+**Phase 7 (2026-11-19):** AI agents done (`ummp ai-assist`, `ummp ai-debug`); see
+`docs/phase/phase-07-ai.md`.
+
 ## Detailed plans
 See `docs/phase/` per phase (created on execution).

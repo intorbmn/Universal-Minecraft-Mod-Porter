@@ -3,6 +3,7 @@
 //! Layered modular monolith: Domain → Application → Infrastructure.
 //! No GUI, AI provider, or Minecraft loader dependency.
 
+pub mod ai;
 pub mod analyzer;
 pub mod build_script;
 pub mod bytecode;
