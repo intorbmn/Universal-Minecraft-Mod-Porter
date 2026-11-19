@@ -5,6 +5,7 @@ use crate::metadata::{
     BuildSystem, BuildSystemKind, JavaVersion, Loader, MinecraftVersion, ModDependency, ModMetadata,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -53,38 +54,33 @@ impl AnalysisReport {
         let mut out = String::new();
         out.push_str("=== Analysis Report ===\n");
         if let Some(ref bs) = self.build_system {
-            out.push_str(&format!(
-                "Build system: {:?} ({})\n",
-                bs.kind,
-                bs.file.display()
-            ));
+            let _ = writeln!(out, "Build system: {:?} ({})", bs.kind, bs.file.display());
         }
         if !self.languages.is_empty() {
-            out.push_str(&format!("Languages: {}\n", self.languages.join(", ")));
+            let _ = writeln!(out, "Languages: {}", self.languages.join(", "));
         }
-        out.push_str(&format!("Mods: {}\n", self.mods.len()));
+        let _ = writeln!(out, "Mods: {}", self.mods.len());
         for m in &self.mods {
-            out.push_str(&format!(
-                "  - {} {} [{:?}] mc={:?} java={:?}\n",
+            let _ = writeln!(
+                out,
+                "  - {} {} [{:?}] mc={:?} java={:?}",
                 m.metadata.name,
                 m.metadata.version,
                 m.detected_loader,
                 m.metadata.minecraft,
                 m.detected_java
-            ));
+            );
         }
-        out.push_str(&format!(
-            "Dependency graph: {} nodes, {} edges\n",
+        let _ = writeln!(
+            out,
+            "Dependency graph: {} nodes, {} edges",
             self.dependency_graph.nodes.len(),
             self.dependency_graph.edges.len()
-        ));
+        );
         if !self.compatibility.issues.is_empty() {
             out.push_str("Compatibility issues:\n");
             for i in &self.compatibility.issues {
-                out.push_str(&format!(
-                    "  [{:?}] {}: {}\n",
-                    i.severity, i.mod_id, i.message
-                ));
+                let _ = writeln!(out, "  [{:?}] {}: {}", i.severity, i.mod_id, i.message);
             }
         }
         out
@@ -346,12 +342,11 @@ fn parse_jar_metadata(
             .map_err(|e: toml::de::Error| AnalyzerError::Parse(e.to_string()))?;
 
         // Get the entry: prefer [[mods]] first element, fall back to flat table
-        let first = if let Some(mods_arr) = v.get("mods").and_then(|v| v.as_array()) {
-            mods_arr.first()
-        } else {
-            // Flat format: modId/version/etc are at root level
-            Some(&v)
-        };
+        // Flat format (no [[mods]] array): modId/version/etc are at root level.
+        let first = v
+            .get("mods")
+            .and_then(|m| m.as_array())
+            .map_or(Some(&v), |mods_arr| mods_arr.first());
 
         if let Some(entry) = first {
             let mod_id = entry
