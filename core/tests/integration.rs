@@ -23,11 +23,18 @@ fn make_session() -> MigrationSession {
     )
 }
 
+/// Phase 3 acceptance: import a project, create a session, checkpoint,
+/// simulate a failing step that corrupts files, roll back, resume.
 #[test]
 fn test_full_pipeline_import_session_checkpoint_resume() {
     let dir = tempfile::tempdir().unwrap();
-    let _pm = DefaultProjectManager;
-    let _project = _pm.open(dir.path()).unwrap();
+    let snaps = tempfile::tempdir().unwrap();
+    let src = dir.path().join("src/main/java/Example.java");
+    std::fs::create_dir_all(src.parent().unwrap()).unwrap();
+    std::fs::write(&src, "class Example {}").unwrap();
+
+    let pm = DefaultProjectManager;
+    let project = pm.open(dir.path()).unwrap();
 
     let mut session = make_session();
     assert_eq!(session.state, SessionState::Pending);
@@ -36,25 +43,43 @@ fn test_full_pipeline_import_session_checkpoint_resume() {
     assert_eq!(session.state, SessionState::Running);
     assert_eq!(session.current_step, Some("import".into()));
 
-    let checkpoint = Checkpoint {
-        id: Uuid::new_v4(),
-        session_id: session.id,
-        step: "import".into(),
-        snapshot_path: dir.path().join("snap_import"),
-        created_at: chrono::Utc::now(),
-    };
     let mut store = CheckpointStore::new();
-    store.add(checkpoint);
+    let cp = store
+        .snapshot(session.id, "import", &project.root, snaps.path())
+        .unwrap();
     assert_eq!(store.latest().unwrap().step, "import");
 
+    // A failing transform step corrupts a file and leaves a stray one behind.
+    session.start("transform");
+    std::fs::write(&src, "class Example { BROKEN").unwrap();
+    std::fs::write(dir.path().join("half-written.tmp"), "x").unwrap();
     session.fail();
     assert_eq!(session.state, SessionState::Failed);
 
+    store.restore(cp.id, &project.root).unwrap();
+    assert_eq!(std::fs::read_to_string(&src).unwrap(), "class Example {}");
+    assert!(!dir.path().join("half-written.tmp").exists());
+
+    // Resume.
     session.start("transform");
     assert_eq!(session.state, SessionState::Running);
-
     session.succeed();
     assert_eq!(session.state, SessionState::Completed);
+}
+
+#[test]
+fn test_checkpoint_metadata_roundtrip() {
+    let cp = Checkpoint {
+        id: Uuid::new_v4(),
+        session_id: Uuid::new_v4(),
+        step: "import".into(),
+        snapshot_path: std::path::PathBuf::from("snap_import"),
+        created_at: chrono::Utc::now(),
+    };
+    let json = serde_json::to_string(&cp).unwrap();
+    let back: Checkpoint = serde_json::from_str(&json).unwrap();
+    assert_eq!(back.id, cp.id);
+    assert_eq!(back.step, "import");
 }
 
 #[test]

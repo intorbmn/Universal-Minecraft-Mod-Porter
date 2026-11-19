@@ -51,12 +51,32 @@ impl FileSystem for LocalFileSystem {
     }
 }
 
-/// Reject paths that escape the project root.
+/// Canonicalize a project root (resolves symlinks and `..`).
 pub fn validate_root(path: &Path) -> Result<PathBuf, FsError> {
     let canon = path
         .canonicalize()
         .map_err(|e| FsError::NotFound(e.to_string()))?;
     Ok(canon)
+}
+
+/// Join a relative path onto `root`, rejecting anything that could escape it.
+///
+/// Absolute paths, drive prefixes and `..` components are refused. This is a
+/// pure path check: it does not touch the disk, so it also works for files
+/// that do not exist yet.
+pub fn resolve_within(root: &Path, rel: &Path) -> Result<PathBuf, FsError> {
+    use std::path::Component;
+    let mut out = root.to_path_buf();
+    for comp in rel.components() {
+        match comp {
+            Component::Normal(part) => out.push(part),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(FsError::PathEscape(rel.display().to_string()));
+            }
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -82,6 +102,27 @@ mod tests {
         fs.write(&dir.path().join("b.txt"), b"b").unwrap();
         let entries = fs.list(dir.path()).unwrap();
         assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn test_resolve_within_rejects_escape() {
+        let root = Path::new("/proj");
+        assert_eq!(
+            resolve_within(root, Path::new("src/./A.java")).unwrap(),
+            PathBuf::from("/proj/src/A.java")
+        );
+        assert!(matches!(
+            resolve_within(root, Path::new("../etc/passwd")),
+            Err(FsError::PathEscape(_))
+        ));
+        assert!(matches!(
+            resolve_within(root, Path::new("src/../../x")),
+            Err(FsError::PathEscape(_))
+        ));
+        assert!(matches!(
+            resolve_within(root, Path::new("/etc/passwd")),
+            Err(FsError::PathEscape(_))
+        ));
     }
 
     #[test]

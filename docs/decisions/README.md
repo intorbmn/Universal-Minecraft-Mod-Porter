@@ -1,0 +1,18 @@
+# Architecture Decision Records
+
+One file per significant decision, numbered in order. A decision is never edited
+after it is `Accepted`; a later ADR supersedes it instead.
+
+Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
+**Consequences**, **Alternatives rejected**.
+
+| ADR | Title | Status |
+|---|---|---|
+| [0001](0001-rust-primary-language.md) | Rust as the primary language | Accepted |
+| [0002](0002-modular-monolith.md) | Modular monolith with layered dependencies | Accepted |
+| [0003](0003-sqlite-knowledge-store.md) | SQLite for structured knowledge and job state | Accepted |
+| [0004](0004-tauri-desktop-ui.md) | Tauri for the desktop UI | Accepted (deferred to Phase 11) |
+| [0005](0005-ai-write-gate.md) | AI never writes to a project directly | Accepted |
+| [0006](0006-filesystem-snapshot-checkpoints.md) | File-copy snapshots for checkpoint/rollback | Accepted |
+| [0007](0007-token-level-source-transform.md) | Token-aware text rewriting for the first source transformer | Accepted (after-dot rule superseded by 0008) |
+| [0008](0008-rename-after-package-path.md) | Rename simple names after a package path | Accepted |

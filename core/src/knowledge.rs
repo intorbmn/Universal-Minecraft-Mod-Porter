@@ -27,7 +27,7 @@ pub struct Mapping {
 }
 
 /// Version/loader compatibility matrix entry.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Compatibility {
     pub minecraft_version: String,
     pub loader: String,
@@ -37,7 +37,7 @@ pub struct Compatibility {
 }
 
 /// Known breaking change entry.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BreakingChange {
     pub version: String,
     pub change: String,
@@ -47,7 +47,7 @@ pub struct BreakingChange {
 }
 
 /// Reusable migration recipe.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Recipe {
     pub recipe_id: String,
     pub version: String,
@@ -61,7 +61,7 @@ pub struct Recipe {
 }
 
 /// Mod dependency metadata.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModDependency {
     pub mod_id: String,
     pub name: Option<String>,
@@ -163,9 +163,9 @@ impl KnowledgeBase {
 
     /// Check whether migration to `target_version` has been applied.
     pub fn is_version_applied(&self, target_version: i32) -> Result<bool, DbError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT version FROM schema_version WHERE version = ?1",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT version FROM schema_version WHERE version = ?1")?;
         let row = stmt.query_row(params![target_version], |row| row.get::<_, i32>(0));
         Ok(row.is_ok())
     }
@@ -205,19 +205,20 @@ impl KnowledgeBase {
 
     pub fn mappings_by_loader(&self, loader: &str) -> Result<Vec<Mapping>, DbError> {
         let mut stmt = self.conn.prepare("SELECT version, loader, from_api, to_api, kind, source, confidence FROM mappings WHERE loader = ?1")?;
-        let rows: Vec<Mapping> = stmt.query_map(params![loader], |row| {
-            Ok(Mapping {
-                version: row.get(0)?,
-                loader: row.get(1)?,
-                from_api: row.get(2)?,
-                to_api: row.get(3)?,
-                kind: row.get(4)?,
-                source: row.get(5)?,
-                confidence: row.get(6)?,
-            })
-        })?
-        .filter_map(Result::ok)
-        .collect();
+        let rows: Vec<Mapping> = stmt
+            .query_map(params![loader], |row| {
+                Ok(Mapping {
+                    version: row.get(0)?,
+                    loader: row.get(1)?,
+                    from_api: row.get(2)?,
+                    to_api: row.get(3)?,
+                    kind: row.get(4)?,
+                    source: row.get(5)?,
+                    confidence: row.get(6)?,
+                })
+            })?
+            .filter_map(Result::ok)
+            .collect();
         Ok(rows)
     }
 
@@ -268,7 +269,10 @@ impl KnowledgeBase {
         Ok(())
     }
 
-    pub fn breaking_changes_by_version(&self, version: &str) -> Result<Vec<BreakingChange>, DbError> {
+    pub fn breaking_changes_by_version(
+        &self,
+        version: &str,
+    ) -> Result<Vec<BreakingChange>, DbError> {
         let mut stmt = self.conn.prepare(
             "SELECT version, change, severity, workaround, source FROM breaking_changes WHERE version = ?1",
         )?;
@@ -300,7 +304,7 @@ impl KnowledgeBase {
                 r.description,
                 serde_json::to_string(&r.steps).unwrap_or_else(|_| "[]".to_string()),
                 r.source,
-                if r.tested { 1 } else { 0 },
+                i32::from(r.tested),
                 r.recipe_version,
                 r.parent_recipe_id,
             ],
@@ -313,24 +317,24 @@ impl KnowledgeBase {
             "SELECT recipe_id, version, loader, description, steps_json, source, tested, recipe_version, parent_recipe_id FROM recipes WHERE recipe_id = ?1",
         )?;
         let opt = match stmt.query_row(params![recipe_id], |row| {
-                let tested: i64 = row.get(6)?;
-                let rver: i64 = row.get(7)?;
-                Ok(Recipe {
-                    recipe_id: row.get(0)?,
-                    version: row.get(1)?,
-                    loader: row.get(2).ok(),
-                    description: row.get(3)?,
-                    steps: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
-                    source: row.get(5)?,
-                    tested: tested != 0,
-                    recipe_version: rver as u32,
-                    parent_recipe_id: row.get(8).ok(),
-                })
-            }) {
-                Ok(r) => Some(r),
-                Err(rusqlite::Error::QueryReturnedNoRows) => None,
-                Err(e) => return Err(e.into()),
-            };
+            let tested: i64 = row.get(6)?;
+            let rver: u32 = row.get(7)?;
+            Ok(Recipe {
+                recipe_id: row.get(0)?,
+                version: row.get(1)?,
+                loader: row.get(2).ok(),
+                description: row.get(3)?,
+                steps: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
+                source: row.get(5)?,
+                tested: tested != 0,
+                recipe_version: rver,
+                parent_recipe_id: row.get(8).ok(),
+            })
+        }) {
+            Ok(r) => Some(r),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(e.into()),
+        };
         Ok(opt)
     }
 
@@ -341,7 +345,7 @@ impl KnowledgeBase {
         let rows: Vec<Recipe> = stmt
             .query_map(params![loader], |row| {
                 let tested: i64 = row.get(6)?;
-                let rver: i64 = row.get(7)?;
+                let rver: u32 = row.get(7)?;
                 Ok(Recipe {
                     recipe_id: row.get(0)?,
                     version: row.get(1)?,
@@ -350,7 +354,7 @@ impl KnowledgeBase {
                     steps: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
                     source: row.get(5)?,
                     tested: tested != 0,
-                    recipe_version: rver as u32,
+                    recipe_version: rver,
                     parent_recipe_id: row.get(8).ok(),
                 })
             })?
@@ -360,14 +364,24 @@ impl KnowledgeBase {
     }
 
     pub fn delete_recipe(&self, recipe_id: &str) -> Result<bool, DbError> {
-        let n = self.conn.execute("DELETE FROM recipes WHERE recipe_id = ?1", params![recipe_id])?;
+        let n = self.conn.execute(
+            "DELETE FROM recipes WHERE recipe_id = ?1",
+            params![recipe_id],
+        )?;
         Ok(n > 0)
     }
 
     /// Create a new version of an existing recipe (task 5.5 versioning).
     /// Copies steps from parent, increments recipe_version, links parent_recipe_id.
-    pub fn version_recipe(&self, parent_id: &str, new_id: &str, new_description: &str) -> Result<Recipe, DbError> {
-        let parent = self.recipe(parent_id)?.ok_or_else(|| DbError::Deserialize("parent recipe not found".into()))?;
+    pub fn version_recipe(
+        &self,
+        parent_id: &str,
+        new_id: &str,
+        new_description: &str,
+    ) -> Result<Recipe, DbError> {
+        let parent = self
+            .recipe(parent_id)?
+            .ok_or_else(|| DbError::Deserialize("parent recipe not found".into()))?;
         let mut new_recipe = parent.clone();
         new_recipe.recipe_id = new_id.to_string();
         new_recipe.description = new_description.to_string();
@@ -419,7 +433,11 @@ impl KnowledgeBase {
     }
 
     /// Dependency compatibility: check if a mod's declared dependencies are satisfied by available mods.
-    pub fn check_dependency_compatibility(&self, mod_id: &str, available_mods: &[String]) -> Result<Vec<String>, DbError> {
+    pub fn check_dependency_compatibility(
+        &self,
+        mod_id: &str,
+        available_mods: &[String],
+    ) -> Result<Vec<String>, DbError> {
         let deps = self.dependencies_by_mod_id(mod_id)?;
         let mut missing = Vec::new();
         for dep in deps {
@@ -491,7 +509,9 @@ impl KnowledgeBase {
     }
 
     pub fn export_breaking_changes_to_file(&self, path: &Path) -> Result<(), DbError> {
-        let mut stmt = self.conn.prepare("SELECT version, change, severity, workaround, source FROM breaking_changes")?;
+        let mut stmt = self.conn.prepare(
+            "SELECT version, change, severity, workaround, source FROM breaking_changes",
+        )?;
         let rows: Vec<BreakingChange> = stmt
             .query_map(params![], |row| {
                 Ok(BreakingChange {
@@ -544,7 +564,7 @@ impl KnowledgeBase {
     // --- KNOWLEDGE SEARCH (5.6) ---
 
     pub fn search_mappings(&self, pattern: &str) -> Result<Vec<Mapping>, DbError> {
-        let like = format!("%{}%", pattern);
+        let like = format!("%{pattern}%");
         let mut stmt = self.conn.prepare(
             "SELECT version, loader, from_api, to_api, kind, source, confidence FROM mappings
              WHERE from_api LIKE ?1 OR to_api LIKE ?1 OR kind LIKE ?1",
@@ -567,7 +587,7 @@ impl KnowledgeBase {
     }
 
     pub fn search_recipes(&self, pattern: &str) -> Result<Vec<Recipe>, DbError> {
-        let like = format!("%{}%", pattern);
+        let like = format!("%{pattern}%");
         let mut stmt = self.conn.prepare(
             "SELECT recipe_id, version, loader, description, steps_json, source, tested, recipe_version, parent_recipe_id FROM recipes
              WHERE description LIKE ?1 OR source LIKE ?1",
@@ -575,7 +595,7 @@ impl KnowledgeBase {
         let rows: Vec<Recipe> = stmt
             .query_map(params![like], |row| {
                 let tested: i64 = row.get(6)?;
-                let rver: i64 = row.get(7)?;
+                let rver: u32 = row.get(7)?;
                 Ok(Recipe {
                     recipe_id: row.get(0)?,
                     version: row.get(1)?,
@@ -584,7 +604,7 @@ impl KnowledgeBase {
                     steps: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
                     source: row.get(5)?,
                     tested: tested != 0,
-                    recipe_version: rver as u32,
+                    recipe_version: rver,
                     parent_recipe_id: row.get(8).ok(),
                 })
             })?
@@ -594,7 +614,7 @@ impl KnowledgeBase {
     }
 
     pub fn search_breaking_changes(&self, pattern: &str) -> Result<Vec<BreakingChange>, DbError> {
-        let like = format!("%{}%", pattern);
+        let like = format!("%{pattern}%");
         let mut stmt = self.conn.prepare(
             "SELECT version, change, severity, workaround, source FROM breaking_changes
              WHERE change LIKE ?1",
@@ -615,7 +635,7 @@ impl KnowledgeBase {
     }
 
     pub fn search_dependencies(&self, pattern: &str) -> Result<Vec<ModDependency>, DbError> {
-        let like = format!("%{}%", pattern);
+        let like = format!("%{pattern}%");
         let mut stmt = self.conn.prepare(
             "SELECT mod_id, name, version, loader, url, checksum, source FROM dependencies
              WHERE mod_id LIKE ?1 OR name LIKE ?1 OR source LIKE ?1",
@@ -655,36 +675,152 @@ pub fn seed_data() -> Vec<(i32, String)> {
 pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
     // Mappings
     for m in [
-        Mapping { version: "1.20.1".into(), loader: "fabric".into(), from_api: "Block".into(), to_api: "Blocks".into(), kind: "rename".into(), source: "fabric-api".into(), confidence: 0.95 },
-        Mapping { version: "1.21".into(), loader: "fabric".into(), from_api: "Block".into(), to_api: "Blocks".into(), kind: "rename".into(), source: "fabric-api".into(), confidence: 0.95 },
-        Mapping { version: "1.20.1".into(), loader: "forge".into(), from_api: "net.minecraft.block.Block".into(), to_api: "net.minecraft.world.level.block.Block".into(), kind: "move".into(), source: "forge".into(), confidence: 0.9 },
-        Mapping { version: "1.21".into(), loader: "neoforge".into(), from_api: "Block".into(), to_api: "Blocks".into(), kind: "rename".into(), source: "neoforge".into(), confidence: 0.9 },
+        Mapping {
+            version: "1.20.1".into(),
+            loader: "fabric".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
+            kind: "rename".into(),
+            source: "fabric-api".into(),
+            confidence: 0.95,
+        },
+        Mapping {
+            version: "1.21".into(),
+            loader: "fabric".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
+            kind: "rename".into(),
+            source: "fabric-api".into(),
+            confidence: 0.95,
+        },
+        Mapping {
+            version: "1.20.1".into(),
+            loader: "forge".into(),
+            from_api: "net.minecraft.block.Block".into(),
+            to_api: "net.minecraft.world.level.block.Block".into(),
+            kind: "move".into(),
+            source: "forge".into(),
+            confidence: 0.9,
+        },
+        Mapping {
+            version: "1.21".into(),
+            loader: "neoforge".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
+            kind: "rename".into(),
+            source: "neoforge".into(),
+            confidence: 0.9,
+        },
     ] {
         kb.insert_mapping(&m)?;
     }
 
     // Compatibility matrix
     for c in [
-        Compatibility { minecraft_version: "1.12.2".into(), loader: "forge".into(), loader_version: "14.23.5".into(), status: "stable".into(), notes: Some("Legacy Forge".into()) },
-        Compatibility { minecraft_version: "1.16.5".into(), loader: "forge".into(), loader_version: "36.2".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.18.2".into(), loader: "forge".into(), loader_version: "40.2".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.20.1".into(), loader: "forge".into(), loader_version: "47.2".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.21".into(), loader: "neoforge".into(), loader_version: "21.0".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.12.2".into(), loader: "fabric".into(), loader_version: "0.14".into(), status: "stable".into(), notes: Some("Legacy Fabric".into()) },
-        Compatibility { minecraft_version: "1.16.5".into(), loader: "fabric".into(), loader_version: "0.33".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.18.2".into(), loader: "fabric".into(), loader_version: "0.56".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.20.1".into(), loader: "fabric".into(), loader_version: "0.88".into(), status: "stable".into(), notes: None },
-        Compatibility { minecraft_version: "1.21".into(), loader: "fabric".into(), loader_version: "0.100".into(), status: "stable".into(), notes: None },
+        Compatibility {
+            minecraft_version: "1.12.2".into(),
+            loader: "forge".into(),
+            loader_version: "14.23.5".into(),
+            status: "stable".into(),
+            notes: Some("Legacy Forge".into()),
+        },
+        Compatibility {
+            minecraft_version: "1.16.5".into(),
+            loader: "forge".into(),
+            loader_version: "36.2".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.18.2".into(),
+            loader: "forge".into(),
+            loader_version: "40.2".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.20.1".into(),
+            loader: "forge".into(),
+            loader_version: "47.2".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.21".into(),
+            loader: "neoforge".into(),
+            loader_version: "21.0".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.12.2".into(),
+            loader: "fabric".into(),
+            loader_version: "0.14".into(),
+            status: "stable".into(),
+            notes: Some("Legacy Fabric".into()),
+        },
+        Compatibility {
+            minecraft_version: "1.16.5".into(),
+            loader: "fabric".into(),
+            loader_version: "0.33".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.18.2".into(),
+            loader: "fabric".into(),
+            loader_version: "0.56".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.20.1".into(),
+            loader: "fabric".into(),
+            loader_version: "0.88".into(),
+            status: "stable".into(),
+            notes: None,
+        },
+        Compatibility {
+            minecraft_version: "1.21".into(),
+            loader: "fabric".into(),
+            loader_version: "0.100".into(),
+            status: "stable".into(),
+            notes: None,
+        },
     ] {
         kb.insert_compatibility(&c)?;
     }
 
     // Breaking changes
     for b in [
-        BreakingChange { version: "1.17".into(), change: "Flattening: block/item IDs changed".into(), severity: "high".into(), workaround: Some("Use DataFixerUpper".into()), source: "mojang".into() },
-        BreakingChange { version: "1.18".into(), change: "World height/build limit changed".into(), severity: "high".into(), workaround: Some("Update chunk handling".into()), source: "mojang".into() },
-        BreakingChange { version: "1.20.1".into(), change: "Block -> Blocks rename (Fabric)".into(), severity: "medium".into(), workaround: Some("Search/replace Block with Blocks".into()), source: "fabric-api".into() },
-        BreakingChange { version: "1.20.5".into(), change: "Data components replace NBT for items".into(), severity: "high".into(), workaround: Some("Migrate to DataComponent API".into()), source: "mojang".into() },
+        BreakingChange {
+            version: "1.17".into(),
+            change: "Flattening: block/item IDs changed".into(),
+            severity: "high".into(),
+            workaround: Some("Use DataFixerUpper".into()),
+            source: "mojang".into(),
+        },
+        BreakingChange {
+            version: "1.18".into(),
+            change: "World height/build limit changed".into(),
+            severity: "high".into(),
+            workaround: Some("Update chunk handling".into()),
+            source: "mojang".into(),
+        },
+        BreakingChange {
+            version: "1.20.1".into(),
+            change: "DemoWidget -> DemoGadget rename (illustrative sample)".into(),
+            severity: "medium".into(),
+            workaround: Some("Rename DemoWidget to DemoGadget".into()),
+            source: "fabric-api".into(),
+        },
+        BreakingChange {
+            version: "1.20.5".into(),
+            change: "Data components replace NBT for items".into(),
+            severity: "high".into(),
+            workaround: Some("Migrate to DataComponent API".into()),
+            source: "mojang".into(),
+        },
     ] {
         kb.insert_breaking_change(&b)?;
     }
@@ -695,8 +831,11 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
             recipe_id: "fabric-block-rename".into(),
             version: "1.20.1+".into(),
             loader: Some("fabric".into()),
-            description: "Rename Block class to Blocks in Fabric mods".into(),
-            steps: vec![Value::String("search: Block".into()), Value::String("replace: Blocks".into())],
+            description: "Rename DemoWidget to DemoGadget (illustrative sample)".into(),
+            steps: vec![
+                Value::String("search: Block".into()),
+                Value::String("replace: DemoGadget".into()),
+            ],
             source: "fabric-api".into(),
             tested: true,
             recipe_version: 1,
@@ -707,7 +846,10 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
             version: "1.17+".into(),
             loader: Some("forge".into()),
             description: "Update Block import path for Forge 1.17+".into(),
-            steps: vec![Value::String("import: net.minecraft.block.Block".into()), Value::String("import: net.minecraft.world.level.block.Block".into())],
+            steps: vec![
+                Value::String("import: net.minecraft.block.Block".into()),
+                Value::String("import: net.minecraft.world.level.block.Block".into()),
+            ],
             source: "forge".into(),
             tested: true,
             recipe_version: 1,
@@ -718,7 +860,11 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
             version: "1.20.5+".into(),
             loader: None,
             description: "Migrate item NBT to data components".into(),
-            steps: vec![Value::String("parse NBT".into()), Value::String("convert to DataComponent".into()), Value::String("write component".into())],
+            steps: vec![
+                Value::String("parse NBT".into()),
+                Value::String("convert to DataComponent".into()),
+                Value::String("write component".into()),
+            ],
             source: "mojang".into(),
             tested: false,
             recipe_version: 1,
@@ -730,8 +876,24 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
 
     // Dependencies
     for d in [
-        ModDependency { mod_id: "fabric-api".into(), name: Some("Fabric API".into()), version: "0.88.0".into(), loader: Some("fabric".into()), url: Some("https://modrinth.com/mod/fabric-api".into()), checksum: None, source: "modrinth".into() },
-        ModDependency { mod_id: "cloth-config".into(), name: Some("Cloth Config".into()), version: "10.0".into(), loader: Some("fabric".into()), url: Some("https://modrinth.com/mod/cloth-config".into()), checksum: None, source: "modrinth".into() },
+        ModDependency {
+            mod_id: "fabric-api".into(),
+            name: Some("Fabric API".into()),
+            version: "0.88.0".into(),
+            loader: Some("fabric".into()),
+            url: Some("https://modrinth.com/mod/fabric-api".into()),
+            checksum: None,
+            source: "modrinth".into(),
+        },
+        ModDependency {
+            mod_id: "cloth-config".into(),
+            name: Some("Cloth Config".into()),
+            version: "10.0".into(),
+            loader: Some("fabric".into()),
+            url: Some("https://modrinth.com/mod/cloth-config".into()),
+            checksum: None,
+            source: "modrinth".into(),
+        },
     ] {
         kb.insert_dependency(&d)?;
     }
@@ -745,23 +907,41 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn setup_kb() -> KnowledgeBase {
+    /// Returns the `TempDir` guard together with the KB: dropping the guard
+    /// deletes the directory, which makes SQLite fail with READONLY_DBMOVED.
+    fn setup_kb() -> (tempfile::TempDir, KnowledgeBase) {
         let dir = tempdir().unwrap();
-        KnowledgeBase::open(&dir.path().join("test.db")).unwrap()
+        let kb = KnowledgeBase::open(&dir.path().join("test.db")).unwrap();
+        (dir, kb)
     }
 
     #[test]
     fn test_schema_and_open() {
-        let kb = setup_kb();
+        let (_kb_dir, kb) = setup_kb();
         // tables exist
-        let count: i64 = kb.conn.query_row("SELECT count(*) FROM sqlite_master WHERE type='table'", [], |r| r.get(0)).unwrap();
+        let count: i64 = kb
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert!(count >= 6); // schema_version + 5 data tables
     }
 
     #[test]
     fn test_mapping_crud() {
-        let kb = setup_kb();
-        let m = Mapping { version: "1.20.1".into(), loader: "fabric".into(), from_api: "Test".into(), to_api: "Test2".into(), kind: "rename".into(), source: "test".into(), confidence: 0.8 };
+        let (_kb_dir, kb) = setup_kb();
+        let m = Mapping {
+            version: "1.20.1".into(),
+            loader: "fabric".into(),
+            from_api: "Test".into(),
+            to_api: "Test2".into(),
+            kind: "rename".into(),
+            source: "test".into(),
+            confidence: 0.8,
+        };
         kb.insert_mapping(&m).unwrap();
         let res = kb.mappings_by_loader("fabric").unwrap();
         assert_eq!(res.len(), 1);
@@ -770,8 +950,14 @@ mod tests {
 
     #[test]
     fn test_compatibility_crud() {
-        let kb = setup_kb();
-        let c = Compatibility { minecraft_version: "1.20.1".into(), loader: "fabric".into(), loader_version: "0.88".into(), status: "stable".into(), notes: None };
+        let (_kb_dir, kb) = setup_kb();
+        let c = Compatibility {
+            minecraft_version: "1.20.1".into(),
+            loader: "fabric".into(),
+            loader_version: "0.88".into(),
+            status: "stable".into(),
+            notes: None,
+        };
         kb.insert_compatibility(&c).unwrap();
         let res = kb.compatibilities_by_loader("fabric").unwrap();
         assert_eq!(res.len(), 1);
@@ -779,8 +965,14 @@ mod tests {
 
     #[test]
     fn test_breaking_change_crud() {
-        let kb = setup_kb();
-        let b = BreakingChange { version: "1.21".into(), change: "Test change".into(), severity: "low".into(), workaround: Some("none".into()), source: "test".into() };
+        let (_kb_dir, kb) = setup_kb();
+        let b = BreakingChange {
+            version: "1.21".into(),
+            change: "Test change".into(),
+            severity: "low".into(),
+            workaround: Some("none".into()),
+            source: "test".into(),
+        };
         kb.insert_breaking_change(&b).unwrap();
         let res = kb.breaking_changes_by_version("1.21").unwrap();
         assert_eq!(res.len(), 1);
@@ -788,7 +980,7 @@ mod tests {
 
     #[test]
     fn test_recipe_crud_and_versioning() {
-        let kb = setup_kb();
+        let (_kb_dir, kb) = setup_kb();
         let r = Recipe {
             recipe_id: "test-recipe".into(),
             version: "1.20.1".into(),
@@ -806,7 +998,9 @@ mod tests {
         assert_eq!(fetched.recipe_version, 1);
 
         // versioning
-        let v2 = kb.version_recipe("test-recipe", "test-recipe-v2", "Test v2").unwrap();
+        let v2 = kb
+            .version_recipe("test-recipe", "test-recipe-v2", "Test v2")
+            .unwrap();
         assert_eq!(v2.recipe_version, 2);
         assert_eq!(v2.parent_recipe_id, Some("test-recipe".into()));
 
@@ -817,28 +1011,46 @@ mod tests {
 
     #[test]
     fn test_dependency_crud_and_compat() {
-        let kb = setup_kb();
-        let d = ModDependency { mod_id: "test-mod".into(), name: Some("Test Mod".into()), version: "1.0".into(), loader: Some("fabric".into()), url: None, checksum: None, source: "test".into() };
+        let (_kb_dir, kb) = setup_kb();
+        let d = ModDependency {
+            mod_id: "test-mod".into(),
+            name: Some("Test Mod".into()),
+            version: "1.0".into(),
+            loader: Some("fabric".into()),
+            url: None,
+            checksum: None,
+            source: "test".into(),
+        };
         kb.insert_dependency(&d).unwrap();
         let res = kb.dependencies_by_mod_id("test-mod").unwrap();
         assert_eq!(res.len(), 1);
 
-        let missing = kb.check_dependency_compatibility("test-mod", &["other-mod".into()]).unwrap();
+        let missing = kb
+            .check_dependency_compatibility("test-mod", &["other-mod".into()])
+            .unwrap();
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0], "test-mod");
     }
 
     #[test]
     fn test_import_export() {
-        let kb = setup_kb();
+        let (_kb_dir, kb) = setup_kb();
         let dir = tempdir().unwrap();
         let path = dir.path().join("mappings.json");
 
-        let m = Mapping { version: "1.20.1".into(), loader: "fabric".into(), from_api: "A".into(), to_api: "B".into(), kind: "rename".into(), source: "test".into(), confidence: 0.9 };
+        let m = Mapping {
+            version: "1.20.1".into(),
+            loader: "fabric".into(),
+            from_api: "A".into(),
+            to_api: "B".into(),
+            kind: "rename".into(),
+            source: "test".into(),
+            confidence: 0.9,
+        };
         kb.insert_mapping(&m).unwrap();
 
         kb.export_mappings_to_file(&path).unwrap();
-        let kb2 = setup_kb();
+        let (_kb2_dir, kb2) = setup_kb();
         kb2.import_mappings_from_file(&path).unwrap();
         let imported = kb2.mappings_by_loader("fabric").unwrap();
         assert_eq!(imported.len(), 1);
@@ -847,34 +1059,46 @@ mod tests {
 
     #[test]
     fn test_search() {
-        let kb = setup_kb();
-        let m = Mapping { version: "1.20.1".into(), loader: "fabric".into(), from_api: "Block".into(), to_api: "Blocks".into(), kind: "rename".into(), source: "test".into(), confidence: 0.9 };
+        let (_kb_dir, kb) = setup_kb();
+        let m = Mapping {
+            version: "1.20.1".into(),
+            loader: "fabric".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
+            kind: "rename".into(),
+            source: "test".into(),
+            confidence: 0.9,
+        };
         kb.insert_mapping(&m).unwrap();
-        let res = kb.search_mappings("Block").unwrap();
+        let res = kb.search_mappings("DemoWidget").unwrap();
         assert_eq!(res.len(), 1);
     }
 
     #[test]
     fn test_seed_knowledge() {
-        let kb = setup_kb();
+        let (_kb_dir, kb) = setup_kb();
         seed_knowledge(&kb).unwrap();
         let mappings = kb.mappings_by_loader("fabric").unwrap();
-        assert!(!mappings.is_empty());
+        assert_ne!(mappings.len(), 0, "seed produced no mappings");
         let compat = kb.compatibilities_by_loader("fabric").unwrap();
-        assert!(!compat.is_empty());
+        assert_ne!(compat.len(), 0, "seed produced no compat");
         let breaks = kb.breaking_changes_by_version("1.17").unwrap();
-        assert!(!breaks.is_empty());
+        assert_ne!(breaks.len(), 0, "seed produced no breaks");
         let recipes = kb.recipes_by_loader("fabric").unwrap();
-        assert!(!recipes.is_empty());
+        assert_ne!(recipes.len(), 0, "seed produced no recipes");
         let deps = kb.dependencies_by_mod_id("fabric-api").unwrap();
-        assert!(!deps.is_empty());
+        assert_ne!(deps.len(), 0, "seed produced no deps");
     }
 
     #[test]
     fn test_apply_migrations() {
-        let kb = setup_kb();
+        let (_kb_dir, kb) = setup_kb();
         let migrations = vec![
-            (2, "Add index", "CREATE INDEX IF NOT EXISTS idx_test ON mappings(version);"),
+            (
+                2,
+                "Add index",
+                "CREATE INDEX IF NOT EXISTS idx_test ON mappings(version);",
+            ),
             (3, "Add column", "ALTER TABLE recipes ADD COLUMN tags TEXT;"),
         ];
         let applied = kb.apply_migrations(&migrations).unwrap();

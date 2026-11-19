@@ -5,6 +5,7 @@ use crate::metadata::{
     BuildSystem, BuildSystemKind, JavaVersion, Loader, MinecraftVersion, ModDependency, ModMetadata,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -53,38 +54,33 @@ impl AnalysisReport {
         let mut out = String::new();
         out.push_str("=== Analysis Report ===\n");
         if let Some(ref bs) = self.build_system {
-            out.push_str(&format!(
-                "Build system: {:?} ({})\n",
-                bs.kind,
-                bs.file.display()
-            ));
+            let _ = writeln!(out, "Build system: {:?} ({})", bs.kind, bs.file.display());
         }
         if !self.languages.is_empty() {
-            out.push_str(&format!("Languages: {}\n", self.languages.join(", ")));
+            let _ = writeln!(out, "Languages: {}", self.languages.join(", "));
         }
-        out.push_str(&format!("Mods: {}\n", self.mods.len()));
+        let _ = writeln!(out, "Mods: {}", self.mods.len());
         for m in &self.mods {
-            out.push_str(&format!(
-                "  - {} {} [{:?}] mc={:?} java={:?}\n",
+            let _ = writeln!(
+                out,
+                "  - {} {} [{:?}] mc={:?} java={:?}",
                 m.metadata.name,
                 m.metadata.version,
                 m.detected_loader,
                 m.metadata.minecraft,
                 m.detected_java
-            ));
+            );
         }
-        out.push_str(&format!(
-            "Dependency graph: {} nodes, {} edges\n",
+        let _ = writeln!(
+            out,
+            "Dependency graph: {} nodes, {} edges",
             self.dependency_graph.nodes.len(),
             self.dependency_graph.edges.len()
-        ));
+        );
         if !self.compatibility.issues.is_empty() {
             out.push_str("Compatibility issues:\n");
             for i in &self.compatibility.issues {
-                out.push_str(&format!(
-                    "  [{:?}] {}: {}\n",
-                    i.severity, i.mod_id, i.message
-                ));
+                let _ = writeln!(out, "  [{:?}] {}: {}", i.severity, i.mod_id, i.message);
             }
         }
         out
@@ -246,36 +242,46 @@ fn find_jars(root: &Path, fs: &dyn FileSystem) -> Result<Vec<PathBuf>, AnalyzerE
     Ok(jars)
 }
 
+/// Metadata descriptors read from a mod JAR. Only these entries are ever
+/// decompressed: compiled classes and assets are binary and irrelevant.
+#[derive(Debug, Default)]
+struct JarMetadataFiles {
+    manifest: String,
+    mods_toml: String,
+    neoforge_mods_toml: String,
+    fabric_json: String,
+    quilt_json: String,
+    mcmod_info: String,
+}
+
+/// Cap per metadata entry, so a crafted archive cannot exhaust memory.
+const MAX_METADATA_BYTES: u64 = 1024 * 1024;
+
 fn inspect_jar(jar_path: &Path, fs: &dyn FileSystem) -> Result<ModAnalysis, AnalyzerError> {
     let bytes = fs.read(jar_path)?;
     let cursor = std::io::Cursor::new(bytes);
     let mut archive = ZipArchive::new(cursor)?;
 
-    let mut manifest = String::new();
-    let mut mods_toml = String::new();
-    let mut fabric_mod_json = String::new();
-    let mut mcmod_info = String::new();
-
+    let mut files = JarMetadataFiles::default();
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
+        let file = archive.by_index(i)?;
         // Normalize Windows backslashes to forward slashes (zip spec uses /)
-        let name = file.name().to_string().replace('\\', "/");
-        let mut content = String::new();
-        file.read_to_string(&mut content)?;
-
-        match name.as_str() {
-            "META-INF/MANIFEST.MF" => manifest = content,
-            "META-INF/mods.toml" => mods_toml = content,
-            "fabric.mod.json" => fabric_mod_json = content,
-            "mcmod.info" => mcmod_info = content,
-            _ => {}
-        }
+        let name = file.name().replace('\\', "/");
+        let slot = match name.as_str() {
+            "META-INF/MANIFEST.MF" => &mut files.manifest,
+            "META-INF/mods.toml" => &mut files.mods_toml,
+            "META-INF/neoforge.mods.toml" => &mut files.neoforge_mods_toml,
+            "fabric.mod.json" => &mut files.fabric_json,
+            "quilt.mod.json" => &mut files.quilt_json,
+            "mcmod.info" => &mut files.mcmod_info,
+            _ => continue,
+        };
+        file.take(MAX_METADATA_BYTES).read_to_string(slot)?;
     }
 
-    let (loader, metadata) =
-        parse_jar_metadata(&manifest, &mods_toml, &fabric_mod_json, &mcmod_info)?;
+    let (loader, metadata) = parse_jar_metadata(&files)?;
     let minecraft = detect_minecraft_version(&metadata);
-    let java = detect_java_version(&manifest);
+    let java = detect_java_version(&files.manifest);
 
     Ok(ModAnalysis {
         metadata,
@@ -287,12 +293,82 @@ fn inspect_jar(jar_path: &Path, fs: &dyn FileSystem) -> Result<ModAnalysis, Anal
     })
 }
 
-fn parse_jar_metadata(
-    manifest: &str,
-    mods_toml: &str,
-    fabric_json: &str,
-    mcmod_info: &str,
-) -> Result<(Loader, ModMetadata), AnalyzerError> {
+/// First dotted version inside a range expression:
+/// `>=1.20.1` -> `1.20.1`, `[1.21,1.21.1)` -> `1.21`, `~1.20` -> `1.20`.
+fn first_version(range: &str) -> Option<&str> {
+    let start = range.find(|c: char| c.is_ascii_digit())?;
+    let rest = &range[start..];
+    let end = rest
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(rest.len());
+    Some(rest[..end].trim_end_matches('.'))
+}
+
+fn parse_quilt_json(text: &str) -> Result<(Loader, ModMetadata), AnalyzerError> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| AnalyzerError::Parse(e.to_string()))?;
+    let ql = &v["quilt_loader"];
+    let mod_id = ql["id"].as_str().unwrap_or("unknown").to_string();
+    let version = ql["version"].as_str().unwrap_or("0.0.0").to_string();
+    let name = ql["metadata"]["name"]
+        .as_str()
+        .unwrap_or(&mod_id)
+        .to_string();
+
+    let mut minecraft = "1.20.1".to_string();
+    let mut dependencies = Vec::new();
+    for dep in ql["depends"].as_array().into_iter().flatten() {
+        // A dependency is either a bare id string or an object.
+        let (id, versions, optional) = match dep {
+            serde_json::Value::String(id) => (id.as_str(), "*", false),
+            obj => (
+                obj["id"].as_str().unwrap_or(""),
+                obj["versions"].as_str().unwrap_or("*"),
+                obj["optional"].as_bool().unwrap_or(false),
+            ),
+        };
+        if id == "minecraft" {
+            if let Some(mc) = first_version(versions) {
+                minecraft = mc.to_string();
+            }
+        } else if !id.is_empty() {
+            dependencies.push(ModDependency {
+                mod_id: id.to_string(),
+                version: versions.to_string(),
+                optional,
+            });
+        }
+    }
+    let (major, minor, patch) = parse_version(&minecraft);
+    Ok((
+        Loader::Quilt,
+        ModMetadata {
+            mod_id,
+            version,
+            name,
+            loader: Loader::Quilt,
+            minecraft: MinecraftVersion {
+                major,
+                minor,
+                patch,
+            },
+            java: None,
+            dependencies,
+        },
+    ))
+}
+
+fn parse_jar_metadata(files: &JarMetadataFiles) -> Result<(Loader, ModMetadata), AnalyzerError> {
+    let fabric_json = files.fabric_json.as_str();
+    let mcmod_info = files.mcmod_info.as_str();
+    let manifest = files.manifest.as_str();
+    // NeoForge 1.20.5+ uses neoforge.mods.toml; same schema as mods.toml.
+    let (mods_toml, default_loader) = if files.neoforge_mods_toml.is_empty() {
+        (files.mods_toml.as_str(), Loader::Forge)
+    } else {
+        (files.neoforge_mods_toml.as_str(), Loader::NeoForge)
+    };
+
     // Try Fabric first
     if !fabric_json.is_empty() {
         let v: serde_json::Value =
@@ -304,6 +380,7 @@ fn parse_jar_metadata(
 
         let minecraft = v["depends"]["minecraft"]
             .as_str()
+            .and_then(first_version)
             .unwrap_or("1.20.1")
             .to_string();
         let (major, minor, patch) = parse_version(&minecraft);
@@ -339,6 +416,10 @@ fn parse_jar_metadata(
         ));
     }
 
+    if !files.quilt_json.is_empty() {
+        return parse_quilt_json(&files.quilt_json);
+    }
+
     // Try Forge/NeoForge (mods.toml) — supports both flat and [[mods]] array formats
     if !mods_toml.is_empty() {
         let v: toml::Value = mods_toml
@@ -346,12 +427,11 @@ fn parse_jar_metadata(
             .map_err(|e: toml::de::Error| AnalyzerError::Parse(e.to_string()))?;
 
         // Get the entry: prefer [[mods]] first element, fall back to flat table
-        let first = if let Some(mods_arr) = v.get("mods").and_then(|v| v.as_array()) {
-            mods_arr.first()
-        } else {
-            // Flat format: modId/version/etc are at root level
-            Some(&v)
-        };
+        // Flat format (no [[mods]] array): modId/version/etc are at root level.
+        let first = v
+            .get("mods")
+            .and_then(|m| m.as_array())
+            .map_or(Some(&v), |mods_arr| mods_arr.first());
 
         if let Some(entry) = first {
             let mod_id = entry
@@ -369,32 +449,49 @@ fn parse_jar_metadata(
                 .and_then(|v| v.as_str())
                 .unwrap_or(&mod_id)
                 .to_string();
-            let loader_str = entry
-                .get("loader")
-                .and_then(|v| v.as_str())
-                .unwrap_or("FORGE");
-            let loader = match loader_str {
-                "NEOFORGE" => Loader::NeoForge,
-                "FORGE" => Loader::Forge,
-                _ => Loader::Unknown(loader_str.to_string()),
+            let loader = match entry.get("loader").and_then(|v| v.as_str()) {
+                Some("NEOFORGE") => Loader::NeoForge,
+                Some("FORGE") => Loader::Forge,
+                Some(other) => Loader::Unknown(other.to_string()),
+                None => default_loader,
             };
 
-            let minecraft_str = entry
+            // Real descriptors: `[[dependencies.<modId>]]` tables at the root.
+            // Older fixtures: a `dependencies` array on the entry itself.
+            let deps: &[toml::Value] = v
+                .get("dependencies")
+                .and_then(|d| d.get(&mod_id))
+                .or_else(|| entry.get("dependencies"))
+                .and_then(|d| d.as_array())
+                .map_or(&[], Vec::as_slice);
+
+            let mut minecraft_str = entry
                 .get("minecraft")
                 .and_then(|v| v.as_str())
-                .unwrap_or("1.20.1");
-            let (major, minor, patch) = parse_version(minecraft_str);
-
+                .unwrap_or("1.20.1")
+                .to_string();
             let mut dependencies = Vec::new();
-            if let Some(deps) = entry.get("dependencies").and_then(|v| v.as_array()) {
-                for dep in deps {
-                    dependencies.push(ModDependency {
-                        mod_id: dep["modId"].as_str().unwrap_or("").to_string(),
-                        version: dep["versionRange"].as_str().unwrap_or("*").to_string(),
-                        optional: dep["mandatory"].as_bool().unwrap_or(true) == false,
-                    });
+            for dep in deps {
+                let id = dep.get("modId").and_then(|v| v.as_str()).unwrap_or("");
+                let range = dep
+                    .get("versionRange")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("*");
+                if id == "minecraft" {
+                    if let Some(mc) = first_version(range) {
+                        minecraft_str = mc.to_string();
+                    }
+                    continue;
                 }
+                let optional = dep.get("mandatory").and_then(toml::Value::as_bool) == Some(false)
+                    || dep.get("type").and_then(|v| v.as_str()) == Some("optional");
+                dependencies.push(ModDependency {
+                    mod_id: id.to_string(),
+                    version: range.to_string(),
+                    optional,
+                });
             }
+            let (major, minor, patch) = parse_version(&minecraft_str);
 
             return Ok((
                 loader.clone(),
@@ -480,12 +577,15 @@ fn parse_jar_metadata(
     ))
 }
 
+/// Parse `major.minor[.patch]`. A missing patch is 0 (`1.21` is `1.21.0`).
+/// Unparseable input falls back to 1.20.1 (see KNOWN_LIMITATIONS.md).
 fn parse_version(s: &str) -> (u32, u32, u32) {
-    let parts: Vec<&str> = s.split('.').collect();
-    let major = parts.get(0).and_then(|p| p.parse().ok()).unwrap_or(1);
-    let minor = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(20);
-    let patch = parts.get(2).and_then(|p| p.parse().ok()).unwrap_or(1);
-    (major, minor, patch)
+    let parts: Vec<Option<u32>> = s.split('.').map(|p| p.parse().ok()).collect();
+    match parts.as_slice() {
+        [Some(major), Some(minor)] => (*major, *minor, 0),
+        [Some(major), Some(minor), Some(patch), ..] => (*major, *minor, *patch),
+        _ => (1, 20, 1),
+    }
 }
 
 fn detect_minecraft_version(metadata: &ModMetadata) -> MinecraftVersion {
@@ -660,7 +760,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let fs = LocalFileSystem;
         let jars = find_jars(dir.path(), &fs).unwrap();
-        assert!(jars.is_empty());
+        assert_eq!(jars.len(), 0, "unexpected jars: {jars:?}");
     }
 
     #[test]
@@ -698,7 +798,8 @@ mod tests {
     #[test]
     fn test_parse_version() {
         assert_eq!(parse_version("1.20.1"), (1, 20, 1));
-        assert_eq!(parse_version("1.21"), (1, 21, 1));
+        // 1.21 and 1.21.1 are different releases.
+        assert_eq!(parse_version("1.21"), (1, 21, 0));
         assert_eq!(parse_version("invalid"), (1, 20, 1));
         assert_eq!(parse_version("garbage"), (1, 20, 1));
     }
@@ -731,8 +832,9 @@ mod tests {
         let engine = AnalyzerEngine::default();
         let report = engine.analyze(fixtures, &fs).unwrap();
 
-        // 7 fixture JARs (fabric-a/b/c, forge-a/b, neoforge-a, legacy-a, manifest-a, empty)
-        assert_eq!(report.mods.len(), 9, "expected 9 fixture mods");
+        // 12 fixture JARs: fabric-a/b/c, fabric-classes, forge-a/b, neoforge-a/b,
+        // quilt-a, legacy-a, manifest-a, empty
+        assert_eq!(report.mods.len(), 12, "expected 12 fixture mods");
 
         let ids: Vec<&str> = report
             .mods
@@ -766,6 +868,60 @@ mod tests {
         assert!(matches!(loader("forgea"), Loader::Forge));
         assert!(matches!(loader("legacya"), Loader::Forge));
         assert!(matches!(loader("manifestmod"), Loader::Unknown(_)));
+
+        // Real-world shapes: binary .class entries, neoforge.mods.toml, quilt.mod.json
+        assert!(matches!(loader("fabricclasses"), Loader::Fabric));
+        assert!(matches!(loader("neoforgeb"), Loader::NeoForge));
+        assert!(matches!(loader("quilta"), Loader::Quilt));
+        let mc = |id: &str| {
+            let m = report
+                .mods
+                .iter()
+                .find(|m| m.metadata.mod_id == id)
+                .unwrap();
+            m.metadata.minecraft.to_string()
+        };
+        assert_eq!(mc("neoforgeb"), "1.21.0");
+        assert_eq!(mc("quilta"), "1.20.1");
+        let quilt = report
+            .mods
+            .iter()
+            .find(|m| m.metadata.mod_id == "quilta")
+            .unwrap();
+        let quilt_deps: Vec<&str> = quilt
+            .metadata
+            .dependencies
+            .iter()
+            .map(|d| d.mod_id.as_str())
+            .collect();
+        assert_eq!(quilt_deps, ["quilt_loader", "qsl"]);
+
+        // Real-world shapes: binary .class entries, neoforge.mods.toml, quilt.mod.json
+        assert!(matches!(loader("fabricclasses"), Loader::Fabric));
+        assert!(matches!(loader("neoforgeb"), Loader::NeoForge));
+        assert!(matches!(loader("quilta"), Loader::Quilt));
+        let mc = |id: &str| {
+            let m = report
+                .mods
+                .iter()
+                .find(|m| m.metadata.mod_id == id)
+                .unwrap();
+            m.metadata.minecraft.to_string()
+        };
+        assert_eq!(mc("neoforgeb"), "1.21.0");
+        assert_eq!(mc("quilta"), "1.20.1");
+        let quilt = report
+            .mods
+            .iter()
+            .find(|m| m.metadata.mod_id == "quilta")
+            .unwrap();
+        let quilt_deps: Vec<&str> = quilt
+            .metadata
+            .dependencies
+            .iter()
+            .map(|d| d.mod_id.as_str())
+            .collect();
+        assert_eq!(quilt_deps, ["quilt_loader", "qsl"]);
 
         // Java version from manifest
         let manifestmod = report

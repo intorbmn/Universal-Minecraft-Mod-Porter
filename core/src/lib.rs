@@ -11,6 +11,7 @@ pub mod filesystem;
 pub mod jobs;
 pub mod knowledge;
 pub mod metadata;
+pub mod migration;
 pub mod persistence;
 pub mod project;
 pub mod session;

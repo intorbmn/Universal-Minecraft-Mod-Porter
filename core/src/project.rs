@@ -94,7 +94,7 @@ mod tests {
         let pm = DefaultProjectManager;
         let project = pm.open(dir.path()).unwrap();
         let meta = pm.metadata(&project).unwrap();
-        assert!(meta.mods.is_empty());
+        assert_eq!(meta.mods.len(), 0);
         assert_eq!(meta.languages.len(), 0);
     }
 
