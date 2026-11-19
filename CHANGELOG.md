@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `docs/guides/`: detailed step-by-step guides for Phases 10–14 (workflow, environment
+  quirks, APIs to reuse, milestones with test names, definition of done). They supersede
+  the rough drafts in `docs/drafts/`.
 - Phase 9 (ADR 0012): technology adapter SDK (`core/src/adapter/`, `docs/ADAPTER_SDK.md`)
   with 15 data-driven detection rules, native-library report, Groovy/Scala renames, Mixin
   member renames, and loader conversion (Fabric/Quilt ↔ NeoForge, Forge ↔ NeoForge,

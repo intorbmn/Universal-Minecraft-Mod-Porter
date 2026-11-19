@@ -26,4 +26,6 @@ locally on branch `phase-9-adapters`.
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Next milestone
-Phase 10 — Modpack Migration (draft: `docs/drafts/phase-10-modpack.md`). Awaiting user review of Phase 9 first.
+Phase 10 — Modpack Migration, paused at the user's request. Follow
+[`docs/guides/phase-10-modpack.md`](guides/phase-10-modpack.md) (guides for 11–14 are in the
+same folder). Phase 9 is merged (PR #6).

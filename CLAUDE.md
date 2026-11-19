@@ -11,6 +11,8 @@ is in `docs/SAD.md` and `docs/decisions/`.
 2. Load the skills listed for the phase you are working on (table below). Loading the
    skills is part of starting the milestone, not optional.
 3. Work on a branch, never directly on `master`.
+4. For Phases 10–14, follow the detailed guide in `docs/guides/` (start with
+   `docs/guides/README.md`: workflow, environment quirks, entry points, definition of done).
 
 ## Commands (must all pass before a commit, same as CI)
 ```sh

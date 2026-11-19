@@ -1,5 +1,8 @@
 # Rough designs for Phases 9–14 (DRAFT)
 
+> **Superseded** by the detailed guides in [`docs/guides/`](../guides/README.md). Kept for
+> history; when the two disagree, the guides win.
+
 First drafts written on 2026-11-19 so the whole road ahead is visible. They are **not
 approved designs**. Each phase still goes through brainstorming → design → plan → approval
 before code (CLAUDE.md), and its draft is replaced by a spec in `docs/superpowers/specs/`.
