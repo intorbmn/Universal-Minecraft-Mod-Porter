@@ -6,6 +6,7 @@
 pub mod analyzer;
 pub mod checkpoint;
 pub mod config;
+pub mod descriptor;
 pub mod events;
 pub mod filesystem;
 pub mod jobs;

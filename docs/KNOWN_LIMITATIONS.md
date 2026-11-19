@@ -23,10 +23,14 @@ Each entry names the module and the phase expected to address it.
 - No real mapping dataset (MCP, Yarn, Mojang, Parchment) is imported yet.
 
 ## Migration engine (Phase 6)
-- **Only API renames in Java/Kotlin sources** are transformed. Not yet implemented: build
-  script migration (Gradle plugin/loader versions, Java toolchain), descriptor migration
-  (`mods.toml`, `fabric.mod.json`), resources/datapacks, Mixins, bytecode, and loader-to-loader
-  migration.
+- **Transformed so far:** API renames in Java/Kotlin sources (6.A), and Minecraft/loader
+  version requirements in `fabric.mod.json`, `quilt.mod.json` and `META-INF/[neoforge.]mods.toml`
+  (6.B). Not yet: build scripts, resources/datapacks, Mixins, bytecode, loader-to-loader.
+- **Descriptors:** the loader requirement is updated only when the KB has a compatibility row
+  for the exact target version; otherwise it is left as is with a warning. `ummp migrate
+  --mappings` uses a KB with no compatibility rows, so it never updates loader versions.
+  `loaderVersion` (the javafml language provider) and `mods.toml` → `neoforge.mods.toml`
+  renames (NeoForge 1.20.5+) are reported, not changed. Escaped JSON strings are skipped.
 - **No type resolution** (ADR 0007). A simple-name rule such as `DemoWidget -> DemoGadget` renames every
   standalone `DemoWidget` token, whichever class it refers to. After a dot it is renamed only
   when the qualifier is all-lowercase (ADR 0008), so `x.DemoWidget` on a lowercase variable
