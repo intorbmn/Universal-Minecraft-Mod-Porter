@@ -25,6 +25,7 @@ Phases 0-5 complete; Phase 6 (migration engine) in progress. See
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
 | [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Known limitations |
 | [decisions/](docs/decisions/README.md) | Architecture Decision Records |
+| [CLAUDE.md](CLAUDE.md) | Workflow rules and skills per phase for AI-assisted work |
 
 ## Quick start
 ```sh
