@@ -204,14 +204,16 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
         // A killed process may linger as a zombie until its new parent reaps it; that is dead.
         let stat = std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()));
-        let alive = match stat {
-            Ok(st) => !st.contains(") Z "),
-            Err(_) => std::process::Command::new("kill")
-                .args(["-0", pid.trim()])
-                .status()
-                .unwrap()
-                .success(),
-        };
+        let alive = stat.map_or_else(
+            |_| {
+                std::process::Command::new("kill")
+                    .args(["-0", pid.trim()])
+                    .status()
+                    .unwrap()
+                    .success()
+            },
+            |st| !st.contains(") Z "),
+        );
         assert!(!alive, "grandchild {pid} survived");
     }
 
