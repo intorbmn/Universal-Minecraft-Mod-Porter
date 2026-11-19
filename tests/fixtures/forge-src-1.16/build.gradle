@@ -1,4 +1,5 @@
 // Minimal ForgeGradle 4 build for the Phase 6 migration fixture (not built in CI).
 plugins { id 'net.minecraftforge.gradle' version '4.1.+' }
-minecraft { mappings channel: 'snapshot', version: '20210309-1.16.5' } // MCP names
-dependencies { minecraft 'net.minecraftforge:forge:1.16.5-36.2.39' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+minecraft { mappings channel: mapping_channel, version: mapping_version } // MCP names
+dependencies { minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}" }

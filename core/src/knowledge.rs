@@ -126,6 +126,13 @@ CREATE TABLE IF NOT EXISTS recipes (
     parent_recipe_id TEXT
 );
 
+CREATE TABLE IF NOT EXISTS pack_formats (
+    minecraft_version TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    format INTEGER NOT NULL,
+    PRIMARY KEY (minecraft_version, kind)
+);
+
 CREATE TABLE IF NOT EXISTS dependencies (
     mod_id TEXT NOT NULL,
     name TEXT,
@@ -360,6 +367,31 @@ impl KnowledgeBase {
             })?
             .filter_map(Result::ok)
             .collect();
+        Ok(rows)
+    }
+
+    /// Record the pack format of `kind` (`"resource"` or `"data"`) for a version.
+    pub fn insert_pack_format(
+        &self,
+        minecraft_version: &str,
+        kind: &str,
+        format: u32,
+    ) -> Result<(), DbError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO pack_formats (minecraft_version, kind, format) VALUES (?1, ?2, ?3)",
+            params![minecraft_version, kind, format],
+        )?;
+        Ok(())
+    }
+
+    /// All `(minecraft_version, format)` rows of one kind.
+    pub fn pack_formats(&self, kind: &str) -> Result<Vec<(String, u32)>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT minecraft_version, format FROM pack_formats WHERE kind = ?1")?;
+        let rows = stmt
+            .query_map(params![kind], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
 

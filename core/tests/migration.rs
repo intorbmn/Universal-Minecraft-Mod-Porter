@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use ummp_core::checkpoint::{collect_files, CheckpointStore};
 use ummp_core::filesystem::{FileSystem, FsError, LocalFileSystem};
-use ummp_core::knowledge::{BreakingChange, Compatibility, KnowledgeBase, Mapping};
+use ummp_core::knowledge::{BreakingChange, Compatibility, KnowledgeBase, Mapping, Recipe};
 use ummp_core::migration::{
     MigrationEngine, MigrationError, MigrationPlanner, MigrationRequest, RunOptions,
 };
@@ -114,7 +114,14 @@ fn forge_117_kb(dir: &Path) -> KnowledgeBase {
         notes: None,
     })
     .unwrap();
+    // Test data: 1.17.x resource and data pack format 7.
+    kb.insert_pack_format("1.17.1", "resource", 7).unwrap();
+    kb.insert_pack_format("1.17.1", "data", 7).unwrap();
     kb
+}
+
+fn read(root: &Path, rel: &str) -> String {
+    fs::read_to_string(root.join(rel)).unwrap()
 }
 
 fn request() -> MigrationRequest {
@@ -162,9 +169,16 @@ fn test_forge_116_to_117_dry_run_apply_rollback() {
         .unwrap();
     assert_eq!(read_tree(work.path()), original);
     assert!(dry.checkpoint_id.is_none());
-    assert_eq!(dry.changes.len(), 2); // ExampleMod.java + mods.toml
-    assert_eq!(dry.total_replacements(), 8);
-    assert!(dry.warnings.is_empty(), "{:?}", dry.warnings);
+    // ExampleMod.java (6) + BlockMixin.java (2) + mods.toml (3) + gradle.properties (5)
+    // + build.gradle (1) + examplemod.mixins.json (1) + pack.mcmeta (1)
+    assert_eq!(dry.changes.len(), 7);
+    assert_eq!(dry.total_replacements(), 19);
+    assert_eq!(dry.warnings.len(), 2, "{:?}", dry.warnings);
+    assert!(dry.warnings.iter().any(|w| w.contains("mapping_version")));
+    assert!(dry
+        .warnings
+        .iter()
+        .any(|w| w.contains("injector method target")));
     let java = dry
         .changes
         .iter()
@@ -203,6 +217,21 @@ fn test_forge_116_to_117_dry_run_apply_rollback() {
         toml.replace("\r\n", "\n"),
         golden_toml.replace("\r\n", "\n")
     );
+    let w = work.path();
+    let props = read(w, "gradle.properties");
+    assert!(props.contains("minecraft_version=1.17.1\nminecraft_version_range=[1.17.1,1.18)\n"));
+    assert!(props
+        .contains("forge_version=37.1.1\nforge_version_range=[37,)\nloader_version_range=[37,)\n"));
+    assert!(props.contains("mapping_version=20210309-1.16.5")); // reported, not guessed
+    assert!(read(w, "build.gradle").contains("JavaLanguageVersion.of(16)"));
+    assert!(read(w, "src/main/resources/examplemod.mixins.json").contains("\"JAVA_16\""));
+    assert!(read(w, "src/main/resources/pack.mcmeta").contains("\"pack_format\": 7"));
+    let mixin = read(
+        w,
+        "src/main/java/com/example/examplemod/mixin/BlockMixin.java",
+    );
+    assert!(mixin.contains("import net.minecraft.world.level.block.Block;"));
+    assert!(mixin.contains("onPlace(Lnet/minecraft/world/level/block/Block;)V"));
     let lang = "src/main/resources/assets/examplemod/lang/en_us.json";
     assert_eq!(
         fs::read(work.path().join(lang)).unwrap(),
@@ -234,10 +263,10 @@ fn test_stages_run_in_version_order() {
     let versions: Vec<&str> = plan.stages.iter().map(|s| s.version.as_str()).collect();
     assert_eq!(versions, ["1.17", "1.18"]);
 
-    let (edits, _, _) = MigrationEngine::default()
+    let set = MigrationEngine::default()
         .compute_edits(&plan, &project)
         .unwrap();
-    assert_eq!(edits[0].updated, "class A { Final o; }");
+    assert_eq!(set.edits[0].updated, "class A { Final o; }");
 }
 
 #[test]
@@ -286,6 +315,9 @@ impl FileSystem for FailingFs {
         }
         LocalFileSystem.write(path, data)
     }
+    fn remove(&self, path: &Path) -> Result<(), FsError> {
+        LocalFileSystem.remove(path)
+    }
     fn list(&self, path: &Path) -> Result<Vec<PathBuf>, FsError> {
         LocalFileSystem.list(path)
     }
@@ -331,6 +363,193 @@ fn test_failed_apply_rolls_back_partial_writes() {
         )
         .unwrap_err();
 
+    assert!(matches!(
+        err,
+        MigrationError::ApplyFailed {
+            rolled_back: true,
+            ..
+        }
+    ));
+    assert_eq!(read_tree(work.path()), original);
+}
+
+fn write(root: &Path, rel: &str, body: &str) {
+    let p = root.join(rel);
+    fs::create_dir_all(p.parent().unwrap()).unwrap();
+    fs::write(p, body).unwrap();
+}
+
+/// Phase 6.D: 1.21 data pack folder renames are applied as moves, the pack
+/// format comes from the KB, and rollback restores the old layout exactly.
+#[test]
+fn test_datapack_moves_pack_format_and_rollback() {
+    let work = tempfile::tempdir().unwrap();
+    let snaps = tempfile::tempdir().unwrap();
+    let kb_dir = tempfile::tempdir().unwrap();
+    let w = work.path();
+    let res = "src/main/resources";
+    write(
+        w,
+        &format!("{res}/pack.mcmeta"),
+        "{\"pack\":{\"pack_format\":26,\"description\":\"demo\"}}\n",
+    );
+    write(
+        w,
+        &format!("{res}/data/demo/recipes/widget.json"),
+        "{\"type\":\"demo\"}\n",
+    );
+    write(
+        w,
+        &format!("{res}/data/demo/tags/items/widgets.json"),
+        "{\"values\":[]}\n",
+    );
+    write(w, &format!("{res}/data/demo/worldgen/biome/x.json"), "{}\n");
+    let original = read_tree(w);
+
+    let kb = KnowledgeBase::open(&kb_dir.path().join("kb.db")).unwrap();
+    kb.insert_pack_format("1.21", "data", 48).unwrap(); // test data
+    let req = MigrationRequest {
+        source_minecraft: "1.20.4".into(),
+        target_minecraft: "1.21".into(),
+        target_loader: "fabric".into(),
+        min_confidence: 0.8,
+    };
+    let plan = MigrationPlanner::plan(&kb, &req).unwrap();
+    assert!(plan.datapack_renames);
+    assert_eq!(plan.java, Some(21));
+
+    let project = DefaultProjectManager.open(w).unwrap();
+    let mut store = CheckpointStore::new();
+    let report = MigrationEngine::default()
+        .run(
+            &plan,
+            &project,
+            &mut store,
+            &RunOptions {
+                dry_run: false,
+                snapshot_root: snaps.path(),
+                session_id: Uuid::new_v4(),
+            },
+        )
+        .unwrap();
+    assert_eq!(report.moves.len(), 2);
+    assert!(w
+        .join(format!("{res}/data/demo/recipe/widget.json"))
+        .exists());
+    assert!(w
+        .join(format!("{res}/data/demo/tags/item/widgets.json"))
+        .exists());
+    assert!(!w.join(format!("{res}/data/demo/recipes")).exists());
+    assert!(!w.join(format!("{res}/data/demo/tags/items")).exists());
+    assert!(w
+        .join(format!("{res}/data/demo/worldgen/biome/x.json"))
+        .exists());
+    // data-only pack (no assets/): pack_format is the data pack format
+    assert!(read(w, &format!("{res}/pack.mcmeta")).contains("\"pack_format\":48"));
+
+    store
+        .restore(report.checkpoint_id.unwrap(), &project.root)
+        .unwrap();
+    assert_eq!(read_tree(w), original);
+}
+
+/// Phase 6.G: tested recipes run (rename + warn); others are reported.
+#[test]
+fn test_recipes_executed_only_when_tested() {
+    let kb_dir = tempfile::tempdir().unwrap();
+    let kb = KnowledgeBase::open(&kb_dir.path().join("kb.db")).unwrap();
+    let recipe = |id: &str, tested: bool, steps: Vec<serde_json::Value>| Recipe {
+        recipe_id: id.into(),
+        version: "1.17".into(),
+        loader: Some("forge".into()),
+        description: format!("{id} description"),
+        steps,
+        source: "test".into(),
+        tested,
+        recipe_version: 1,
+        parent_recipe_id: None,
+    };
+    kb.insert_recipe(&recipe(
+        "demo-tested",
+        true,
+        vec![
+            serde_json::json!({"op": "rename", "from": "DemoWidget", "to": "DemoGadget"}),
+            serde_json::json!({"op": "warn", "message": "check DemoGadget registration"}),
+        ],
+    ))
+    .unwrap();
+    kb.insert_recipe(&recipe(
+        "demo-untested",
+        false,
+        vec![serde_json::json!({"op": "rename", "from": "DemoOther", "to": "DemoThing"})],
+    ))
+    .unwrap();
+    kb.insert_recipe(&recipe(
+        "demo-legacy",
+        true,
+        vec![serde_json::json!("replace: x")],
+    ))
+    .unwrap();
+
+    let plan = MigrationPlanner::plan(&kb, &request()).unwrap();
+    let outcome = |id: &str| plan.recipes.iter().find(|o| o.recipe_id == id).unwrap();
+    assert!(outcome("demo-tested").executed);
+    assert_eq!(outcome("demo-tested").note, "check DemoGadget registration");
+    assert!(!outcome("demo-untested").executed);
+    assert!(!outcome("demo-legacy").executed);
+
+    let work = tempfile::tempdir().unwrap();
+    fs::write(
+        work.path().join("A.java"),
+        "class A { DemoWidget w; DemoOther o; }",
+    )
+    .unwrap();
+    let project = DefaultProjectManager.open(work.path()).unwrap();
+    let set = MigrationEngine::default()
+        .compute_edits(&plan, &project)
+        .unwrap();
+    assert_eq!(
+        set.edits[0].updated,
+        "class A { DemoGadget w; DemoOther o; }"
+    );
+}
+
+/// A move that fails mid-apply restores the checkpoint.
+#[test]
+fn test_failed_move_rolls_back() {
+    let work = tempfile::tempdir().unwrap();
+    let snaps = tempfile::tempdir().unwrap();
+    let kb_dir = tempfile::tempdir().unwrap();
+    write(work.path(), "data/demo/recipes/a.json", "{}");
+    write(work.path(), "data/demo/loot_tables/b.json", "{}");
+    let original = read_tree(work.path());
+    let kb = KnowledgeBase::open(&kb_dir.path().join("kb.db")).unwrap();
+    let req = MigrationRequest {
+        source_minecraft: "1.20.4".into(),
+        target_minecraft: "1.21".into(),
+        target_loader: "fabric".into(),
+        min_confidence: 0.8,
+    };
+    let plan = MigrationPlanner::plan(&kb, &req).unwrap();
+    let project = Project {
+        root: work.path().canonicalize().unwrap(),
+        fs: Arc::new(FailingFs {
+            ok_writes: 1,
+            writes: AtomicUsize::new(0),
+        }),
+    };
+    let err = MigrationEngine::default()
+        .run(
+            &plan,
+            &project,
+            &mut CheckpointStore::new(),
+            &RunOptions {
+                dry_run: false,
+                snapshot_root: snaps.path(),
+                session_id: Uuid::new_v4(),
+            },
+        )
+        .unwrap_err();
     assert!(matches!(
         err,
         MigrationError::ApplyFailed {

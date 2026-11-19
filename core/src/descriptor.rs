@@ -57,8 +57,9 @@ impl DescriptorKind {
     }
 }
 
+/// Result of a text transform: new content, what changed, and notes.
 #[derive(Debug, Clone, Default)]
-pub struct DescriptorResult {
+pub struct EditResult {
     pub updated: String,
     pub replacements: Vec<Replacement>,
     pub warnings: Vec<String>,
@@ -76,7 +77,7 @@ fn next_minor(v: &str) -> Option<String> {
 /// Maven ranges (`[1.20.1,1.21)`) become `[target,next-minor)`; operator
 /// forms (`>=1.20.1`, `~1.20.1`, `1.20.1`) keep their operator; wildcards
 /// (`1.20.x`) become `~target`; `*` is left alone.
-fn retarget_minecraft(old: &str, target: &str) -> Option<String> {
+pub(crate) fn retarget_minecraft(old: &str, target: &str) -> Option<String> {
     let old = old.trim();
     if old == "*" || old.is_empty() {
         return None;
@@ -96,17 +97,61 @@ fn retarget_minecraft(old: &str, target: &str) -> Option<String> {
     }
 }
 
+/// New loader requirement for loader version `lv`, in the style of `old`.
+/// MDK major-only ranges stay major-only (`[36,)` -> `[37,)`); other maven
+/// ranges become `[lv,)`; operator forms keep the operator (`>=0.14` -> `>=lv`).
+pub(crate) fn retarget_loader(old: &str, lv: &str) -> Option<String> {
+    let old = old.trim();
+    if old == "*" || old.is_empty() {
+        return None;
+    }
+    let major = lv.split('.').next().unwrap_or(lv);
+    if let Some(inner) = old.strip_prefix('[').and_then(|s| s.strip_suffix(",)")) {
+        if !inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit()) {
+            return Some(format!("[{major},)"));
+        }
+    }
+    if old.starts_with('[') || old.starts_with('(') {
+        return Some(format!("[{lv},)"));
+    }
+    let start = old.find(|c: char| c.is_ascii_digit())?;
+    Some(format!("{}{lv}", &old[..start]))
+}
+
+/// Apply value edits back to front and validate the result.
+/// Returns `None` when `valid` rejects the edited text.
+pub(crate) fn apply_edits(
+    content: &str,
+    mut edits: Edits,
+    valid: impl Fn(&str) -> bool,
+) -> Option<(String, Vec<Replacement>)> {
+    // Collectors may find values in any order; sort so offsets stay valid.
+    edits.sort_by_key(|(range, _, _)| range.start);
+    let mut updated = content.to_string();
+    let mut replacements = Vec::new();
+    for (range, old, new) in edits.iter().rev() {
+        updated.replace_range(range.clone(), new);
+        replacements.push(Replacement {
+            line: 1 + content[..range.start].matches('\n').count(),
+            from: old.clone(),
+            to: new.clone(),
+        });
+    }
+    replacements.reverse();
+    valid(&updated).then_some((updated, replacements))
+}
+
 /// Collected value edits: byte range of the value contents, old, new.
-type Edits = Vec<(Range<usize>, String, String)>;
+pub(crate) type Edits = Vec<(Range<usize>, String, String)>;
 
 pub fn migrate_descriptor(
     kind: DescriptorKind,
     content: &str,
     target: &DescriptorTarget,
-) -> DescriptorResult {
-    let mut result = DescriptorResult {
+) -> EditResult {
+    let mut result = EditResult {
         updated: content.to_string(),
-        ..DescriptorResult::default()
+        ..EditResult::default()
     };
     if !kind.accepts_loader(&target.loader) {
         result.warnings.push(format!(
@@ -129,7 +174,7 @@ pub fn migrate_descriptor(
     }
 
     let mut wants_loader = false;
-    let mut edits = match kind {
+    let edits = match kind {
         DescriptorKind::Fabric | DescriptorKind::Quilt => {
             json_edits(kind, content, target, &mut wants_loader)
         }
@@ -146,35 +191,20 @@ pub fn migrate_descriptor(
     if edits.is_empty() {
         return result;
     }
-    // Apply back to front so earlier offsets stay valid; collectors may
-    // find values in any order.
-    edits.sort_by_key(|(range, _, _)| range.start);
-
-    let mut updated = content.to_string();
-    let mut replacements = Vec::new();
-    for (range, old, new) in edits.iter().rev() {
-        updated.replace_range(range.clone(), new);
-        replacements.push(Replacement {
-            line: 1 + content[..range.start].matches('\n').count(),
-            from: old.clone(),
-            to: new.clone(),
-        });
-    }
-    replacements.reverse();
-
-    let still_valid = match kind {
+    let valid = |t: &str| match kind {
         DescriptorKind::Fabric | DescriptorKind::Quilt => {
-            serde_json::from_str::<serde_json::Value>(&updated).is_ok()
+            serde_json::from_str::<serde_json::Value>(t).is_ok()
         }
-        _ => updated.parse::<toml::Table>().is_ok(),
+        _ => t.parse::<toml::Table>().is_ok(),
     };
-    if still_valid {
-        result.updated = updated;
-        result.replacements = replacements;
-    } else {
-        result
+    match apply_edits(content, edits, valid) {
+        Some((updated, replacements)) => {
+            result.updated = updated;
+            result.replacements = replacements;
+        }
+        None => result
             .warnings
-            .push("edit would produce an unparsable descriptor; left unchanged".into());
+            .push("edit would produce an unparsable descriptor; left unchanged".into()),
     }
     result
 }
@@ -184,7 +214,7 @@ pub fn migrate_descriptor(
 // ---------------------------------------------------------------------------
 
 /// Index just past the string literal starting at `i` (a `"`).
-fn skip_json_string(b: &[u8], i: usize) -> usize {
+pub(crate) fn skip_json_string(b: &[u8], i: usize) -> usize {
     let mut j = i + 1;
     while j < b.len() {
         match b[j] {
@@ -197,7 +227,7 @@ fn skip_json_string(b: &[u8], i: usize) -> usize {
 }
 
 /// Index of the bracket closing the one at `open`.
-fn matching_close(b: &[u8], open: usize) -> Option<usize> {
+pub(crate) fn matching_close(b: &[u8], open: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut i = open;
     while i < b.len() {
@@ -220,7 +250,7 @@ fn matching_close(b: &[u8], open: usize) -> Option<usize> {
     None
 }
 
-fn skip_ws(b: &[u8], mut i: usize) -> usize {
+pub(crate) fn skip_ws(b: &[u8], mut i: usize) -> usize {
     while i < b.len() && b[i].is_ascii_whitespace() {
         i += 1;
     }
@@ -229,7 +259,7 @@ fn skip_ws(b: &[u8], mut i: usize) -> usize {
 
 /// Start index of the value of `key` among the direct members of the object
 /// whose `{` is at `obj`.
-fn find_key(text: &str, obj: usize, key: &str) -> Option<usize> {
+pub(crate) fn find_key(text: &str, obj: usize, key: &str) -> Option<usize> {
     let b = text.as_bytes();
     let end = matching_close(b, obj)?;
     let mut i = obj + 1;
@@ -257,7 +287,7 @@ fn find_key(text: &str, obj: usize, key: &str) -> Option<usize> {
 }
 
 /// Contents range of the string value starting at `v` (a `"`), if it has no escapes.
-fn string_value(text: &str, v: usize) -> Option<Range<usize>> {
+pub(crate) fn string_value(text: &str, v: usize) -> Option<Range<usize>> {
     let b = text.as_bytes();
     if b.get(v) != Some(&b'"') {
         return None;
@@ -267,7 +297,7 @@ fn string_value(text: &str, v: usize) -> Option<Range<usize>> {
     (!text[range.clone()].contains('\\')).then_some(range)
 }
 
-fn push_edit(edits: &mut Edits, text: &str, range: Range<usize>, new: Option<String>) {
+pub(crate) fn push_edit(edits: &mut Edits, text: &str, range: Range<usize>, new: Option<String>) {
     if let Some(new) = new {
         if text[range.clone()] != new {
             let old = text[range.clone()].to_string();
@@ -287,7 +317,6 @@ fn json_edits(
     let Some(root) = text.find('{') else {
         return edits;
     };
-    let loader_range = target.loader_version.as_ref().map(|v| format!(">={v}"));
 
     if kind == DescriptorKind::Fabric {
         let Some(deps) = find_key(text, root, "depends").filter(|&d| b[d] == b'{') else {
@@ -299,7 +328,11 @@ fn json_edits(
         }
         if let Some(r) = find_key(text, deps, "fabricloader").and_then(|v| string_value(text, v)) {
             *wants_loader = true;
-            push_edit(&mut edits, text, r, loader_range);
+            let new = target
+                .loader_version
+                .as_deref()
+                .and_then(|lv| retarget_loader(&text[r.clone()], lv));
+            push_edit(&mut edits, text, r, new);
         }
         return edits;
     }
@@ -332,7 +365,11 @@ fn json_edits(
                         }
                         Some("quilt_loader") => {
                             *wants_loader = true;
-                            push_edit(&mut edits, text, r, loader_range.clone());
+                            let new = target
+                                .loader_version
+                                .as_deref()
+                                .and_then(|lv| retarget_loader(&text[r.clone()], lv));
+                            push_edit(&mut edits, text, r, new);
                         }
                         _ => {}
                     }
@@ -350,7 +387,7 @@ fn json_edits(
 // ---------------------------------------------------------------------------
 
 /// Range of the quoted value of `key = "..."` on one line (offset `base`).
-fn toml_value(line: &str, base: usize, key: &str) -> Option<Range<usize>> {
+pub(crate) fn toml_value(line: &str, base: usize, key: &str) -> Option<Range<usize>> {
     let t = line.trim_start();
     let rest = t.strip_prefix(key)?;
     let rest_trim = rest.trim_start();
@@ -369,10 +406,18 @@ fn toml_edits(text: &str, target: &DescriptorTarget, wants_loader: &mut bool) ->
     // (modId, versionRange range) per [[dependencies.*]] block
     let mut blocks: Vec<(Option<String>, Option<Range<usize>>)> = Vec::new();
     let mut in_dep = false;
+    let mut top_level = true;
+    let mut loader_version_value: Option<Range<usize>> = None;
     let mut offset = 0;
     for line in text.split_inclusive('\n') {
         let t = line.trim_start();
+        if top_level && !t.starts_with('[') {
+            if let Some(r) = toml_value(line, offset, "loaderVersion") {
+                loader_version_value = Some(r);
+            }
+        }
         if t.starts_with('[') {
+            top_level = false;
             in_dep = t.starts_with("[[dependencies.");
             if in_dep {
                 blocks.push((None, None));
@@ -389,7 +434,7 @@ fn toml_edits(text: &str, target: &DescriptorTarget, wants_loader: &mut bool) ->
         offset += line.len();
     }
 
-    let loader_range = target.loader_version.as_ref().map(|v| format!("[{v},)"));
+    let lv = target.loader_version.as_deref();
     for (mod_id, range) in blocks {
         let (Some(mod_id), Some(r)) = (mod_id, range) else {
             continue;
@@ -399,7 +444,16 @@ fn toml_edits(text: &str, target: &DescriptorTarget, wants_loader: &mut bool) ->
             push_edit(&mut edits, text, r, new);
         } else if mod_id == target.loader {
             *wants_loader = true;
-            push_edit(&mut edits, text, r, loader_range.clone());
+            // Forge's javafml loaderVersion tracks the Forge major version;
+            // update it only when it equals the old Forge range.
+            if let (Some(lvr), Some(lv)) = (&loader_version_value, lv) {
+                if target.loader == "forge" && text[lvr.clone()] == text[r.clone()] {
+                    let new = retarget_loader(&text[lvr.clone()], lv);
+                    push_edit(&mut edits, text, lvr.clone(), new);
+                }
+            }
+            let new = lv.and_then(|lv| retarget_loader(&text[r.clone()], lv));
+            push_edit(&mut edits, text, r, new);
         }
     }
     edits
@@ -415,6 +469,14 @@ mod tests {
             loader: loader.into(),
             loader_version: lv.map(Into::into),
         }
+    }
+
+    #[test]
+    fn test_retarget_loader_keeps_style() {
+        assert_eq!(retarget_loader("[36,)", "37.1.1").unwrap(), "[37,)");
+        assert_eq!(retarget_loader("[36.2.0,)", "37.1.1").unwrap(), "[37.1.1,)");
+        assert_eq!(retarget_loader(">=0.14.21", "0.16.0").unwrap(), ">=0.16.0");
+        assert_eq!(retarget_loader("*", "0.16.0"), None);
     }
 
     #[test]
@@ -510,14 +572,14 @@ version="1.0.0"
             FORGE_TOML,
             &target("forge", "1.17.1", Some("37.1.1")),
         );
+        // MDK style: major-only ranges stay major-only, and Forge's javafml
+        // loaderVersion follows the Forge major.
         let expected = FORGE_TOML
-            .replace("versionRange=\"[36,)\"", "versionRange=\"[37.1.1,)\"")
+            .replace("\"[36,)\"", "\"[37,)\"")
             .replace("\"[1.16.5,1.17)\"", "\"[1.17.1,1.18)\"");
         assert_eq!(r.updated, expected);
-        assert_eq!(r.replacements[0].line, 10);
-        assert_eq!(r.replacements[1].line, 16);
-        // loaderVersion (javafml language provider) is not the Forge version
-        assert!(r.updated.contains("loaderVersion=\"[36,)\""));
+        let lines: Vec<usize> = r.replacements.iter().map(|x| x.line).collect();
+        assert_eq!(lines, [2, 10, 16]);
     }
 
     #[test]
@@ -552,7 +614,9 @@ version="1.0.0"
             &src,
             &target("neoforge", "1.21", Some("21.0.167")),
         );
-        assert!(r.updated.contains("versionRange=\"[21.0.167,)\""));
+        assert!(r.updated.contains("versionRange=\"[21,)\""));
+        // NeoForge's loaderVersion is the FML version, not NeoForge's: untouched.
+        assert!(r.updated.contains("loaderVersion=\"[36,)\""));
         assert!(r.warnings.iter().any(|w| w.contains("neoforge.mods.toml")));
     }
 }

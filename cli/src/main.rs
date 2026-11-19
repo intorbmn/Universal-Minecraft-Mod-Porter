@@ -2,6 +2,7 @@ use clap::{ArgGroup, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use ummp_core::analyzer::AnalyzerEngine;
+use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
@@ -59,6 +60,32 @@ enum Commands {
         #[arg(long)]
         report: Option<PathBuf>,
     },
+    /// Remap class names inside a compiled mod JAR into a new JAR (input untouched).
+    #[command(group(ArgGroup::new("knowledge").required(true).args(["kb", "mappings"])))]
+    RemapJar {
+        /// Input mod JAR.
+        input: PathBuf,
+        /// Output JAR; must not exist.
+        output: PathBuf,
+        /// Source Minecraft version.
+        #[arg(long)]
+        from: String,
+        /// Target Minecraft version.
+        #[arg(long)]
+        to: String,
+        /// Target loader.
+        #[arg(long)]
+        loader: String,
+        /// Knowledge-base SQLite file (read only).
+        #[arg(long)]
+        kb: Option<PathBuf>,
+        /// JSON file with a list of mappings.
+        #[arg(long)]
+        mappings: Option<PathBuf>,
+        /// Mappings below this confidence are not applied.
+        #[arg(long, default_value_t = 0.8)]
+        min_confidence: f64,
+    },
     /// Restore the project to a checkpoint taken by `migrate --apply`.
     Rollback {
         /// Project root path.
@@ -94,6 +121,21 @@ fn save_store(dir: &Path, store: &CheckpointStore) -> Result<(), Box<dyn std::er
     std::fs::create_dir_all(dir)?;
     std::fs::write(dir.join(STORE_FILE), serde_json::to_vec_pretty(store)?)?;
     Ok(())
+}
+
+fn open_kb(
+    kb: Option<PathBuf>,
+    mappings: Option<PathBuf>,
+) -> Result<KnowledgeBase, Box<dyn std::error::Error>> {
+    Ok(match (kb, mappings) {
+        (Some(db), _) => KnowledgeBase::open(&db)?,
+        (None, Some(file)) => {
+            let mem = KnowledgeBase::open(Path::new(":memory:"))?;
+            mem.import_mappings_from_file(&file)?;
+            mem
+        }
+        (None, None) => unreachable!("clap requires --kb or --mappings"),
+    })
 }
 
 fn main() {
@@ -132,15 +174,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             report,
         } => {
             let project = pm.open(&path)?;
-            let kb = match (kb, mappings) {
-                (Some(db), _) => KnowledgeBase::open(&db)?,
-                (None, Some(file)) => {
-                    let mem = KnowledgeBase::open(Path::new(":memory:"))?;
-                    mem.import_mappings_from_file(&file)?;
-                    mem
-                }
-                (None, None) => unreachable!("clap requires --kb or --mappings"),
-            };
+            let kb = open_kb(kb, mappings)?;
             let request = MigrationRequest {
                 source_minecraft: from,
                 target_minecraft: to,
@@ -175,6 +209,43 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if !apply && !result.changes.is_empty() {
                 eprintln!("\nDry run: nothing was written. Re-run with --apply to write.");
             }
+        }
+
+        Commands::RemapJar {
+            input,
+            output,
+            from,
+            to,
+            loader,
+            kb,
+            mappings,
+            min_confidence,
+        } => {
+            let kb = open_kb(kb, mappings)?;
+            let request = MigrationRequest {
+                source_minecraft: from,
+                target_minecraft: to,
+                target_loader: loader.to_lowercase(),
+                min_confidence,
+            };
+            let plan = MigrationPlanner::plan(&kb, &request)?;
+            let stages: Vec<ClassMap> = plan
+                .stages
+                .iter()
+                .map(|s| ClassMap::from_rules(&s.rules))
+                .filter(|m| !m.is_empty())
+                .collect();
+            if stages.is_empty() {
+                return Err("no qualified class mappings for this request".into());
+            }
+            let stats = remap_jar(&input, &output, &stages)?;
+            println!(
+                "Wrote {}: {} classes remapped, {} class files moved, {} signature files dropped",
+                output.display(),
+                stats.classes_changed,
+                stats.entries_moved,
+                stats.signatures_dropped
+            );
         }
 
         Commands::Rollback {
