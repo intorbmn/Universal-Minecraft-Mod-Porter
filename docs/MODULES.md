@@ -11,7 +11,7 @@
 | CORE-07 | Job Persistence | Infrastructure | IJobStore | Database | COMPLETED |
 | ENG-01 | Analyzer Engine | Application | IAnalyzer | JAR, Source, Build | COMPLETED |
 | ENG-02 | Compatibility Engine | Application | ICompatibility | Knowledge Base | COMPLETED |
-| ENG-03 | Migration Engine | Application | IMigration | Analyzer, Compatibility, Transform | IN_PROGRESS |
+| ENG-03 | Migration Engine | Application | IMigration | Analyzer, Compatibility, Transform | COMPLETED |
 | ENG-04 | Build Engine | Application | IBuild | Toolchain, Sandbox | PLANNED |
 | ENG-05 | Testing Engine | Application | ITestRunner | Build, Launcher | PLANNED |
 | AI-01 | AI Provider Abstraction | Infrastructure | IAIProvider | — | PLANNED |
@@ -31,4 +31,4 @@
 | CORE-07 | `core/src/jobs.rs`, `core/src/persistence.rs` |
 | ENG-01 | `core/src/analyzer.rs` |
 | ENG-02 | `core/src/knowledge.rs` |
-| ENG-03 | `core/src/migration.rs` (`MigrationPlanner`, `SourceTransformer`, `MigrationEngine`) |
+| ENG-03 | `core/src/migration.rs` (planner, engine), `descriptor.rs`, `build_script.rs`, `resources.rs`, `mixin.rs`, `bytecode.rs` |

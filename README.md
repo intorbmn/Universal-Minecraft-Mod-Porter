@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-5 complete; Phase 6 (migration engine) in progress. See
+Phases 0-6 complete; Phase 7 (AI agents) is next. See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -40,6 +40,9 @@ ummp migrate path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings map
 # Write it (a checkpoint is taken first), then undo if needed
 ummp migrate path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json --apply --report report.md
 ummp rollback path/to/mod
+
+# JAR-only mod: remap class names into a new JAR (input is not modified)
+ummp remap-jar mod.jar mod-1.17.jar --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 ```
 `--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
 (the knowledge-base export format); `--kb` takes a knowledge-base SQLite file instead.

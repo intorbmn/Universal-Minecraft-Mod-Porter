@@ -18,6 +18,7 @@ pub enum FsError {
 pub trait FileSystem: Send + Sync {
     fn read(&self, path: &Path) -> Result<Vec<u8>, FsError>;
     fn write(&self, path: &Path, data: &[u8]) -> Result<(), FsError>;
+    fn remove(&self, path: &Path) -> Result<(), FsError>;
     fn list(&self, path: &Path) -> Result<Vec<PathBuf>, FsError>;
     fn exists(&self, path: &Path) -> bool;
     fn is_dir(&self, path: &Path) -> bool;
@@ -35,6 +36,9 @@ impl FileSystem for LocalFileSystem {
         }
         std::fs::write(path, data)?;
         Ok(())
+    }
+    fn remove(&self, path: &Path) -> Result<(), FsError> {
+        Ok(std::fs::remove_file(path)?)
     }
     fn list(&self, path: &Path) -> Result<Vec<PathBuf>, FsError> {
         let mut out = Vec::new();

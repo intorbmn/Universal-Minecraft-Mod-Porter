@@ -12,12 +12,18 @@
 //! - Edits are applied only after a checkpoint is taken; any write failure
 //!   restores the checkpoint (ADR 0005, ADR 0006).
 
+use crate::build_script::{migrate_build_file, required_java, BuildFile};
 use crate::checkpoint::{collect_files, CheckpointError, CheckpointStore};
 use crate::descriptor::{migrate_descriptor, DescriptorKind, DescriptorTarget};
 use crate::filesystem::{resolve_within, FsError};
 use crate::knowledge::{BreakingChange, KnowledgeBase, Mapping};
+use crate::mixin::{
+    count_method_targets, is_mixin_class, is_mixin_config, migrate_mixin_config,
+    migrate_mixin_strings,
+};
 use crate::persistence::DbError;
 use crate::project::Project;
+use crate::resources::{datapack_move, is_pack_mcmeta, migrate_pack_mcmeta, FileMove, PackFormats};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -98,9 +104,32 @@ pub struct MigrationPlan {
     pub stages: Vec<Stage>,
     pub skipped: Vec<SkippedMapping>,
     pub breaking_changes: Vec<BreakingChange>,
-    pub recipes: Vec<String>,
+    pub recipes: Vec<RecipeOutcome>,
     /// Versions the mod descriptors should declare (Phase 6.B).
     pub descriptor_target: DescriptorTarget,
+    /// Minimum Java release for the target (Phase 6.C/6.E).
+    pub java: Option<u32>,
+    /// Pack formats for the target, from the KB (Phase 6.D).
+    pub pack_formats: PackFormats,
+    /// Source < 1.21 <= target: move data pack folders to singular names.
+    pub datapack_renames: bool,
+}
+
+/// One step of a knowledge-base recipe (`Recipe.steps`), e.g.
+/// `{"op": "rename", "from": "a.B", "to": "c.B"}` or `{"op": "warn", "message": "..."}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum RecipeStep {
+    Rename { from: String, to: String },
+    Warn { message: String },
+}
+
+/// What happened to a recipe during planning (Phase 6.G).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecipeOutcome {
+    pub recipe_id: String,
+    pub executed: bool,
+    pub note: String,
 }
 
 impl MigrationPlan {
@@ -230,6 +259,71 @@ impl MigrationPlanner {
             }
         }
 
+        // Phase 6.G: tested recipes contribute rename rules to their version's
+        // stage; untested or unparsable recipes are reported, never executed.
+        let mut recipes = Vec::new();
+        for recipe in kb.recipes_by_loader(&request.target_loader)? {
+            if !in_upgrade_range(&recipe.version, src, tgt) {
+                continue;
+            }
+            let outcome = |executed: bool, note: String| RecipeOutcome {
+                recipe_id: recipe.recipe_id.clone(),
+                executed,
+                note,
+            };
+            if !recipe.tested {
+                recipes.push(outcome(false, "not marked tested".into()));
+                continue;
+            }
+            let steps: Result<Vec<RecipeStep>, _> = recipe
+                .steps
+                .iter()
+                .map(|v| serde_json::from_value(v.clone()))
+                .collect();
+            let Ok(steps) = steps else {
+                recipes.push(outcome(false, "unsupported step format".into()));
+                continue;
+            };
+            let key = parse_version(&recipe.version).unwrap_or_default();
+            let mut notes = Vec::new();
+            for step in steps {
+                match step {
+                    RecipeStep::Rename { from, to } => {
+                        let rules = &mut by_version
+                            .entry(key.clone())
+                            .or_insert_with(|| (recipe.version.clone(), BTreeMap::new()))
+                            .1;
+                        match rules.get(&from) {
+                            Some(existing) if existing.to != to => notes.push(format!(
+                                "rename {from} skipped: KB maps it to {}",
+                                existing.to
+                            )),
+                            Some(_) => {}
+                            None => {
+                                rules.insert(
+                                    from.clone(),
+                                    RenameRule {
+                                        from,
+                                        to,
+                                        kind: format!("recipe:{}", recipe.recipe_id),
+                                        confidence: 1.0,
+                                        version: recipe.version.clone(),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                    RecipeStep::Warn { message } => notes.push(message),
+                }
+            }
+            let note = if notes.is_empty() {
+                recipe.description.clone()
+            } else {
+                notes.join("; ")
+            };
+            recipes.push(outcome(true, note));
+        }
+
         let stages = by_version
             .into_values()
             .filter(|(_, rules)| !rules.is_empty())
@@ -245,12 +339,17 @@ impl MigrationPlanner {
             .into_iter()
             .filter(|b| in_upgrade_range(&b.version, src, tgt))
             .collect();
-        let recipes = kb
-            .recipes_by_loader(&request.target_loader)?
-            .into_iter()
-            .filter(|r| in_upgrade_range(&r.version, src, tgt))
-            .map(|r| r.recipe_id)
-            .collect();
+        let pack_format = |kind: &str| -> Result<Option<u32>, MigrationError> {
+            Ok(kb
+                .pack_formats(kind)?
+                .into_iter()
+                .find(|(mc, _)| compare_versions(mc, tgt) == Some(Ordering::Equal))
+                .map(|(_, f)| f))
+        };
+        let pack_formats = PackFormats {
+            resource: pack_format("resource")?,
+            data: pack_format("data")?,
+        };
 
         // Loader version for the exact target Minecraft version; highest wins.
         let loader_version = kb
@@ -271,6 +370,9 @@ impl MigrationPlanner {
                 loader: request.target_loader.clone(),
                 loader_version,
             },
+            java: required_java(tgt),
+            pack_formats,
+            datapack_renames: in_upgrade_range("1.21", src, tgt),
         })
     }
 }
@@ -544,9 +646,11 @@ pub struct MigrationReport {
     pub checkpoint_id: Option<Uuid>,
     pub files_scanned: usize,
     pub changes: Vec<FileChangeSummary>,
+    /// Files moved (1.21 data pack folder renames).
+    pub moves: Vec<FileMove>,
     pub skipped_mappings: Vec<SkippedMapping>,
     pub breaking_changes: Vec<BreakingChange>,
-    pub recipes: Vec<String>,
+    pub recipes: Vec<RecipeOutcome>,
     pub warnings: Vec<String>,
 }
 
@@ -579,9 +683,10 @@ impl MigrationReport {
         }
         let _ = writeln!(
             out,
-            "- Files scanned: {}, files changed: {}, replacements: {}\n",
+            "- Files scanned: {}, files changed: {}, files moved: {}, replacements: {}\n",
             self.files_scanned,
             self.changes.len(),
+            self.moves.len(),
             self.total_replacements()
         );
 
@@ -596,9 +701,14 @@ impl MigrationReport {
             out.push('\n');
         }
         if !self.recipes.is_empty() {
-            let _ = writeln!(out, "## Applicable recipes (not executed yet)\n");
-            for id in &self.recipes {
-                let _ = writeln!(out, "- `{id}`");
+            let _ = writeln!(out, "## Recipes\n");
+            for o in &self.recipes {
+                let state = if o.executed {
+                    "executed"
+                } else {
+                    "not executed"
+                };
+                let _ = writeln!(out, "- `{}` ({state}): {}", o.recipe_id, o.note);
             }
             out.push('\n');
         }
@@ -617,6 +727,13 @@ impl MigrationReport {
             let _ = writeln!(out, "## Warnings\n");
             for w in &self.warnings {
                 let _ = writeln!(out, "- {w}");
+            }
+            out.push('\n');
+        }
+        if !self.moves.is_empty() {
+            let _ = writeln!(out, "## Moved files\n");
+            for m in &self.moves {
+                let _ = writeln!(out, "- `{}` -> `{}`", m.from.display(), m.to.display());
             }
             out.push('\n');
         }
@@ -641,6 +758,15 @@ pub struct RunOptions<'a> {
     pub session_id: Uuid,
 }
 
+/// Everything a run would change, computed without writing.
+#[derive(Debug, Clone, Default)]
+pub struct EditSet {
+    pub edits: Vec<FileEdit>,
+    pub moves: Vec<FileMove>,
+    pub files_scanned: usize,
+    pub warnings: Vec<String>,
+}
+
 pub struct MigrationEngine {
     transformers: Vec<Box<dyn SourceTransformer>>,
 }
@@ -653,62 +779,148 @@ impl Default for MigrationEngine {
     }
 }
 
+/// How a file is migrated.
+enum Handler<'a> {
+    Descriptor(DescriptorKind),
+    Build(BuildFile),
+    MixinConfig,
+    PackMeta,
+    Source(&'a dyn SourceTransformer),
+}
+
 impl MigrationEngine {
     pub fn new(transformers: Vec<Box<dyn SourceTransformer>>) -> Self {
         Self { transformers }
     }
 
-    /// Compute edits without writing anything.
-    /// Returns `(edits, files_scanned, warnings)`.
+    fn handler(&self, rel: &Path) -> Option<Handler<'_>> {
+        if let Some(k) = DescriptorKind::from_path(rel) {
+            return Some(Handler::Descriptor(k));
+        }
+        if let Some(b) = BuildFile::from_path(rel) {
+            return Some(Handler::Build(b));
+        }
+        if is_mixin_config(rel) {
+            return Some(Handler::MixinConfig);
+        }
+        if is_pack_mcmeta(rel) {
+            return Some(Handler::PackMeta);
+        }
+        self.transformers
+            .iter()
+            .find(|t| t.applies_to(rel))
+            .map(|t| Handler::Source(t.as_ref()))
+    }
+
+    /// Compute edits and moves without writing anything.
     pub fn compute_edits(
         &self,
         plan: &MigrationPlan,
         project: &Project,
-    ) -> Result<(Vec<FileEdit>, usize, Vec<String>), MigrationError> {
-        let mut edits = Vec::new();
-        let mut warnings = Vec::new();
-        let mut scanned = 0;
+    ) -> Result<EditSet, MigrationError> {
+        let mut set = EditSet::default();
+        let files = collect_files(&project.root)?;
 
-        for rel in collect_files(&project.root)? {
-            let descriptor = DescriptorKind::from_path(&rel);
-            let tf = self.transformers.iter().find(|t| t.applies_to(&rel));
-            if descriptor.is_none() && tf.is_none() {
-                continue;
+        if plan.datapack_renames {
+            let existing: std::collections::HashSet<&PathBuf> = files.iter().collect();
+            for rel in &files {
+                if let Some(to) = datapack_move(rel) {
+                    if existing.contains(&to) {
+                        set.warnings.push(format!(
+                            "{}: not moved, {} already exists",
+                            rel.display(),
+                            to.display()
+                        ));
+                    } else {
+                        set.moves.push(FileMove {
+                            from: rel.clone(),
+                            to,
+                        });
+                    }
+                }
             }
+        }
+
+        for rel in files {
+            let Some(handler) = self.handler(&rel) else {
+                continue;
+            };
             let abs = resolve_within(&project.root, &rel)?;
             if std::fs::metadata(&abs)?.len() > MAX_SOURCE_BYTES {
-                warnings.push(format!(
+                set.warnings.push(format!(
                     "{}: larger than {MAX_SOURCE_BYTES} bytes, skipped",
                     rel.display()
                 ));
                 continue;
             }
-            scanned += 1;
+            set.files_scanned += 1;
             let Ok(original) = String::from_utf8(project.fs.read(&abs)?) else {
-                warnings.push(format!("{}: not valid UTF-8, skipped", rel.display()));
+                set.warnings
+                    .push(format!("{}: not valid UTF-8, skipped", rel.display()));
                 continue;
             };
 
             let mut current = original.clone();
             let mut replacements = Vec::new();
-            if let Some(kind) = descriptor {
-                let r = migrate_descriptor(kind, &original, &plan.descriptor_target);
-                warnings.extend(
-                    r.warnings
-                        .into_iter()
-                        .map(|w| format!("{}: {w}", rel.display())),
-                );
-                current = r.updated;
-                replacements = r.replacements;
-            } else if let Some(tf) = tf {
-                for stage in &plan.stages {
-                    let (next, reps) = tf.transform(&current, &stage.rules);
-                    current = next;
-                    replacements.extend(reps);
+            let mut notes = Vec::new();
+            let mut take = |r: crate::descriptor::EditResult,
+                            current: &mut String,
+                            replacements: &mut Vec<Replacement>| {
+                *current = r.updated;
+                replacements.extend(r.replacements);
+                notes.extend(r.warnings);
+            };
+            match handler {
+                Handler::Descriptor(kind) => {
+                    let r = migrate_descriptor(kind, &original, &plan.descriptor_target);
+                    take(r, &mut current, &mut replacements);
+                }
+                Handler::Build(kind) => {
+                    let r = migrate_build_file(kind, &original, &plan.descriptor_target, plan.java);
+                    take(r, &mut current, &mut replacements);
+                }
+                Handler::MixinConfig => {
+                    take(
+                        migrate_mixin_config(&original, plan.java),
+                        &mut current,
+                        &mut replacements,
+                    );
+                }
+                Handler::PackMeta => {
+                    let dir = rel.parent().unwrap_or_else(|| Path::new(""));
+                    let has = |d: &str| project.root.join(dir).join(d).is_dir();
+                    let data_only = has("data") && !has("assets");
+                    take(
+                        migrate_pack_mcmeta(&original, plan.pack_formats, data_only),
+                        &mut current,
+                        &mut replacements,
+                    );
+                }
+                Handler::Source(tf) => {
+                    let mixin = is_mixin_class(&original);
+                    for stage in &plan.stages {
+                        let (next, reps) = tf.transform(&current, &stage.rules);
+                        current = next;
+                        replacements.extend(reps);
+                        if mixin {
+                            let r = migrate_mixin_strings(&current, &stage.rules);
+                            take(r, &mut current, &mut replacements);
+                        }
+                    }
+                    if mixin {
+                        let n = count_method_targets(&original);
+                        if n > 0 {
+                            notes.push(format!(
+                                "{n} injector method target(s) not verified (no method mappings in the knowledge base)"
+                            ));
+                        }
+                    }
                 }
             }
+            set.warnings
+                .extend(notes.into_iter().map(|w| format!("{}: {w}", rel.display())));
             if current != original {
-                edits.push(FileEdit {
+                set.edits.push(FileEdit {
                     path: rel,
                     original,
                     updated: current,
@@ -716,11 +928,42 @@ impl MigrationEngine {
                 });
             }
         }
-        Ok((edits, scanned, warnings))
+        Ok(set)
+    }
+
+    fn apply(
+        set: &EditSet,
+        project: &Project,
+    ) -> Result<(), (PathBuf, crate::filesystem::FsError)> {
+        for edit in &set.edits {
+            resolve_within(&project.root, &edit.path)
+                .and_then(|abs| project.fs.write(&abs, edit.updated.as_bytes()))
+                .map_err(|e| (edit.path.clone(), e))?;
+        }
+        for m in &set.moves {
+            let moved = (|| {
+                let from = resolve_within(&project.root, &m.from)?;
+                let to = resolve_within(&project.root, &m.to)?;
+                let data = project.fs.read(&from)?;
+                project.fs.write(&to, &data)?;
+                project.fs.remove(&from)?;
+                // Best effort: drop now-empty source directories inside the project.
+                let mut dir = from.parent();
+                while let Some(d) = dir.filter(|d| *d != project.root) {
+                    if std::fs::remove_dir(d).is_err() {
+                        break;
+                    }
+                    dir = d.parent();
+                }
+                Ok(())
+            })();
+            moved.map_err(|e| (m.from.clone(), e))?;
+        }
+        Ok(())
     }
 
     /// Run Transform (+ Apply unless `dry_run`). On apply, a checkpoint is
-    /// taken first; if any write fails the project is restored from it.
+    /// taken first; if any write or move fails the project is restored from it.
     pub fn run(
         &self,
         plan: &MigrationPlan,
@@ -728,10 +971,10 @@ impl MigrationEngine {
         store: &mut CheckpointStore,
         opts: &RunOptions<'_>,
     ) -> Result<MigrationReport, MigrationError> {
-        let (edits, files_scanned, warnings) = self.compute_edits(plan, project)?;
+        let set = self.compute_edits(plan, project)?;
 
         let mut checkpoint_id = None;
-        if !opts.dry_run && !edits.is_empty() {
+        if !opts.dry_run && (!set.edits.is_empty() || !set.moves.is_empty()) {
             let cp = store.snapshot(
                 opts.session_id,
                 "pre-transform",
@@ -739,17 +982,13 @@ impl MigrationEngine {
                 opts.snapshot_root,
             )?;
             checkpoint_id = Some(cp.id);
-            for edit in &edits {
-                let written = resolve_within(&project.root, &edit.path)
-                    .and_then(|abs| project.fs.write(&abs, edit.updated.as_bytes()));
-                if let Err(e) = written {
-                    let rolled_back = store.restore(cp.id, &project.root).is_ok();
-                    return Err(MigrationError::ApplyFailed {
-                        path: edit.path.clone(),
-                        cause: e.to_string(),
-                        rolled_back,
-                    });
-                }
+            if let Err((path, e)) = Self::apply(&set, project) {
+                let rolled_back = store.restore(cp.id, &project.root).is_ok();
+                return Err(MigrationError::ApplyFailed {
+                    path,
+                    cause: e.to_string(),
+                    rolled_back,
+                });
             }
         }
 
@@ -757,8 +996,9 @@ impl MigrationEngine {
             request: plan.request.clone(),
             dry_run: opts.dry_run,
             checkpoint_id,
-            files_scanned,
-            changes: edits
+            files_scanned: set.files_scanned,
+            changes: set
+                .edits
                 .iter()
                 .map(|e| FileChangeSummary {
                     path: e.path.clone(),
@@ -766,10 +1006,11 @@ impl MigrationEngine {
                     diff: e.unified_diff(),
                 })
                 .collect(),
+            moves: set.moves,
             skipped_mappings: plan.skipped.clone(),
             breaking_changes: plan.breaking_changes.clone(),
             recipes: plan.recipes.clone(),
-            warnings,
+            warnings: set.warnings,
         })
     }
 }
