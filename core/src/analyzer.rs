@@ -640,6 +640,50 @@ impl IAnalyzer for SourceScanner {
             report.languages.push("scala".into());
         }
 
+        // Source projects keep their descriptors under src/main/resources (Phase 9).
+        let res = project_root.join("src/main/resources");
+        let read = |rel: &str| -> String {
+            let p = res.join(rel);
+            if fs.exists(&p) {
+                fs.read(&p)
+                    .ok()
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            }
+        };
+        let files = JarMetadataFiles {
+            manifest: String::new(),
+            mods_toml: read("META-INF/mods.toml"),
+            neoforge_mods_toml: read("META-INF/neoforge.mods.toml"),
+            fabric_json: read("fabric.mod.json"),
+            quilt_json: read("quilt.mod.json"),
+            mcmod_info: read("mcmod.info"),
+        };
+        let any = [
+            &files.mods_toml,
+            &files.neoforge_mods_toml,
+            &files.fabric_json,
+            &files.quilt_json,
+            &files.mcmod_info,
+        ]
+        .iter()
+        .any(|s| !s.is_empty());
+        if any {
+            if let Ok((loader, metadata)) = parse_jar_metadata(&files) {
+                let minecraft = detect_minecraft_version(&metadata);
+                report.mods.push(ModAnalysis {
+                    metadata,
+                    source_files: java_files.iter().chain(&kt_files).cloned().collect(),
+                    jar_path: None,
+                    detected_loader: loader,
+                    detected_minecraft: minecraft,
+                    detected_java: None,
+                });
+            }
+        }
+
         Ok(report)
     }
 }
@@ -954,5 +998,22 @@ mod tests {
         let text = report.to_text();
         assert!(text.contains("Fabrica"));
         assert!(text.contains("NeoForgeA"));
+    }
+
+    #[test]
+    fn source_tree_descriptor_is_read() {
+        let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/loader");
+        let fabric = AnalyzerEngine::default()
+            .analyze(&root.join("fabric-src"), &fs)
+            .unwrap();
+        assert_eq!(fabric.mods.len(), 1);
+        assert_eq!(fabric.mods[0].metadata.mod_id, "demowidget");
+        assert_eq!(fabric.mods[0].metadata.loader, Loader::Fabric);
+        assert!(fabric.mods[0].jar_path.is_none());
+        let neo = AnalyzerEngine::default()
+            .analyze(&root.join("neoforge-src"), &fs)
+            .unwrap();
+        assert_eq!(neo.mods[0].metadata.loader, Loader::NeoForge);
     }
 }
