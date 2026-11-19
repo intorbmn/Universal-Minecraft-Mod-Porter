@@ -20,7 +20,7 @@ use crate::filesystem::{resolve_within, FsError};
 use crate::knowledge::{BreakingChange, KnowledgeBase, Mapping};
 use crate::mixin::{
     count_method_targets, is_mixin_class, is_mixin_config, migrate_mixin_config,
-    migrate_mixin_strings,
+    migrate_mixin_members, migrate_mixin_strings,
 };
 use crate::persistence::DbError;
 use crate::project::Project;
@@ -957,6 +957,8 @@ impl MigrationEngine {
                         replacements.extend(reps);
                         if mixin {
                             let r = migrate_mixin_strings(&current, &stage.rules);
+                            take(r, &mut current, &mut replacements);
+                            let r = migrate_mixin_members(&current, &stage.rules);
                             take(r, &mut current, &mut replacements);
                         }
                     }

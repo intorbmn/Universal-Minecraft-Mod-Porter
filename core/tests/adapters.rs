@@ -203,3 +203,114 @@ fn native_methods_and_load_library_reported() {
         f.message
     );
 }
+
+// ---- Mixin member renames (Task 3) ----
+
+const MIXIN_STUBS: &[(&str, &str)] = &[
+    ("org/spongepowered/asm/mixin/Mixin.java", "package org.spongepowered.asm.mixin;\npublic @interface Mixin { Class<?>[] value() default {}; String[] targets() default {}; }\n"),
+    ("org/spongepowered/asm/mixin/gen/Accessor.java", "package org.spongepowered.asm.mixin.gen;\npublic @interface Accessor { String value() default \"\"; }\n"),
+    ("org/spongepowered/asm/mixin/gen/Invoker.java", "package org.spongepowered.asm.mixin.gen;\npublic @interface Invoker { String value() default \"\"; }\n"),
+    ("org/spongepowered/asm/mixin/injection/At.java", "package org.spongepowered.asm.mixin.injection;\npublic @interface At { String value(); String target() default \"\"; }\n"),
+    ("org/spongepowered/asm/mixin/injection/Inject.java", "package org.spongepowered.asm.mixin.injection;\npublic @interface Inject { String[] method(); At[] at(); }\n"),
+    ("com/example/demo/DemoWidget.java", "package com.example.demo;\npublic class DemoWidget { int demoSize; void tickDemo() {} void runDemo() {} }\n"),
+    ("com/example/demo/OtherWidget.java", "package com.example.demo;\npublic class OtherWidget { void tickDemo() {} }\n"),
+];
+
+const DEMO_MIXIN: &str = "package com.example.demo.mixin;\n\
+import com.example.demo.DemoWidget;\n\
+import org.spongepowered.asm.mixin.Mixin;\n\
+import org.spongepowered.asm.mixin.gen.Accessor;\n\
+import org.spongepowered.asm.mixin.gen.Invoker;\n\
+import org.spongepowered.asm.mixin.injection.At;\n\
+import org.spongepowered.asm.mixin.injection.Inject;\n\
+@Mixin(DemoWidget.class)\n\
+public interface DemoWidgetMixin {\n\
+    @Accessor(\"demoSize\") int ummpSize();\n\
+    @Invoker(\"runDemo\") void ummpRun();\n\
+    @Inject(method = \"tickDemo\", at = @At(value = \"INVOKE\", target = \"Lcom/example/demo/DemoWidget;runDemo()V\"))\n\
+    default void ummpTick() {}\n\
+}\n";
+
+fn member_rules() -> Vec<ummp_core::migration::RenameRule> {
+    [
+        (
+            "com.example.demo.DemoWidget#tickDemo",
+            "com.example.demo.DemoWidget#tickWidget",
+        ),
+        (
+            "com.example.demo.DemoWidget#runDemo",
+            "com.example.demo.DemoWidget#runWidget",
+        ),
+        (
+            "com.example.demo.DemoWidget#demoSize",
+            "com.example.demo.DemoWidget#widgetSize",
+        ),
+    ]
+    .iter()
+    .map(|(f, t)| ummp_core::migration::RenameRule {
+        from: (*f).into(),
+        to: (*t).into(),
+        kind: "method".into(),
+        confidence: 1.0,
+        version: "1.21.1".into(),
+    })
+    .collect()
+}
+
+fn javac_ok(extra: &[(&str, &str)]) -> bool {
+    let d = tempfile::tempdir().unwrap();
+    let mut files = Vec::new();
+    for (rel, body) in MIXIN_STUBS.iter().chain(extra) {
+        write(d.path(), &format!("src/{rel}"), body);
+        files.push(d.path().join("src").join(rel));
+    }
+    std::process::Command::new("javac")
+        .arg("-d")
+        .arg(d.path().join("out"))
+        .args(&files)
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+#[test]
+fn member_rename_inject_accessor_invoker_at() {
+    let r = ummp_core::mixin::migrate_mixin_members(DEMO_MIXIN, &member_rules());
+    let out = &r.updated;
+    assert!(out.contains("@Accessor(\"widgetSize\")"), "{out}");
+    assert!(out.contains("@Invoker(\"runWidget\")"), "{out}");
+    assert!(out.contains("method = \"tickWidget\""), "{out}");
+    assert!(
+        out.contains("target = \"Lcom/example/demo/DemoWidget;runWidget()V\""),
+        "{out}"
+    );
+    assert_eq!(r.replacements.len(), 4);
+    if std::process::Command::new("javac")
+        .arg("-version")
+        .output()
+        .is_ok()
+    {
+        let rel = "com/example/demo/mixin/DemoWidgetMixin.java";
+        assert!(
+            javac_ok(&[(rel, DEMO_MIXIN)]),
+            "original fixture must compile"
+        );
+        assert!(javac_ok(&[(rel, out)]), "renamed source must compile");
+    }
+}
+
+#[test]
+fn member_rename_owner_guard() {
+    let other = DEMO_MIXIN
+        .replace(
+            "import com.example.demo.DemoWidget;",
+            "import com.example.demo.OtherWidget;",
+        )
+        .replace("@Mixin(DemoWidget.class)", "@Mixin(OtherWidget.class)")
+        .replace(
+            "Lcom/example/demo/DemoWidget;",
+            "Lcom/example/demo/OtherWidget;",
+        );
+    let r = ummp_core::mixin::migrate_mixin_members(&other, &member_rules());
+    assert_eq!(r.updated, other);
+    assert!(r.replacements.is_empty());
+}
