@@ -16,3 +16,4 @@
 | Acceptance Criteria | Search returns correct mappings/recipes; schema migrations apply cleanly; seed data loads. |
 | Complexity | L |
 | Status | COMPLETED |
+| Notes | 2026-11-19: all 10 KB tests failed on `master` (TempDir dropped before use → SQLITE_READONLY_DBMOVED); fixed. Seed data is illustrative only (see KNOWN_LIMITATIONS). |

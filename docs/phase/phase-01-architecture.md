@@ -16,3 +16,4 @@
 | Acceptance Criteria | Every module has a defined interface; no cycle in dependency graph; ADR exists for each major decision; diagrams render. |
 | Complexity | S |
 | Status | COMPLETED |
+| Notes | ADRs were missing despite the acceptance criterion; `docs/decisions/0001`-`0005` written retroactively on 2026-11-19 from SAD/TECH_STACK, plus 0006/0007 for new decisions. |

@@ -16,3 +16,4 @@
 | Acceptance Criteria | Import a fixture project; create a session; checkpoint; simulate failure; resume; rollback works. |
 | Complexity | M |
 | Status | COMPLETED |
+| Notes | 2026-11-19: "rollback works" was not actually met (checkpoint stored metadata only). Closed with `CheckpointStore::snapshot`/`restore` (ADR 0006) and a rewritten integration test. |

@@ -15,4 +15,27 @@
 | Risks | Transform breaks compilation; recipe coverage gaps. |
 | Acceptance Criteria | A corpus mod migrates through transform step and produces a valid diff; rollback restores original exactly. |
 | Complexity | L |
-| Status | PLANNED |
+| Status | IN_PROGRESS |
+
+## Milestones
+| ID | Milestone | Status | Evidence |
+|---|---|---|---|
+| 6.A | Planner + Java/Kotlin API-rename transformer + diff + report + checkpointed apply + rollback + CLI | COMPLETED | `core/tests/migration.rs` (golden file, stage order, conflicts, downgrade rejection, rollback after simulated write failure); 8 tokenizer unit tests; CLI end-to-end run (dry run → apply → rollback, `diff -r` identical) |
+| 6.B | Descriptor migration (`mods.toml`, `neoforge.mods.toml`, `fabric.mod.json`, `quilt.mod.json`) | NOT_STARTED | |
+| 6.C | Build migration (Gradle plugin/loader/mappings versions, Java toolchain) | NOT_STARTED | |
+| 6.D | Resource / datapack migration | NOT_STARTED | |
+| 6.E | Mixin migration | NOT_STARTED | |
+| 6.F | Bytecode migration (adapter over an external tool) | NOT_STARTED | |
+| 6.G | Recipe execution (interpret `Recipe.steps`) | NOT_STARTED | |
+
+## Milestone 6.A report
+- **Implemented:** `MigrationPlanner` (mappings in `(source, target]`, per-version stages,
+  confidence threshold, conflict/no-op detection, breaking changes, recipes);
+  `SourceTransformer` trait + `TokenRenameTransformer` (ADR 0007); `FileEdit` + unified diff;
+  `MigrationReport` (Markdown/JSON); `MigrationEngine::run` with checkpoint-before-write and
+  automatic restore on write failure (ADR 0005/0006); CLI `migrate` / `rollback`.
+- **Architecture changes:** ADR 0006 (snapshot checkpoints), ADR 0007 (token-aware rewrite).
+  Phase 3 checkpoint gained real `snapshot`/`restore`.
+- **Known issues / technical debt:** see `docs/KNOWN_LIMITATIONS.md` → Migration engine.
+- **Risks still open:** R1/R4 (no real mapping dataset yet), R5 (Mixins untouched).
+- **Entry condition for 6.B:** user review of ADR 0007 rewrite policy (`should_rewrite`).
