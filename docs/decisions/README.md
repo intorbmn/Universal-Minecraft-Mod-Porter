@@ -14,4 +14,5 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0004](0004-tauri-desktop-ui.md) | Tauri for the desktop UI | Accepted (deferred to Phase 11) |
 | [0005](0005-ai-write-gate.md) | AI never writes to a project directly | Accepted |
 | [0006](0006-filesystem-snapshot-checkpoints.md) | File-copy snapshots for checkpoint/rollback | Accepted |
-| [0007](0007-token-level-source-transform.md) | Token-aware text rewriting for the first source transformer | Accepted |
+| [0007](0007-token-level-source-transform.md) | Token-aware text rewriting for the first source transformer | Accepted (after-dot rule superseded by 0008) |
+| [0008](0008-rename-after-package-path.md) | Rename simple names after a package path | Accepted |

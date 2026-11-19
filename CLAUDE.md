@@ -33,7 +33,7 @@ with that variable set. Never unpin the toolchain to get around this.
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
   milestone, report it, and wait for the user to review.
-- Every significant decision gets an ADR in `docs/decisions/` (next number: 0008).
+- Every significant decision gets an ADR in `docs/decisions/` (next number: 0009).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
 - Edits are applied only by `MigrationEngine` after a checkpoint (ADR 0005/0006). This

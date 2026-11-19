@@ -278,19 +278,29 @@ pub struct MatchContext<'a> {
     pub preceded_by_dot: bool,
     /// The name is part of an `import` / `import static` statement.
     pub in_import: bool,
+    /// The dotted path before the matched name (`com.example` in
+    /// `com.example.DemoWidget`); empty when nothing precedes it.
+    pub qualifier: &'a str,
 }
 
-/// Rewrite policy for a token that matches a rule.
+/// Rewrite policy for a token that matches a rule (ADR 0008).
 ///
-/// Without type information we cannot tell whether `x.Block` refers to the
-/// class `Block` or to an unrelated member called `Block`, so a *simple-name*
-/// rule only rewrites names that are not member accesses. Qualified rules and
-/// import statements are unambiguous: they name a type by its full path.
+/// Qualified rules and import statements name a type by its full path, so
+/// they always match. A *simple-name* rule matches a standalone name, and a
+/// name after a dot only when everything before it is lowercase, i.e. looks
+/// like a package path (`com.example.DemoWidget`). `Outer.DemoWidget` (a
+/// member or nested type) and `foo().DemoWidget` are left alone. Without type
+/// information a lowercase variable (`x.DemoWidget`) is indistinguishable from
+/// a package and is renamed too; this is the accepted trade-off.
 pub fn should_rewrite(ctx: &MatchContext<'_>) -> bool {
-    if ctx.rule.is_qualified() || ctx.in_import {
+    if ctx.rule.is_qualified() || ctx.in_import || !ctx.preceded_by_dot {
         return true;
     }
-    !ctx.preceded_by_dot
+    !ctx.qualifier.is_empty()
+        && ctx
+            .qualifier
+            .split('.')
+            .all(|seg| seg.starts_with(|c: char| c.is_ascii_lowercase()))
 }
 
 pub trait SourceTransformer: Send + Sync {
@@ -437,10 +447,16 @@ impl SourceTransformer for TokenRenameTransformer {
                         .iter()
                         .enumerate()
                         .all(|(t, seg)| &src[segs[k + t].0..segs[k + t].1] == *seg);
+                    let qualifier = if k > 0 {
+                        &src[segs[0].0..segs[k - 1].1]
+                    } else {
+                        ""
+                    };
                     let ctx = MatchContext {
                         rule,
                         preceded_by_dot: k > 0 || lead_dot,
                         in_import,
+                        qualifier,
                     };
                     if matches && should_rewrite(&ctx) {
                         best = Some((len, rule));
@@ -790,13 +806,17 @@ mod tests {
         assert_eq!(out, r#"s = "a\"DemoWidget"; DemoGadget y;"#);
     }
 
+    /// ADR 0008: after a dot, a simple name is renamed only when everything
+    /// before it in the dotted path is lowercase (a package path).
     #[test]
-    fn test_member_access_not_renamed_but_import_is() {
-        let src = "import com.example.DemoWidget;\nfoo.DemoWidget = 1; DemoWidget.getId();";
+    fn test_after_dot_renamed_only_after_package_path() {
+        let src = "import com.example.DemoWidget;\n\
+                   com.example.DemoWidget.create(); Outer.DemoWidget o; foo().DemoWidget = 1; DemoWidget.getId();";
         let out = rewrite(src, &[rule("DemoWidget", "DemoGadget")]);
         assert_eq!(
             out,
-            "import com.example.DemoGadget;\nfoo.DemoWidget = 1; DemoGadget.getId();"
+            "import com.example.DemoGadget;\n\
+             com.example.DemoGadget.create(); Outer.DemoWidget o; foo().DemoWidget = 1; DemoGadget.getId();"
         );
     }
 

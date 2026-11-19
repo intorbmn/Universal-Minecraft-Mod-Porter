@@ -28,8 +28,9 @@ Each entry names the module and the phase expected to address it.
   (`mods.toml`, `fabric.mod.json`), resources/datapacks, Mixins, bytecode, and loader-to-loader
   migration.
 - **No type resolution** (ADR 0007). A simple-name rule such as `DemoWidget -> DemoGadget` renames every
-  standalone `DemoWidget` token, whichever class it refers to. Member accesses (`foo.DemoWidget`) are
-  left alone except inside `import` statements. Prefer qualified mappings.
+  standalone `DemoWidget` token, whichever class it refers to. After a dot it is renamed only
+  when the qualifier is all-lowercase (ADR 0008), so `x.DemoWidget` on a lowercase variable
+  is renamed too. Prefer qualified mappings.
 - **Not rewritten:** string literals, comments, Kotlin string templates (`"${DemoWidget.ID}"`),
   and wildcard imports (`import com.example.*`).
 - **Versions must be numeric** (`1.20.1`). Snapshots and pre-releases (`24w14a`,
