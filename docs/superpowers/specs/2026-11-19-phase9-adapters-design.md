@@ -106,6 +106,22 @@ Applied only to string values of the listed annotation attributes in a Mixin cla
 `@Mixin` target is `Owner` (or whose `@At(target=…)` names `Owner`). Descriptors in strings
 (`name(Lpkg/Type;)V`) keep their descriptor part, which class renames already handle.
 
+### Source in, ported source out (user requirement)
+A user hands UMMP their mod source and gets the ported source back, without touching the
+original:
+- `ummp port <input> --to <mc> [--loader <loader>] [--output <dir>] [--zip]`
+- `<input>` is a source folder or a `.zip` of one (zip entries go through `resolve_within`).
+- UMMP copies the input to a new output folder: by default
+  `D:\Claude\ummp-ports\<mod>-<mc>-<loader>-<time>` on Windows and `~/ummp-ports/...`
+  elsewhere. It then runs the whole pipeline (version migration, adapters, loader
+  conversion) on the copy through `MigrationEngine`.
+- The copy also receives `UMMP_REPORT.md` (diff summary, Technologies, every `assisted`/
+  `manual` item with file:line). `--zip` additionally writes `<output>.zip`.
+- The original is never modified. `migrate --apply` keeps its in-place behaviour with
+  checkpoints.
+- Optional `--build`: runs Phase 8 `ummp build` on the output and appends the result to the
+  report.
+
 ### CLI
 - `ummp analyze` prints the Technologies section.
 - `ummp migrate --loader neoforge` on a Fabric mod performs the conversion (dry run by
@@ -120,6 +136,9 @@ Applied only to string values of the listed annotation attributes in a Mixin cla
 - Mixin members: compile a real Mixin-style source with annotations (javac with stub
   annotation types) and check only the right strings change; mutation-check the owner guard.
 - Groovy/Scala: tokenizer tests for triple quotes and `${}`.
+- `port`: input folder and input zip both produce an output folder (and zip) with the ported
+  source and `UMMP_REPORT.md`; the input stays byte-identical; a zip entry with `../` is
+  rejected.
 - Demonstration: `tests/fixtures/demo-fabric-mod/` (minimal real mod, one Mixin, one
   initializer); manual evidence = `ummp build` on GitHub before and after conversion,
   recorded in the phase file.
