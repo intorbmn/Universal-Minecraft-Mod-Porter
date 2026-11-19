@@ -4,7 +4,7 @@ Last updated: 2026-11-19
 
 Status follows the rule in the master prompt: **COMPLETED only with test evidence
 against the phase's acceptance criteria.** Evidence = `cargo build`, `cargo test --all`
-(63 tests), `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`, all green
+(92 tests), `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`, all green
 locally on branch `fix/ci-green-and-phase-6`.
 
 | Phase | Status | Evidence / note |
@@ -15,7 +15,7 @@ locally on branch `fix/ci-green-and-phase-6`.
 | 3 Core Engine | COMPLETED | Checkpoint previously stored metadata only. Real snapshot/restore and `resolve_within` path guard added; integration test covers import → checkpoint → failure → rollback → resume |
 | 4 Analyzer Engine | COMPLETED | Fixed: binary JAR entries aborted analysis of every real mod; `neoforge.mods.toml`; Quilt; version ranges. Corpus 12 mods (criterion: 10+). See KNOWN_LIMITATIONS for gaps |
 | 5 Compatibility & Knowledge Base | COMPLETED | 10 KB tests now actually pass (TempDir lifetime bug). Seed data is illustrative only |
-| 6 Migration Engine | IN_PROGRESS | 6.A (Java/Kotlin API renames) and 6.B (descriptor Minecraft/loader versions) COMPLETED with regression tests; 6.C-6.G not started (see `docs/phase/phase-06-migration.md`) |
+| 6 Migration Engine | COMPLETED | 6.A–6.G: source renames, descriptors, build scripts, resources/data packs, Mixins, class-level bytecode, recipes. 92 tests incl. real-JVM check; see `docs/phase/phase-06-migration.md` |
 | 7 AI Agent System | NOT_STARTED | |
 | 8 Build & Testing Engine | NOT_STARTED | |
 | 9 Advanced Technology Adapters | NOT_STARTED | |
@@ -26,5 +26,4 @@ locally on branch `fix/ci-green-and-phase-6`.
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Next milestone
-6.C — build migration (Gradle plugin/loader/mappings versions, Java toolchain). Awaiting
-user review of 6.B first.
+Phase 7 — AI Agent System. Awaiting user review of Phase 6 first.

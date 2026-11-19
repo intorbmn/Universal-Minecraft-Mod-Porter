@@ -23,9 +23,18 @@ Each entry names the module and the phase expected to address it.
 - No real mapping dataset (MCP, Yarn, Mojang, Parchment) is imported yet.
 
 ## Migration engine (Phase 6)
-- **Transformed so far:** API renames in Java/Kotlin sources (6.A), and Minecraft/loader
-  version requirements in `fabric.mod.json`, `quilt.mod.json` and `META-INF/[neoforge.]mods.toml`
-  (6.B). Not yet: build scripts, resources/datapacks, Mixins, bytecode, loader-to-loader.
+- **Covered:** source API renames, descriptors, `gradle.properties`/Java level, `pack.mcmeta`
+  and 1.21 data pack folder renames, Mixin configs and descriptor strings, class-level
+  bytecode remapping, tested KB recipes. **Not covered:** loader-to-loader migration;
+  method/field renames (source and bytecode; needs member mappings); Gradle plugin and
+  mappings versions (reported only); data pack *content* changes (e.g. recipe JSON schema
+  changes); Kotlin string templates.
+- **Built-in tables** (not in the KB): the Minecraft → Java table (`required_java`) and the
+  1.21 data pack folder renames. Both are cited in code; update them there.
+- **Pack formats** come only from the KB `pack_formats` table, which ships empty. Without
+  rows, `pack.mcmeta` is left unchanged with a warning.
+- **`remap-jar`** drops JAR signatures and does not touch reflection strings. Mixin
+  injector method targets are reported, not verified.
 - **Descriptors:** the loader requirement is updated only when the KB has a compatibility row
   for the exact target version; otherwise it is left as is with a warning. `ummp migrate
   --mappings` uses a KB with no compatibility rows, so it never updates loader versions.

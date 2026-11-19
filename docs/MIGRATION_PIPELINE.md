@@ -27,11 +27,11 @@ Steps run in order; `Plan` depends on `Analyze`; `Transform` depends on `Plan`; 
 
 ## User visibility
 The UI/CLI shows current step, progress, logs, and a clear error with suggested next action.
-## Implemented so far (Phase 6.A)
+## Implemented (Phase 6)
 | Step | Code | Notes |
 |---|---|---|
 | Plan | `MigrationPlanner::plan` | mappings for the target loader with version in `(source, target]`, grouped into ordered per-version stages |
-| Transform | `SourceTransformer` / `TokenRenameTransformer` | Java/Kotlin API renames only (ADR 0007) |
+| Transform | `TokenRenameTransformer`, `descriptor`, `build_script`, `resources`, `mixin`, `bytecode` | sources, descriptors, Gradle, packs and data pack moves, Mixins, compiled JARs (`remap-jar`) |
 | Review | `FileEdit::unified_diff`, `MigrationReport::to_markdown` / `to_json` | dry run is the default in the CLI |
 | Export (apply) | `MigrationEngine::run` | checkpoint first; any failed write restores it |
 | Rollback | `CheckpointStore::restore`, `ummp rollback` | byte-identical restore outside `SKIP_DIRS` |

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 6.C–6.G: build-script migration (`build_script.rs`), resources and 1.21 data pack folder
+  moves (`resources.rs`, KB `pack_formats` table), Mixin migration (`mixin.rs`), class-level
+  bytecode remapping (`bytecode.rs`, `ummp remap-jar`, ADR 0009), and recipe execution.
+- `FileSystem::remove`; `MigrationEngine::compute_edits` now returns an `EditSet` with moves.
 - Phase 6.B descriptor migration (`core/src/descriptor.rs`): retargets Minecraft and loader
   version requirements in Fabric/Quilt/Forge/NeoForge descriptors, preserving formatting.
 - ADR 0008: simple names after an all-lowercase (package) qualifier are renamed.
