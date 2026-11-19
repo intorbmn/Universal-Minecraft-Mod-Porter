@@ -147,6 +147,44 @@ pub fn remap_class(
     Ok(changed.then_some(out))
 }
 
+/// All `CONSTANT_Utf8` strings of a class file (class names, member names, descriptors and
+/// string literals), lossily decoded. Used by the risk scan.
+///
+/// # Errors
+/// [`BytecodeError::InvalidClass`] when the file is not a well-formed class file.
+pub fn utf8_constants(bytes: &[u8], name: &str) -> Result<Vec<String>, BytecodeError> {
+    let bad = |m: &str| BytecodeError::InvalidClass(name.into(), m.into());
+    if bytes.get(0..4) != Some(&[0xCA, 0xFE, 0xBA, 0xBE]) {
+        return Err(bad("missing CAFEBABE magic"));
+    }
+    let count = u16_at(bytes, 8, name)?;
+    let (mut i, mut index, mut out) = (10, 1, Vec::new());
+    while index < count {
+        let tag = *bytes.get(i).ok_or_else(|| bad("truncated constant pool"))?;
+        let size = match tag {
+            1 => {
+                let len = u16_at(bytes, i + 1, name)?;
+                let raw = bytes
+                    .get(i + 3..i + 3 + len)
+                    .ok_or_else(|| bad("truncated Utf8"))?;
+                out.push(String::from_utf8_lossy(raw).into_owned());
+                3 + len
+            }
+            7 | 8 | 16 | 19 | 20 => 3,
+            15 => 4,
+            3 | 4 | 9 | 10 | 11 | 12 | 17 | 18 => 5,
+            5 | 6 => {
+                index += 1;
+                9
+            }
+            t => return Err(bad(&format!("unknown constant tag {t}"))),
+        };
+        i += size;
+        index += 1;
+    }
+    Ok(out)
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RemapStats {
     pub classes_changed: usize,

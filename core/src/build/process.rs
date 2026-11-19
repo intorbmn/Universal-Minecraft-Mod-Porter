@@ -202,11 +202,16 @@ mod tests {
         assert_eq!(st, ProcStatus::TimedOut);
         let pid = std::fs::read_to_string(d.path().join("pid")).unwrap();
         std::thread::sleep(Duration::from_millis(200));
-        let alive = std::process::Command::new("kill")
-            .args(["-0", pid.trim()])
-            .status()
-            .unwrap()
-            .success();
+        // A killed process may linger as a zombie until its new parent reaps it; that is dead.
+        let stat = std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()));
+        let alive = match stat {
+            Ok(st) => !st.contains(") Z "),
+            Err(_) => std::process::Command::new("kill")
+                .args(["-0", pid.trim()])
+                .status()
+                .unwrap()
+                .success(),
+        };
         assert!(!alive, "grandchild {pid} survived");
     }
 
