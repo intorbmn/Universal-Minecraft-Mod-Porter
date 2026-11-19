@@ -323,7 +323,7 @@ fn find_seq(b: &[u8], from: usize, pat: &[u8]) -> Option<usize> {
 
 /// Skip a `"…"` or `'…'` literal starting at `i`; stops at an unescaped
 /// closing quote or at end of line (unterminated literal).
-fn skip_quoted(b: &[u8], i: usize, quote: u8) -> usize {
+const fn skip_quoted(b: &[u8], i: usize, quote: u8) -> usize {
     let mut j = i + 1;
     while j < b.len() {
         match b[j] {

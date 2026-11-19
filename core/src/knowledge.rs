@@ -1079,15 +1079,15 @@ mod tests {
         let (_kb_dir, kb) = setup_kb();
         seed_knowledge(&kb).unwrap();
         let mappings = kb.mappings_by_loader("fabric").unwrap();
-        assert!(!mappings.is_empty());
+        assert_ne!(mappings.len(), 0, "seed produced no mappings");
         let compat = kb.compatibilities_by_loader("fabric").unwrap();
-        assert!(!compat.is_empty());
+        assert_ne!(compat.len(), 0, "seed produced no compat");
         let breaks = kb.breaking_changes_by_version("1.17").unwrap();
-        assert!(!breaks.is_empty());
+        assert_ne!(breaks.len(), 0, "seed produced no breaks");
         let recipes = kb.recipes_by_loader("fabric").unwrap();
-        assert!(!recipes.is_empty());
+        assert_ne!(recipes.len(), 0, "seed produced no recipes");
         let deps = kb.dependencies_by_mod_id("fabric-api").unwrap();
-        assert!(!deps.is_empty());
+        assert_ne!(deps.len(), 0, "seed produced no deps");
     }
 
     #[test]

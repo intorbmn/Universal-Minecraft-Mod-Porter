@@ -760,7 +760,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let fs = LocalFileSystem;
         let jars = find_jars(dir.path(), &fs).unwrap();
-        assert!(jars.is_empty());
+        assert_eq!(jars.len(), 0, "unexpected jars: {jars:?}");
     }
 
     #[test]
