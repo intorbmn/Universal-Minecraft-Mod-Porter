@@ -479,7 +479,7 @@ impl SourceTransformer for TokenRenameTransformer {
     fn applies_to(&self, path: &Path) -> bool {
         matches!(
             path.extension().and_then(|e| e.to_str()),
-            Some("java" | "kt")
+            Some("java" | "kt" | "groovy" | "scala")
         )
     }
 
@@ -519,7 +519,12 @@ impl SourceTransformer for TokenRenameTransformer {
                 continue;
             }
             if c == b'\'' {
-                i = skip_quoted(bytes, i, b'\'');
+                // Groovy triple-single-quoted strings span lines.
+                i = if bytes[i..].starts_with(b"'''") {
+                    find_seq(bytes, i + 3, b"'''").map_or(src_len, |p| p + 3)
+                } else {
+                    skip_quoted(bytes, i, b'\'')
+                };
                 prev_words = [None, None];
                 continue;
             }
@@ -1194,11 +1199,35 @@ mod tests {
     }
 
     #[test]
-    fn test_applies_to_java_and_kotlin_only() {
+    fn test_applies_to_jvm_sources_only() {
         let t = TokenRenameTransformer;
         assert!(t.applies_to(Path::new("src/A.java")));
         assert!(t.applies_to(Path::new("src/A.kt")));
+        assert!(t.applies_to(Path::new("src/A.groovy")));
+        assert!(t.applies_to(Path::new("src/A.scala")));
         assert!(!t.applies_to(Path::new("build.gradle.kts")));
+        assert!(!t.applies_to(Path::new("build.gradle")));
         assert!(!t.applies_to(Path::new("assets/lang/en_us.json")));
+    }
+
+    #[test]
+    fn groovy_and_scala_renamed_not_in_triple_strings() {
+        let rules = [
+            rule("com.example.old.DemoWidget", "com.example.next.DemoGadget"),
+            rule("DemoWidget", "DemoGadget"),
+        ];
+        let groovy = "import com.example.old.DemoWidget\n\
+                      def w = new DemoWidget()\n\
+                      def doc = '''\nDemoWidget stays here\n'''\n";
+        let out = rewrite(groovy, &rules);
+        assert!(out.contains("import com.example.next.DemoGadget"), "{out}");
+        assert!(out.contains("new DemoGadget()"), "{out}");
+        assert!(out.contains("DemoWidget stays here"), "{out}");
+        let scala = "import com.example.old.DemoWidget\n\
+                     val doc = \"\"\"\nDemoWidget stays\n\"\"\"\n\
+                     val w: DemoWidget = new DemoWidget\n";
+        let out = rewrite(scala, &rules);
+        assert!(out.contains("val w: DemoGadget = new DemoGadget"), "{out}");
+        assert!(out.contains("DemoWidget stays"), "{out}");
     }
 }

@@ -158,3 +158,48 @@ fn delete_and_create_apply_and_rollback() {
     store.restore(id, d.path()).unwrap();
     assert_eq!(read_tree(d.path()), before);
 }
+
+#[test]
+fn native_lists_missing_platforms() {
+    let d = tempfile::tempdir().unwrap();
+    write(
+        d.path(),
+        "src/main/resources/natives/windows-x86_64/demo.dll",
+        "MZ",
+    );
+    write(
+        d.path(),
+        "src/main/resources/natives/linux-x86_64/libdemo.so",
+        "\x7fELF",
+    );
+    let found = AdapterRegistry::default().scan_dir(d.path());
+    let f = found
+        .iter()
+        .find(|f| f.tech == "native-libs")
+        .expect("native finding");
+    assert_eq!(f.handling, Handling::Manual);
+    assert!(f.message.contains("macos"), "{}", f.message);
+    assert!(!f.message.contains("missing: windows"), "{}", f.message);
+}
+
+#[test]
+fn native_methods_and_load_library_reported() {
+    let d = tempfile::tempdir().unwrap();
+    write(
+        d.path(),
+        "src/main/java/com/example/demo/DemoNative.java",
+        "class DemoNative {\n  static { System.loadLibrary(\"demo\"); }\n  static native int size();\n}\n",
+    );
+    write(d.path(), "src/main/resources/natives/demo.dll", "MZ");
+    let found = AdapterRegistry::default().scan_dir(d.path());
+    let f = found
+        .iter()
+        .find(|f| f.tech == "native-libs" && f.message.contains("'demo'"))
+        .expect("loadLibrary finding");
+    assert_eq!(f.line, Some(2));
+    assert!(
+        f.message.contains("linux") && f.message.contains("macos"),
+        "{}",
+        f.message
+    );
+}

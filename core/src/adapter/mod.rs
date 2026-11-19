@@ -4,6 +4,7 @@
 //! is covered by a [`TechAdapter`]. An adapter always reports what it finds; some also
 //! produce edits, which go through `MigrationEngine` like every other change.
 
+pub mod native;
 pub mod rules;
 
 use crate::migration::{EditSet, MigrationError, MigrationPlan};
@@ -106,6 +107,7 @@ impl Default for AdapterRegistry {
     fn default() -> Self {
         let mut adapters: Vec<Box<dyn TechAdapter>> = Vec::new();
         adapters.extend(rules::RuleAdapter::all());
+        adapters.push(Box::new(native::NativeAdapter));
         Self { adapters }
     }
 }
