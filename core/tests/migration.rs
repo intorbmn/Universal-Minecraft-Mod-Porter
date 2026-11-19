@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use ummp_core::checkpoint::{collect_files, CheckpointStore};
 use ummp_core::filesystem::{FileSystem, FsError, LocalFileSystem};
-use ummp_core::knowledge::{BreakingChange, KnowledgeBase, Mapping};
+use ummp_core::knowledge::{BreakingChange, Compatibility, KnowledgeBase, Mapping};
 use ummp_core::migration::{
     MigrationEngine, MigrationError, MigrationPlanner, MigrationRequest, RunOptions,
 };
@@ -22,6 +22,8 @@ use uuid::Uuid;
 const FIXTURE: &str = "../tests/fixtures/forge-src-1.16";
 const GOLDEN: &str = "../tests/fixtures/golden/ExampleMod-1.17.java.golden";
 const MOD_JAVA: &str = "src/main/java/com/example/examplemod/ExampleMod.java";
+const MODS_TOML: &str = "src/main/resources/META-INF/mods.toml";
+const GOLDEN_TOML: &str = "../tests/fixtures/golden/mods-1.17.toml.golden";
 
 fn copy_tree(from: &Path, to: &Path) {
     for rel in collect_files(from).unwrap() {
@@ -103,6 +105,15 @@ fn forge_117_kb(dir: &Path) -> KnowledgeBase {
         source: "test".into(),
     })
     .unwrap();
+    // Test data: Forge 1.17.1 shipped as 37.x.
+    kb.insert_compatibility(&Compatibility {
+        minecraft_version: "1.17.1".into(),
+        loader: "forge".into(),
+        loader_version: "37.1.1".into(),
+        status: "stable".into(),
+        notes: None,
+    })
+    .unwrap();
     kb
 }
 
@@ -151,9 +162,15 @@ fn test_forge_116_to_117_dry_run_apply_rollback() {
         .unwrap();
     assert_eq!(read_tree(work.path()), original);
     assert!(dry.checkpoint_id.is_none());
-    assert_eq!(dry.changes.len(), 1);
-    assert_eq!(dry.total_replacements(), 6);
-    let diff = &dry.changes[0].diff;
+    assert_eq!(dry.changes.len(), 2); // ExampleMod.java + mods.toml
+    assert_eq!(dry.total_replacements(), 8);
+    assert!(dry.warnings.is_empty(), "{:?}", dry.warnings);
+    let java = dry
+        .changes
+        .iter()
+        .find(|c| c.path == Path::new(MOD_JAVA))
+        .unwrap();
+    let diff = &java.diff;
     assert!(diff.starts_with(&format!("--- a/{MOD_JAVA}\n+++ b/{MOD_JAVA}\n")));
     assert!(diff.contains("-import net.minecraft.block.Block;\n"));
     assert!(diff.contains("+import net.minecraft.world.level.block.Block;\n"));
@@ -180,6 +197,12 @@ fn test_forge_116_to_117_dry_run_apply_rollback() {
     let golden = fs::read_to_string(GOLDEN).unwrap();
     assert_eq!(migrated.replace("\r\n", "\n"), golden.replace("\r\n", "\n"));
     assert!(!migrated.contains("SHOULD_NOT_APPEAR"));
+    let toml = fs::read_to_string(work.path().join(MODS_TOML)).unwrap();
+    let golden_toml = fs::read_to_string(GOLDEN_TOML).unwrap();
+    assert_eq!(
+        toml.replace("\r\n", "\n"),
+        golden_toml.replace("\r\n", "\n")
+    );
     let lang = "src/main/resources/assets/examplemod/lang/en_us.json";
     assert_eq!(
         fs::read(work.path().join(lang)).unwrap(),

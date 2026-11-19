@@ -13,6 +13,7 @@
 //!   restores the checkpoint (ADR 0005, ADR 0006).
 
 use crate::checkpoint::{collect_files, CheckpointError, CheckpointStore};
+use crate::descriptor::{migrate_descriptor, DescriptorKind, DescriptorTarget};
 use crate::filesystem::{resolve_within, FsError};
 use crate::knowledge::{BreakingChange, KnowledgeBase, Mapping};
 use crate::persistence::DbError;
@@ -98,6 +99,8 @@ pub struct MigrationPlan {
     pub skipped: Vec<SkippedMapping>,
     pub breaking_changes: Vec<BreakingChange>,
     pub recipes: Vec<String>,
+    /// Versions the mod descriptors should declare (Phase 6.B).
+    pub descriptor_target: DescriptorTarget,
 }
 
 impl MigrationPlan {
@@ -249,12 +252,25 @@ impl MigrationPlanner {
             .map(|r| r.recipe_id)
             .collect();
 
+        // Loader version for the exact target Minecraft version; highest wins.
+        let loader_version = kb
+            .compatibilities_by_loader(&request.target_loader)?
+            .into_iter()
+            .filter(|c| compare_versions(&c.minecraft_version, tgt) == Some(Ordering::Equal))
+            .map(|c| c.loader_version)
+            .max_by(|a, b| compare_versions(a, b).unwrap_or_else(|| a.cmp(b)));
+
         Ok(MigrationPlan {
             request: request.clone(),
             stages,
             skipped,
             breaking_changes,
             recipes,
+            descriptor_target: DescriptorTarget {
+                minecraft: tgt.clone(),
+                loader: request.target_loader.clone(),
+                loader_version,
+            },
         })
     }
 }
@@ -654,9 +670,11 @@ impl MigrationEngine {
         let mut scanned = 0;
 
         for rel in collect_files(&project.root)? {
-            let Some(tf) = self.transformers.iter().find(|t| t.applies_to(&rel)) else {
+            let descriptor = DescriptorKind::from_path(&rel);
+            let tf = self.transformers.iter().find(|t| t.applies_to(&rel));
+            if descriptor.is_none() && tf.is_none() {
                 continue;
-            };
+            }
             let abs = resolve_within(&project.root, &rel)?;
             if std::fs::metadata(&abs)?.len() > MAX_SOURCE_BYTES {
                 warnings.push(format!(
@@ -673,10 +691,21 @@ impl MigrationEngine {
 
             let mut current = original.clone();
             let mut replacements = Vec::new();
-            for stage in &plan.stages {
-                let (next, reps) = tf.transform(&current, &stage.rules);
-                current = next;
-                replacements.extend(reps);
+            if let Some(kind) = descriptor {
+                let r = migrate_descriptor(kind, &original, &plan.descriptor_target);
+                warnings.extend(
+                    r.warnings
+                        .into_iter()
+                        .map(|w| format!("{}: {w}", rel.display())),
+                );
+                current = r.updated;
+                replacements = r.replacements;
+            } else if let Some(tf) = tf {
+                for stage in &plan.stages {
+                    let (next, reps) = tf.transform(&current, &stage.rules);
+                    current = next;
+                    replacements.extend(reps);
+                }
             }
             if current != original {
                 edits.push(FileEdit {

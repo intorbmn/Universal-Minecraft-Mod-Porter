@@ -21,7 +21,7 @@
 | ID | Milestone | Status | Evidence |
 |---|---|---|---|
 | 6.A | Planner + Java/Kotlin API-rename transformer + diff + report + checkpointed apply + rollback + CLI | COMPLETED | `core/tests/migration.rs` (golden file, stage order, conflicts, downgrade rejection, rollback after simulated write failure); 8 tokenizer unit tests; CLI end-to-end run (dry run → apply → rollback, `diff -r` identical) |
-| 6.B | Descriptor migration (`mods.toml`, `neoforge.mods.toml`, `fabric.mod.json`, `quilt.mod.json`) | NOT_STARTED | |
+| 6.B | Descriptor migration (`mods.toml`, `neoforge.mods.toml`, `fabric.mod.json`, `quilt.mod.json`) | COMPLETED | `core/src/descriptor.rs` (8 unit tests: style-preserving ranges, formatting kept, loader version from KB, mismatch skip, NeoForge rename warning); fixture `mods.toml` vs golden in `core/tests/migration.rs`; mutation-checked |
 | 6.C | Build migration (Gradle plugin/loader/mappings versions, Java toolchain) | NOT_STARTED | |
 | 6.D | Resource / datapack migration | NOT_STARTED | |
 | 6.E | Mixin migration | NOT_STARTED | |

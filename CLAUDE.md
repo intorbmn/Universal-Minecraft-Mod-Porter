@@ -72,7 +72,7 @@ skip the practice.
 ## Layout
 | Path | Contents |
 |---|---|
-| `core/src/` | `project`, `filesystem`, `metadata`, `session`, `events`, `checkpoint`, `jobs`/`persistence`, `analyzer`, `knowledge`, `migration` |
+| `core/src/` | `project`, `filesystem`, `metadata`, `session`, `events`, `checkpoint`, `jobs`/`persistence`, `analyzer`, `knowledge`, `migration`, `descriptor` |
 | `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` for Phase 6) |
 | `cli/src/main.rs` | The `ummp analyze`, `migrate`, and `rollback` commands |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |
