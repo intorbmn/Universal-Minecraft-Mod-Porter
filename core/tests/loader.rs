@@ -245,7 +245,7 @@ fn template_applied_for_known_version() {
 
     let (w2, _s2, _, _) = convert("neoforge-src", "neoforge", "fabric");
     let build = read(w2.path(), "build.gradle");
-    assert!(build.contains("net.fabricmc.fabric-loom-remap"), "{build}");
+    assert!(build.contains("id 'fabric-loom' version"), "{build}");
     assert!(
         build.contains("accessWidenerPath = file(\"src/main/resources/demowidget.accesswidener\")"),
         "{build}"

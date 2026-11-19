@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 9 (ADR 0012): technology adapter SDK (`core/src/adapter/`, `docs/ADAPTER_SDK.md`)
+  with 15 data-driven detection rules, native-library report, Groovy/Scala renames, Mixin
+  member renames, and loader conversion (Fabric/Quilt ↔ NeoForge, Forge ↔ NeoForge,
+  Fabric → Forge) with 1.21.1 build templates. `ummp port` turns a mod's source (folder or
+  zip) into a ported copy plus `UMMP_REPORT.md`; `ummp adapters`; `migrate --from-loader`.
+  Analyzer reads descriptors of source projects. Rough designs for Phases 10–14 in
+  `docs/drafts/`. Verified on GitHub Actions: the demo Fabric mod and its NeoForge port both
+  build, test and start a server.
+
+### Changed
+- `scan`: the standard Gradle wrapper JAR is one Medium finding (verify checksum) instead of
+  High content findings; GitHub builds run `gradle/actions/wrapper-validation`.
+- `build` (GitHub): failed stage log tails go to the job log; the artifact-less fallback uses them.
 - Phase 8 (ADR 0011): `ummp scan` static malware-risk scan (class constant pools, sources,
   build scripts, nested JARs, native libraries, obfuscation); `ummp build` runs build, tests
   and a dedicated-server start on GitHub Actions (default) or locally (`--local`, new folder

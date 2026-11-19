@@ -82,6 +82,20 @@ Each entry names the module and the phase expected to address it.
   reflection give false positives. "No risk indicators" is not proof of safety.
 - Full list of deferred items: `docs/BACKLOG.md`.
 
+## Adapters and loader conversion (Phase 9)
+- Loader conversion is structural: descriptor, entry bridge, build template, Mixin/AT/AW
+  registration, a few package renames. Loader APIs (events, registries, networking, config)
+  are listed as `assisted` with file:line, not rewritten.
+- Build templates exist only for Minecraft 1.21.1 (NeoForge ModDevGradle, Fabric Loom);
+  other versions and Forge targets get a `manual` finding for the build files.
+- Descriptor dependency ranges without KB data are permissive (`[0,)`, `*`).
+- Technology detection is pattern-based (first match per rule); rendering, shader and
+  networking are detected, not migrated.
+- The analyzer reads source descriptors only from `src/main/resources`.
+- `scan` does not inspect `gradle/wrapper/gradle-wrapper.jar` (one Medium finding instead);
+  GitHub builds validate it, local builds need `--yes`.
+- Full list: `docs/BACKLOG.md`.
+
 ## Not started
-Phases 9-14 (advanced adapters, modpacks, UI, REST/MCP API,
+Phases 10-14 (modpacks, UI, REST/MCP API,
 production readiness, community) have no code yet.

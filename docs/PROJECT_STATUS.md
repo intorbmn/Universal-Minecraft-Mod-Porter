@@ -4,8 +4,8 @@ Last updated: 2026-11-19
 
 Status follows the rule in the master prompt: **COMPLETED only with test evidence
 against the phase's acceptance criteria.** Evidence = `cargo build`, `cargo test --all`
-(148 tests), `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`, all green
-locally on branch `phase-8-build`.
+(170 tests), `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`, all green
+locally on branch `phase-9-adapters`.
 
 | Phase | Status | Evidence / note |
 |---|---|---|
@@ -18,7 +18,7 @@ locally on branch `phase-8-build`.
 | 6 Migration Engine | COMPLETED | 6.A–6.G: source renames, descriptors, build scripts, resources/data packs, Mixins, class-level bytecode, recipes. 92 tests incl. real-JVM check; see `docs/phase/phase-06-migration.md` |
 | 7 AI Agent System | COMPLETED | Provider trait + Anthropic/OpenAI-compatible providers, structured output, validated search/replace edits, review + approval gate, checkpointed apply, retry/fallback, budget, cost, audit. 9 eval cases; see `docs/phase/phase-07-ai.md`, ADR 0010 |
 | 8 Build & Testing Engine | COMPLETED | `ummp scan` (static malware risk), `ummp build` local + GitHub Actions (real run 3/3 verified): build, tests, server launch, scored report; see `docs/phase/phase-08-build.md`, ADR 0011, `docs/BACKLOG.md` |
-| 9 Advanced Technology Adapters | NOT_STARTED | |
+| 9 Advanced Technology Adapters | COMPLETED | Adapter SDK + 15 technology rules, native report, Groovy/Scala, Mixin member renames, loader conversion (Fabric/Quilt ↔ NeoForge, Forge ↔ NeoForge), `ummp port`. See `docs/phase/phase-09-adapters.md`, ADR 0012 |
 | 10 Modpack Migration | NOT_STARTED | |
 | 11 User Interface | NOT_STARTED | |
 | 12 CLI, API & External Integration | NOT_STARTED | CLI has `analyze`, `migrate`, `remap-jar`, `rollback`, `ai-assist`, `ai-debug` (built as part of Phases 4/6) |
@@ -26,4 +26,4 @@ locally on branch `phase-8-build`.
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Next milestone
-Phase 9 — Advanced Technology Adapters. Awaiting user review of Phase 8 first. Deferred work: `docs/BACKLOG.md`.
+Phase 10 — Modpack Migration (draft: `docs/drafts/phase-10-modpack.md`). Awaiting user review of Phase 9 first.

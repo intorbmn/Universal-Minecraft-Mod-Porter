@@ -33,7 +33,7 @@ with that variable set. Never unpin the toolchain to get around this.
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
   milestone, report it, and wait for the user to review.
-- Every significant decision gets an ADR in `docs/decisions/` (next number: 0012).
+- Every significant decision gets an ADR in `docs/decisions/` (next number: 0013).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
 - Edits are applied only by `MigrationEngine` after a checkpoint (ADR 0005/0006). This
@@ -72,9 +72,9 @@ skip the practice.
 ## Layout
 | Path | Contents |
 |---|---|
-| `core/src/` | `project`, `filesystem`, `metadata`, `session`, `events`, `checkpoint`, `jobs`/`persistence`, `analyzer`, `knowledge`, `migration`, `descriptor`, `build_script`, `resources`, `mixin`, `bytecode`, `ai` (provider trait, agents, orchestrator), `build` (process runner, log/crash analyzers, local and GitHub backends, report), `scan` (malware-risk rules in `scan_rules.toml`) |
-| `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8) |
-| `cli/src/main.rs` | The `ummp analyze`, `migrate`, `remap-jar`, `rollback`, `ai-assist`, `ai-debug`, `scan`, and `build` commands |
+| `core/src/` | `project`, `filesystem`, `metadata`, `session`, `events`, `checkpoint`, `jobs`/`persistence`, `analyzer`, `knowledge`, `migration`, `descriptor`, `build_script`, `resources`, `mixin`, `bytecode`, `ai` (provider trait, agents, orchestrator), `build` (process runner, log/crash analyzers, local and GitHub backends, report), `scan` (malware-risk rules in `scan_rules.toml`), `adapter` (technology adapters: rules, native, loader conversion; data in `adapter_rules.toml`, `loader_rules.toml`, `loader_templates.toml`), `port` (source in, ported source out) |
+| `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8, `adapters.rs`, `loader.rs`, `port.rs` for Phase 9) |
+| `cli/src/main.rs` | The `ummp analyze`, `migrate`, `remap-jar`, `rollback`, `ai-assist`, `ai-debug`, `scan`, `build`, `port`, and `adapters` commands |
 | `providers/` | HTTP AI providers (Anthropic, OpenAI-compatible); the only crate that talks to model APIs |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |
 | `docs/` | PRD, SAD, ROADMAP, phase files, ADRs, KNOWN_LIMITATIONS, PROJECT_STATUS |

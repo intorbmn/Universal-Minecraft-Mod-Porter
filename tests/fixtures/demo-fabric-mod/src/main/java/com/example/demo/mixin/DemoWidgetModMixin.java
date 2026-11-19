@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(DemoWidgetMod.class)
 public class DemoWidgetModMixin {
-    @Inject(method = "greet", at = @At("HEAD"))
+    @Inject(method = "greet", at = @At("HEAD"), remap = false)
     private void ummp$onGreet(CallbackInfoReturnable<String> cir) {
         System.out.println("[demowidget] mixin applied");
     }

@@ -34,6 +34,7 @@ fn fakes(dir: &Path, artifact: &Path, auth_ok: bool) -> (PathBuf, PathBuf) {
              'api repos/demo-owner/ummp-build-sandbox/actions/runs/42/jobs') echo '{{\"jobs\":[{{\"id\":7}}]}}' ;;\n\
              'api repos/demo-owner/ummp-build-sandbox/actions/jobs/7/logs') \
                echo '2026-11-19T07:32:25Z echo \"UMMP-STAGES $(jq -c . ummp-out/stages.json)\"'; \
+               echo '2026-11-19T07:32:39Z /home/runner/work/x/x/src/main/java/com/example/demo/DemoWidget.java:7: error: cannot find symbol'; \
                echo '2026-11-19T07:32:40Z UMMP-STAGES [{{\"stage\":\"build\",\"status\":\"passed\"}},{{\"stage\":\"test\",\"status\":\"passed\"}},{{\"stage\":\"server\",\"status\":\"failed\"}}]' ;;\n\
              'api repos/'*) exit {auth} ;;\n\
              'run list') echo '[{{\"databaseId\":42,\"status\":\"completed\",\"conclusion\":\"success\"}}]' ;;\n\
@@ -147,7 +148,21 @@ fn blocked_artifact_download_falls_back_to_job_log() {
             StageStatus::Failed
         ]
     );
-    assert!(o.stages[2].log.as_os_str().is_empty());
+    assert!(
+        o.stages[2].log.ends_with("job.log"),
+        "{:?}",
+        o.stages[2].log
+    );
+    let e = &o.stages[2].errors[0];
+    assert_eq!(e.kind, ummp_core::build::logs::ErrorKind::MissingSymbol);
+    assert_eq!(
+        e.file.as_deref(),
+        Some("src/main/java/com/example/demo/DemoWidget.java")
+    );
+    assert!(
+        o.stages[0].errors.is_empty(),
+        "passed stages carry no job-log errors"
+    );
 }
 
 #[test]
