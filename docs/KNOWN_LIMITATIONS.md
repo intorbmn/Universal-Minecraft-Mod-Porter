@@ -71,6 +71,17 @@ Each entry names the module and the phase expected to address it.
 - OpenAI-compatible servers differ in `json_schema` support; some ignore it.
 - Agent memory across sessions is not implemented.
 
+## Build & malware scan (Phase 8)
+- If the network blocks GitHub artifact storage, `build` falls back to the job log: stage results only, no per-stage logs or test counts. Each build leaves a `ummp/<mod>-<time>` branch in the build repo (not deleted automatically).
+- Local builds are isolated at process level only (copy, env allow-list, timeout, tree kill);
+  a malicious build script still runs with your user's rights. Prefer the GitHub backend.
+- The env allow-list drops proxy variables, so local builds behind a proxy may fail.
+- Server check = a `Done (` line appears; client launch is not checked.
+- Gradle only; JAR-only mods are scanned, not built.
+- The scan is static: obfuscated or novel malware can pass, and native libraries and
+  reflection give false positives. "No risk indicators" is not proof of safety.
+- Full list of deferred items: `docs/BACKLOG.md`.
+
 ## Not started
-Phases 8-14 (build & test engine, advanced adapters, modpacks, UI, REST/MCP API,
+Phases 9-14 (advanced adapters, modpacks, UI, REST/MCP API,
 production readiness, community) have no code yet.

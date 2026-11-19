@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod analyzer;
+pub mod build;
 pub mod build_script;
 pub mod bytecode;
 pub mod checkpoint;
@@ -20,6 +21,7 @@ pub mod mixin;
 pub mod persistence;
 pub mod project;
 pub mod resources;
+pub mod scan;
 pub mod session;
 
 pub use knowledge::{BreakingChange, Compatibility, KnowledgeBase, Mapping, ModDependency, Recipe};

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 8 (ADR 0011): `ummp scan` static malware-risk scan (class constant pools, sources,
+  build scripts, nested JARs, native libraries, obfuscation); `ummp build` runs build, tests
+  and a dedicated-server start on GitHub Actions (default) or locally (`--local`, new folder
+  per build, scrubbed env, timeouts, process-tree kill) and prints a scored report with
+  classified errors and crash info. High-risk mods are not built locally without
+  `--i-accept-risk`. `docs/BACKLOG.md` lists deferred work.
 - Phase 7 AI agent system (`core/src/ai/`, crate `ummp-ai-providers`, ADR 0010): Analysis,
   Migration, Debug and Review agents with JSON-schema output; search/replace proposals validated
   and applied only through `MigrationEngine` after review, approval and a checkpoint; retry,

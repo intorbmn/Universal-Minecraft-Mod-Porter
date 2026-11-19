@@ -6,12 +6,18 @@ use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
+use ummp_core::build::github::GithubBackend;
+use ummp_core::build::local::{default_workdir, LocalBackend};
+use ummp_core::build::report::{score, to_markdown};
+use ummp_core::build::{BuildBackend, BuildRequest, Stage};
+use ummp_core::build_script::required_java;
 use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
+use ummp_core::scan::{scan_path, Severity};
 use uuid::Uuid;
 
 #[derive(Parser)]
@@ -123,6 +129,46 @@ enum Commands {
         loader: String,
         #[command(flatten)]
         ai: AiArgs,
+    },
+    /// Static malware-risk scan of a mod project or JAR. Exit code 2 when High risk.
+    Scan {
+        /// Project folder or JAR file.
+        path: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Build, test and start a dedicated server; on GitHub Actions unless `--local`.
+    Build {
+        /// Project root path (source tree with Gradle build files).
+        path: PathBuf,
+        /// Build on this machine instead of GitHub.
+        #[arg(long)]
+        local: bool,
+        /// GitHub build repository `owner/name` (default: $UMMP_BUILD_REPO or
+        /// intorbmn/ummp-build-sandbox).
+        #[arg(long)]
+        repo: Option<String>,
+        /// Folder for build copies (default: D:\Claude\ummp-builds on Windows, ~/ummp-builds).
+        #[arg(long)]
+        workdir: Option<PathBuf>,
+        /// Comma-separated stages: build,test,server.
+        #[arg(long, value_delimiter = ',', default_value = "build,test,server")]
+        stages: Vec<String>,
+        /// Limit per stage, in seconds.
+        #[arg(long, default_value_t = 1800)]
+        timeout: u64,
+        /// Java major version (default: detected from the mod).
+        #[arg(long)]
+        java: Option<u32>,
+        /// Build a High-risk mod on this machine anyway.
+        #[arg(long)]
+        i_accept_risk: bool,
+        /// Build a Medium-risk mod on this machine without asking.
+        #[arg(long)]
+        yes: bool,
+        /// Also write the Markdown report here.
+        #[arg(long)]
+        report: Option<PathBuf>,
     },
     /// Restore the project to a checkpoint taken by `migrate --apply`.
     Rollback {
@@ -282,6 +328,77 @@ fn open_kb(
         }
         (None, None) => unreachable!("clap requires --kb or --mappings"),
     })
+}
+
+/// Local builds run mod code on this machine: High risk needs `--i-accept-risk`, Medium
+/// needs `--yes` or a y/N answer. GitHub builds run on a disposable runner and only warn.
+fn check_risk(
+    risk: Option<Severity>,
+    local: bool,
+    accept: bool,
+    yes: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !local {
+        if risk.is_some() {
+            println!("Warning: risk indicators found; building on a disposable GitHub runner.");
+        }
+        return Ok(());
+    }
+    match risk {
+        Some(Severity::High) if !accept => {
+            Err("refusing to build a High-risk mod on this machine. \
+             Build on GitHub (drop --local), or review the findings and pass --i-accept-risk"
+                .into())
+        }
+        Some(Severity::Medium) if !yes && !accept => {
+            if !std::io::stdin().is_terminal() {
+                return Err("Medium risk: pass --yes to build on this machine".into());
+            }
+            print!("Medium risk. Build on this machine anyway? [y/N] ");
+            std::io::stdout().flush()?;
+            let mut line = String::new();
+            std::io::stdin().lock().read_line(&mut line)?;
+            if line.trim().eq_ignore_ascii_case("y") {
+                Ok(())
+            } else {
+                Err("build cancelled".into())
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+/// A folder- and branch-safe mod name, and the Java version the mod needs, if known.
+fn mod_identity(path: &Path) -> (String, Option<u32>) {
+    let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+    let first = AnalyzerEngine::default()
+        .analyze(path, &fs)
+        .ok()
+        .and_then(|r| r.mods.into_iter().next());
+    let raw = first
+        .as_ref()
+        .map(|m| m.metadata.mod_id.clone())
+        .filter(|id| !id.is_empty())
+        .or_else(|| path.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "mod".into());
+    let name: String = raw
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .take(40)
+        .collect();
+    let java = first.and_then(|m| {
+        m.detected_java
+            .map(|j| j.major)
+            .or_else(|| m.metadata.java.map(|j| j.major))
+            .or_else(|| required_java(&m.metadata.minecraft.to_string()))
+    });
+    (if name.is_empty() { "mod".into() } else { name }, java)
 }
 
 fn main() {
@@ -497,6 +614,86 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 save_store(&snap_dir, &store)?;
             }
             print_ai_report(&report, &cfg);
+        }
+
+        Commands::Scan { path, json } => {
+            let report = scan_path(&path)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print!("{}", report.to_text());
+            }
+            if report.risk() == Some(Severity::High) {
+                std::process::exit(2);
+            }
+        }
+
+        Commands::Build {
+            path,
+            local,
+            repo,
+            workdir,
+            stages,
+            timeout,
+            java,
+            i_accept_risk,
+            yes,
+            report,
+        } => {
+            if !path.is_dir() {
+                return Err("JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project".into());
+            }
+            let scan = scan_path(&path)?;
+            print!("{}", scan.to_text());
+            check_risk(scan.risk(), local, i_accept_risk, yes)?;
+            let stages = stages
+                .iter()
+                .map(|s| match s.trim() {
+                    "build" => Ok(Stage::Build),
+                    "test" => Ok(Stage::Test),
+                    "server" => Ok(Stage::Server),
+                    other => Err(format!("unknown stage `{other}` (use build, test, server)")),
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let (mod_name, detected_java) = mod_identity(&path);
+            let req = BuildRequest {
+                project: path,
+                mod_name,
+                stages,
+                java: java.or(detected_java),
+                timeout: std::time::Duration::from_secs(timeout),
+            };
+            let workdir = workdir.unwrap_or_else(default_workdir);
+            let outcome = if local {
+                LocalBackend {
+                    workdir,
+                    gradle: None,
+                }
+                .run(&req)?
+            } else {
+                let repo = repo
+                    .or_else(|| std::env::var("UMMP_BUILD_REPO").ok())
+                    .unwrap_or_else(|| "intorbmn/ummp-build-sandbox".into());
+                println!("Building on GitHub Actions in {repo} (this takes a few minutes)...");
+                GithubBackend {
+                    repo,
+                    gh: "gh".into(),
+                    git: "git".into(),
+                    poll: std::time::Duration::from_secs(15),
+                    workdir,
+                }
+                .run(&req)?
+            };
+            let md = to_markdown(&outcome, &scan);
+            std::fs::write(outcome.workdir.join("ummp-report.md"), &md)?;
+            if let Some(p) = report {
+                std::fs::write(p, &md)?;
+            }
+            println!("\n{md}");
+            let (passed, run) = score(&outcome);
+            if passed < run {
+                std::process::exit(1);
+            }
         }
 
         Commands::Rollback {
