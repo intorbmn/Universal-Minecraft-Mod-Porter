@@ -23,6 +23,8 @@ Phases 0-9 complete; Phase 10 (modpacks) is next; rough designs for 10-14 in [do
 | [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) | Testing strategy |
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
+| [guides/](docs/guides/README.md) | Step-by-step guides for the remaining phases (10–14) |
+| [BACKLOG.md](docs/BACKLOG.md) | Deferred work |
 | [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Known limitations |
 | [decisions/](docs/decisions/README.md) | Architecture Decision Records |
 | [CLAUDE.md](CLAUDE.md) | Workflow rules and skills per phase for AI-assisted work |
