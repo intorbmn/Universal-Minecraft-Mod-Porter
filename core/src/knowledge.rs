@@ -678,8 +678,8 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
         Mapping {
             version: "1.20.1".into(),
             loader: "fabric".into(),
-            from_api: "Block".into(),
-            to_api: "Blocks".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
             kind: "rename".into(),
             source: "fabric-api".into(),
             confidence: 0.95,
@@ -687,8 +687,8 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
         Mapping {
             version: "1.21".into(),
             loader: "fabric".into(),
-            from_api: "Block".into(),
-            to_api: "Blocks".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
             kind: "rename".into(),
             source: "fabric-api".into(),
             confidence: 0.95,
@@ -705,8 +705,8 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
         Mapping {
             version: "1.21".into(),
             loader: "neoforge".into(),
-            from_api: "Block".into(),
-            to_api: "Blocks".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
             kind: "rename".into(),
             source: "neoforge".into(),
             confidence: 0.9,
@@ -809,9 +809,9 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
         },
         BreakingChange {
             version: "1.20.1".into(),
-            change: "Block -> Blocks rename (Fabric)".into(),
+            change: "DemoWidget -> DemoGadget rename (illustrative sample)".into(),
             severity: "medium".into(),
-            workaround: Some("Search/replace Block with Blocks".into()),
+            workaround: Some("Rename DemoWidget to DemoGadget".into()),
             source: "fabric-api".into(),
         },
         BreakingChange {
@@ -831,10 +831,10 @@ pub fn seed_knowledge(kb: &KnowledgeBase) -> Result<(), DbError> {
             recipe_id: "fabric-block-rename".into(),
             version: "1.20.1+".into(),
             loader: Some("fabric".into()),
-            description: "Rename Block class to Blocks in Fabric mods".into(),
+            description: "Rename DemoWidget to DemoGadget (illustrative sample)".into(),
             steps: vec![
                 Value::String("search: Block".into()),
-                Value::String("replace: Blocks".into()),
+                Value::String("replace: DemoGadget".into()),
             ],
             source: "fabric-api".into(),
             tested: true,
@@ -1063,14 +1063,14 @@ mod tests {
         let m = Mapping {
             version: "1.20.1".into(),
             loader: "fabric".into(),
-            from_api: "Block".into(),
-            to_api: "Blocks".into(),
+            from_api: "DemoWidget".into(),
+            to_api: "DemoGadget".into(),
             kind: "rename".into(),
             source: "test".into(),
             confidence: 0.9,
         };
         kb.insert_mapping(&m).unwrap();
-        let res = kb.search_mappings("Block").unwrap();
+        let res = kb.search_mappings("DemoWidget").unwrap();
         assert_eq!(res.len(), 1);
     }
 

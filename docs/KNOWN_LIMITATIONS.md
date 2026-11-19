@@ -16,7 +16,7 @@ Each entry names the module and the phase expected to address it.
 
 ## Knowledge base (Phase 5)
 - **Seed data is illustrative, not authoritative.** `seed_knowledge()` contains sample rows
-  (for example the `Block -> Blocks` rename and a "Fabric 1.12.2" row, which is really the
+  (for example the synthetic `DemoWidget -> DemoGadget` rename and a "Fabric 1.12.2" row, which is really the
   separate Legacy Fabric project). It exists for tests. The CLI never seeds a user's KB.
 - **Rows that fail to decode are skipped silently.** Query methods use
   `.filter_map(Result::ok)`; a corrupt row disappears instead of producing an error.
@@ -27,11 +27,11 @@ Each entry names the module and the phase expected to address it.
   script migration (Gradle plugin/loader versions, Java toolchain), descriptor migration
   (`mods.toml`, `fabric.mod.json`), resources/datapacks, Mixins, bytecode, and loader-to-loader
   migration.
-- **No type resolution** (ADR 0007). A simple-name rule such as `Block -> X` renames every
-  standalone `Block` token, whichever class it refers to. Member accesses (`foo.Block`) are
+- **No type resolution** (ADR 0007). A simple-name rule such as `DemoWidget -> DemoGadget` renames every
+  standalone `DemoWidget` token, whichever class it refers to. Member accesses (`foo.DemoWidget`) are
   left alone except inside `import` statements. Prefer qualified mappings.
-- **Not rewritten:** string literals, comments, Kotlin string templates (`"${Block.ID}"`),
-  and wildcard imports (`import net.minecraft.block.*`).
+- **Not rewritten:** string literals, comments, Kotlin string templates (`"${DemoWidget.ID}"`),
+  and wildcard imports (`import com.example.*`).
 - **Versions must be numeric** (`1.20.1`). Snapshots and pre-releases (`24w14a`,
   `1.21-pre1`) are rejected by the planner.
 - **Recipes are listed, not executed.** The report names applicable recipes, but recipe

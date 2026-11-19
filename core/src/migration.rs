@@ -760,55 +760,55 @@ mod tests {
     #[test]
     fn test_whole_identifier_only() {
         let out = rewrite(
-            "Block b = new Block(); BlockEntity e; MyBlock m;",
-            &[rule("Block", "Blocks")],
+            "DemoWidget b = new DemoWidget(); DemoWidgetEntity e; MyDemoWidget m;",
+            &[rule("DemoWidget", "DemoGadget")],
         );
-        assert_eq!(out, "Blocks b = new Blocks(); BlockEntity e; MyBlock m;");
+        assert_eq!(
+            out,
+            "DemoGadget b = new DemoGadget(); DemoWidgetEntity e; MyDemoWidget m;"
+        );
     }
 
     #[test]
     fn test_skips_strings_comments_and_text_blocks() {
-        let src = "// Block here\n/* Block */ String s = \"Block\"; char c = 'B';\n\
-                   String t = \"\"\"\n  Block\n\"\"\"; Block x;";
-        let out = rewrite(src, &[rule("Block", "Blocks")]);
-        assert!(out.contains("// Block here"));
-        assert!(out.contains("/* Block */"));
-        assert!(out.contains("\"Block\""));
-        assert!(out.contains("\n  Block\n"));
-        assert!(out.ends_with("Blocks x;"));
+        let src = "// DemoWidget here\n/* DemoWidget */ String s = \"DemoWidget\"; char c = 'D';\n\
+                   String t = \"\"\"\n  DemoWidget\n\"\"\"; DemoWidget x;";
+        let out = rewrite(src, &[rule("DemoWidget", "DemoGadget")]);
+        assert!(out.contains("// DemoWidget here"));
+        assert!(out.contains("/* DemoWidget */"));
+        assert!(out.contains("\"DemoWidget\""));
+        assert!(out.contains("\n  DemoWidget\n"));
+        assert!(out.ends_with("DemoGadget x;"));
     }
 
     #[test]
     fn test_escaped_quote_does_not_end_string() {
-        let out = rewrite(r#"s = "a\"Block"; Block y;"#, &[rule("Block", "Blocks")]);
-        assert_eq!(out, r#"s = "a\"Block"; Blocks y;"#);
+        let out = rewrite(
+            r#"s = "a\"DemoWidget"; DemoWidget y;"#,
+            &[rule("DemoWidget", "DemoGadget")],
+        );
+        assert_eq!(out, r#"s = "a\"DemoWidget"; DemoGadget y;"#);
     }
 
     #[test]
     fn test_member_access_not_renamed_but_import_is() {
-        let src = "import net.minecraft.block.Block;\nfoo.Block = 1; Block.getId();";
-        let out = rewrite(src, &[rule("Block", "Blocks")]);
+        let src = "import com.example.DemoWidget;\nfoo.DemoWidget = 1; DemoWidget.getId();";
+        let out = rewrite(src, &[rule("DemoWidget", "DemoGadget")]);
         assert_eq!(
             out,
-            "import net.minecraft.block.Blocks;\nfoo.Block = 1; Blocks.getId();"
+            "import com.example.DemoGadget;\nfoo.DemoWidget = 1; DemoGadget.getId();"
         );
     }
 
     #[test]
     fn test_qualified_rule_wins_over_simple() {
-        let src = "import net.minecraft.block.Block;\nBlock b;";
+        let src = "import com.example.old.DemoWidget;\nDemoWidget b;";
         let rules = [
-            rule("Block", "Blocks"),
-            rule(
-                "net.minecraft.block.Block",
-                "net.minecraft.world.level.block.Block",
-            ),
+            rule("DemoWidget", "DemoGadget"),
+            rule("com.example.old.DemoWidget", "com.example.demo.DemoWidget"),
         ];
         let (out, reps) = TokenRenameTransformer.transform(src, &rules);
-        assert_eq!(
-            out,
-            "import net.minecraft.world.level.block.Block;\nBlocks b;"
-        );
+        assert_eq!(out, "import com.example.demo.DemoWidget;\nDemoGadget b;");
         assert_eq!(reps.len(), 2);
         assert_eq!(reps[0].line, 1);
         assert_eq!(reps[1].line, 2);
