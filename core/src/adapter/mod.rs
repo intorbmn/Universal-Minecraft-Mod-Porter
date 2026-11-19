@@ -4,6 +4,7 @@
 //! is covered by a [`TechAdapter`]. An adapter always reports what it finds; some also
 //! produce edits, which go through `MigrationEngine` like every other change.
 
+pub mod loader;
 pub mod native;
 pub mod rules;
 
@@ -89,6 +90,11 @@ pub trait TechAdapter: Send + Sync {
     fn owns(&self, _cx: &AdapterContext<'_>, _rel: &Path) -> bool {
         false
     }
+    /// Rewrites a source file on top of the generic transforms (e.g. removing a loader
+    /// interface); `None` leaves it unchanged.
+    fn rewrite(&self, _cx: &AdapterContext<'_>, _rel: &Path, _text: &str) -> Option<String> {
+        None
+    }
     /// Edits for a migration (`cx.plan` is set).
     ///
     /// # Errors
@@ -108,6 +114,7 @@ impl Default for AdapterRegistry {
         let mut adapters: Vec<Box<dyn TechAdapter>> = Vec::new();
         adapters.extend(rules::RuleAdapter::all());
         adapters.push(Box::new(native::NativeAdapter));
+        adapters.push(Box::new(loader::LoaderConverter::default()));
         Self { adapters }
     }
 }
@@ -140,6 +147,14 @@ impl AdapterRegistry {
     #[must_use]
     pub fn owns(&self, cx: &AdapterContext<'_>, rel: &Path) -> bool {
         self.adapters.iter().any(|a| a.owns(cx, rel))
+    }
+
+    /// Runs every adapter's [`TechAdapter::rewrite`] in order.
+    #[must_use]
+    pub fn rewrite(&self, cx: &AdapterContext<'_>, rel: &Path, text: &str) -> String {
+        self.adapters
+            .iter()
+            .fold(text.to_string(), |t, a| a.rewrite(cx, rel, &t).unwrap_or(t))
     }
 
     /// Findings for a project folder (used by the analyzer); empty for non-folders.

@@ -329,7 +329,7 @@ impl MigrationPlanner {
             recipes.push(outcome(true, note));
         }
 
-        let stages = by_version
+        let mut stages: Vec<Stage> = by_version
             .into_values()
             .filter(|(_, rules)| !rules.is_empty())
             .map(|(version, rules)| Stage {
@@ -337,6 +337,34 @@ impl MigrationPlanner {
                 rules: rules.into_values().collect(),
             })
             .collect();
+
+        // Loader conversion (Phase 9): KB rows with loader "<from>-><to>" form one last stage.
+        if let Some(from) = request
+            .source_loader
+            .as_deref()
+            .filter(|f| *f != request.target_loader)
+        {
+            let pair = format!("{from}->{}", request.target_loader);
+            let rules: Vec<RenameRule> = kb
+                .mappings_by_loader(&pair)?
+                .into_iter()
+                .filter(|m| m.from_api != m.to_api)
+                .filter(|m| m.confidence >= request.min_confidence)
+                .map(|m| RenameRule {
+                    from: m.from_api,
+                    to: m.to_api,
+                    kind: m.kind,
+                    confidence: m.confidence,
+                    version: pair.clone(),
+                })
+                .collect();
+            if !rules.is_empty() {
+                stages.push(Stage {
+                    version: pair,
+                    rules,
+                });
+            }
+        }
 
         // `search_breaking_changes("")` matches every row (LIKE '%%').
         let breaking_changes = kb
@@ -962,6 +990,7 @@ impl MigrationEngine {
                             take(r, &mut current, &mut replacements);
                         }
                     }
+                    current = self.adapters.rewrite(&cx, &rel, &current);
                     if mixin {
                         let n = count_method_targets(&original);
                         if n > 0 {
