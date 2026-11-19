@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 7 AI agent system (`core/src/ai/`, crate `ummp-ai-providers`, ADR 0010): Analysis,
+  Migration, Debug and Review agents with JSON-schema output; search/replace proposals validated
+  and applied only through `MigrationEngine` after review, approval and a checkpoint; retry,
+  fallback model, token budget, cost tracking, audit log. CLI `ai-assist` and `ai-debug`.
+- `MigrationEngine::apply_edit_set` (public checkpointed apply).
 - Phase 6.C–6.G: build-script migration (`build_script.rs`), resources and 1.21 data pack folder
   moves (`resources.rs`, KB `pack_formats` table), Mixin migration (`mixin.rs`), class-level
   bytecode remapping (`bytecode.rs`, `ummp remap-jar`, ADR 0009), and recipe execution.

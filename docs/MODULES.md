@@ -14,8 +14,8 @@
 | ENG-03 | Migration Engine | Application | IMigration | Analyzer, Compatibility, Transform | COMPLETED |
 | ENG-04 | Build Engine | Application | IBuild | Toolchain, Sandbox | PLANNED |
 | ENG-05 | Testing Engine | Application | ITestRunner | Build, Launcher | PLANNED |
-| AI-01 | AI Provider Abstraction | Infrastructure | IAIProvider | — | PLANNED |
-| AI-02 | Agent Orchestrator | Application | IAgent | AI-01, Context | PLANNED |
+| AI-01 | AI Provider Abstraction | Infrastructure | IAIProvider | — | DONE (Phase 7) |
+| AI-02 | Agent Orchestrator | Application | IAgent | AI-01, Context | DONE (Phase 7) |
 | PLG-01 | Plugin Registry | Infrastructure | IPluginRegistry | — | PLANNED |
 | PLG-02 | Plugin Loader | Infrastructure | IPluginLoader | PLG-01 | PLANNED |
 | PLG-03 | Plugin SDK | — | SDK docs + API | — | PLANNED |

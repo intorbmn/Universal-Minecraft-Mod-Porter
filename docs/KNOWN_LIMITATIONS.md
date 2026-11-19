@@ -60,6 +60,17 @@ Each entry names the module and the phase expected to address it.
 - `restore` does not touch the skipped directories. Build output produced after a
   checkpoint survives a rollback.
 
+## AI agents (Phase 7)
+- No streaming; requests use a 10-minute HTTP timeout.
+- No live API test in CI; the providers are tested against a local fake server only.
+- Edits are search/replace; the model must quote text exactly once per file.
+- Context is the files the rule-based migration touched, up to `context_chars`; larger
+  files are skipped, not summarized.
+- `ai-debug` needs a build or crash log supplied by the user (no build runner until Phase 8).
+- ureq does not read `HTTPS_PROXY`.
+- OpenAI-compatible servers differ in `json_schema` support; some ignore it.
+- Agent memory across sessions is not implemented.
+
 ## Not started
-Phases 7-14 (AI agents, build & test engine, advanced adapters, modpacks, UI, REST/MCP API,
+Phases 8-14 (build & test engine, advanced adapters, modpacks, UI, REST/MCP API,
 production readiness, community) have no code yet.

@@ -30,6 +30,22 @@ AI assists; it never writes directly. Every AI-generated change is a diff requir
 | Review | 7 | review diffs for correctness before approval. |
 | Mixin / Rendering / Native / Testing | 9+ | specialized agents for those tech areas. |
 
+## Implemented (Phase 7, ADR 0010)
+| Requirement | Where |
+|---|---|
+| Provider abstraction | `core::ai::AiProvider`; `ummp-ai-providers`: `AnthropicProvider`, `OpenAiCompatibleProvider` |
+| Structured output | JSON schemas in `ai/agents.rs`; Anthropic `output_config.format`, OpenAI `response_format` |
+| Model routing | `AiConfig.agents` (model, effort, max_tokens per agent) |
+| Context management | `build_context`: character budget, whole files omitted, never truncated |
+| Prompt versioning | `PROMPT_*` constants, recorded in each audit entry |
+| Human approval | `ApprovalGate`: CLI prompt, `--approve-reviewed`, `DenyAll` when not a terminal |
+| Cost tracking | `CostTracker` per agent and model; prices from config only |
+| Retry and fallback | exponential backoff on transient errors, then `fallback_model` |
+| Evaluation | `core/tests/ai_eval.rs` (scripted provider) |
+| Audit trail | `<snapshots>/ai-audit.jsonl` |
+
+Not built: tool calling (agents get context up front), long-term memory, streaming.
+
 ## Guardrails
 - AI outputs are proposals only.
 - File writes go through the checkpoint/rollback system.
