@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod analyzer;
+pub mod build;
 pub mod build_script;
 pub mod bytecode;
 pub mod checkpoint;
