@@ -18,3 +18,4 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0008](0008-rename-after-package-path.md) | Rename simple names after a package path | Accepted |
 | [0009](0009-in-process-class-remapping.md) | Remap class names in-process instead of running an external remapper | Accepted |
 | [0010](0010-ai-structured-search-replace.md) | AI agents return validated search/replace proposals through structured output | Accepted |
+| [0011](0011-build-isolation-and-risk-gate.md) | Build on disposable GitHub runners by default; gate local builds on a static risk scan | Accepted |

@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-7 complete; Phase 8 (build & test engine) is next. See
+Phases 0-8 complete; Phase 9 (advanced adapters) is next. Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -47,6 +47,13 @@ ummp remap-jar mod.jar mod-1.17.jar --from 1.16.5 --to 1.17.1 --loader forge --m
 # AI assistance (needs ANTHROPIC_API_KEY; proposals are reviewed, approved, then applied with a checkpoint)
 ummp ai-assist path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 ummp ai-debug path/to/mod --log build.log --from 1.16.5 --to 1.17.1 --loader forge
+
+# Malware-risk scan (exit code 2 on High risk); runs automatically before every build
+ummp scan path/to/mod-or.jar
+# Build + tests + dedicated-server start on GitHub Actions (needs `gh auth login` and a build repo)
+ummp build path/to/mod --repo you/ummp-build-sandbox
+# ...or on this machine, in a new folder under D:\Claude\ummp-builds (Windows) or ~/ummp-builds
+ummp build path/to/mod --local
 # local model: --provider openai --base-url http://localhost:11434/v1 ; settings: --ai-config ai.json
 ```
 `--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
