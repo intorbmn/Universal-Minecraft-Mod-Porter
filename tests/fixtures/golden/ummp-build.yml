@@ -48,6 +48,7 @@ jobs:
           stage test timeout 1800 $G test --no-daemon --console=plain
           stage server server
           jq -s . ummp-out/stages.jsonl > ummp-out/stages.json
+          echo "UMMP-STAGES $(jq -c . ummp-out/stages.json)"
           cp -r build/test-results ummp-out/ 2> /dev/null || true
           cp -r run/crash-reports ummp-out/ 2> /dev/null || true
       - uses: actions/upload-artifact@v4

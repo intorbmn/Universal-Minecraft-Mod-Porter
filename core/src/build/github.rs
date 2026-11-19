@@ -59,6 +59,7 @@ jobs:
           }
 @STAGES@
           jq -s . ummp-out/stages.jsonl > ummp-out/stages.json
+          echo "UMMP-STAGES $(jq -c . ummp-out/stages.json)"
           cp -r build/test-results ummp-out/ 2> /dev/null || true
           cp -r run/crash-reports ummp-out/ 2> /dev/null || true
       - uses: actions/upload-artifact@v4
@@ -142,7 +143,48 @@ fn tool(program: &Path, args: &[&str], cwd: &Path) -> Result<String, BuildError>
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+#[derive(Deserialize)]
+struct Jobs {
+    jobs: Vec<Job>,
+}
+
+#[derive(Deserialize)]
+struct Job {
+    id: u64,
+}
+
+/// The JSON after the `UMMP-STAGES ` marker the workflow prints to its log.
+fn stages_line(log: &str) -> Option<String> {
+    log.lines()
+        .filter_map(|l| l.split_once("UMMP-STAGES ").map(|(_, rest)| rest.trim()))
+        .find(|rest| rest.starts_with('['))
+        .map(String::from)
+}
+
 impl GithubBackend {
+    fn stages_from_job_log(&self, run_id: &str, dir: &Path) -> Option<String> {
+        let jobs = tool(
+            &self.gh,
+            &[
+                "api",
+                &format!("repos/{}/actions/runs/{run_id}/jobs", self.repo),
+            ],
+            dir,
+        )
+        .ok()?;
+        let job = serde_json::from_str::<Jobs>(&jobs).ok()?.jobs.first()?.id;
+        let log = tool(
+            &self.gh,
+            &[
+                "api",
+                &format!("repos/{}/actions/jobs/{job}/logs", self.repo),
+            ],
+            dir,
+        )
+        .ok()?;
+        stages_line(&log)
+    }
+
     fn wait_for_run(&self, branch: &str, dir: &Path, limit: Duration) -> Result<u64, BuildError> {
         let deadline = Instant::now() + limit;
         loop {
@@ -183,8 +225,15 @@ impl BuildBackend for GithubBackend {
     fn run(&self, req: &BuildRequest) -> Result<BuildOutcome, BuildError> {
         let here = Path::new(".");
         tool(&self.gh, &["--version"], here)?;
-        tool(&self.gh, &["auth", "status"], here)
-            .map_err(|_| BuildError::Tool(format!("The GitHub CLI is not logged in. {NO_GH}")))?;
+        // Checks login and access to the build repo in one REST call.
+        let repo_api = format!("repos/{}", self.repo);
+        tool(&self.gh, &["api", &repo_api, "--jq", ".full_name"], here).map_err(|e| {
+            BuildError::Tool(format!(
+                "Cannot reach build repo {} with the GitHub CLI ({e}). Create the repo and run \
+                 `gh auth login`, or build on this machine with --local",
+                self.repo
+            ))
+        })?;
 
         let dir = new_build_dir(&self.workdir, &req.mod_name)?;
         copy_project(&req.project, &dir)?;
@@ -246,7 +295,7 @@ impl BuildBackend for GithubBackend {
         let id = self.wait_for_run(&branch, &dir, limit)?.to_string();
         let art = dir.join("ummp-artifact");
         let art_s = art.to_string_lossy().into_owned();
-        tool(
+        let downloaded = tool(
             &self.gh,
             &[
                 "run",
@@ -260,11 +309,19 @@ impl BuildBackend for GithubBackend {
                 &art_s,
             ],
             &dir,
-        )?;
-
-        let json = std::fs::read_to_string(art.join("stages.json")).map_err(|_| {
+        );
+        let json = match downloaded {
+            Ok(_) => std::fs::read_to_string(art.join("stages.json")).ok(),
+            // Artifact storage can be blocked by a proxy; the job log (REST) still has the
+            // stage results, though not the per-stage logs.
+            Err(e) => {
+                eprintln!("warning: artifact download failed, reading stage results from the job log: {e}");
+                self.stages_from_job_log(&id, &dir)
+            }
+        }
+        .ok_or_else(|| {
             BuildError::Tool(format!(
-                "run {id} produced no stages.json; see https://github.com/{}/actions/runs/{id}",
+                "run {id} produced no stage results; see https://github.com/{}/actions/runs/{id}",
                 self.repo
             ))
         })?;

@@ -30,9 +30,14 @@ fn fakes(dir: &Path, artifact: &Path, auth_ok: bool) -> (PathBuf, PathBuf) {
         &format!(
             "echo \"gh $*\" >> '{calls}'\n\
              case \"$1 $2\" in\n\
-             'auth status') exit {auth} ;;\n\
+             'auth status') exit 1 ;;\n\
+             'api repos/demo-owner/ummp-build-sandbox/actions/runs/42/jobs') echo '{{\"jobs\":[{{\"id\":7}}]}}' ;;\n\
+             'api repos/demo-owner/ummp-build-sandbox/actions/jobs/7/logs') \
+               echo '2026-11-19T07:32:25Z echo \"UMMP-STAGES $(jq -c . ummp-out/stages.json)\"'; \
+               echo '2026-11-19T07:32:40Z UMMP-STAGES [{{\"stage\":\"build\",\"status\":\"passed\"}},{{\"stage\":\"test\",\"status\":\"passed\"}},{{\"stage\":\"server\",\"status\":\"failed\"}}]' ;;\n\
+             'api repos/'*) exit {auth} ;;\n\
              'run list') echo '[{{\"databaseId\":42,\"status\":\"completed\",\"conclusion\":\"success\"}}]' ;;\n\
-             'run download') while [ $# -gt 0 ]; do [ \"$1\" = -D ] && D=$2; shift; done; mkdir -p \"$D\"; cp -r '{art}'/. \"$D\" ;;\n\
+             'run download') [ -d '{art}' ] || exit 1; while [ $# -gt 0 ]; do [ \"$1\" = -D ] && D=$2; shift; done; mkdir -p \"$D\"; cp -r '{art}'/. \"$D\" ;;\n\
              esac\n",
             calls = calls.display(),
             art = artifact.display()
@@ -126,6 +131,23 @@ fn failed_run_reports_failed_stage() {
     assert_eq!(o.stages[0].status, StageStatus::Failed);
     assert_eq!(o.stages[0].errors[0].kind, ErrorKind::Compile);
     assert_eq!(o.stages[1].status, StageStatus::Skipped);
+}
+
+#[test]
+fn blocked_artifact_download_falls_back_to_job_log() {
+    let d = tempfile::tempdir().unwrap();
+    let (gh, git) = fakes(d.path(), &d.path().join("no-artifact"), true);
+    let o = backend(d.path(), gh, git).run(&request()).unwrap();
+    let statuses: Vec<_> = o.stages.iter().map(|s| s.status).collect();
+    assert_eq!(
+        statuses,
+        vec![
+            StageStatus::Passed,
+            StageStatus::Passed,
+            StageStatus::Failed
+        ]
+    );
+    assert!(o.stages[2].log.as_os_str().is_empty());
 }
 
 #[test]

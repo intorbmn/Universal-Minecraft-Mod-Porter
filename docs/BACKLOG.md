@@ -4,9 +4,9 @@ Items deferred from finished phases. Each line says what is missing and why it w
 Move an item into a phase file when it is picked up.
 
 ## Phase 8 — Build & Testing Engine
-- [ ] **Real GitHub run not yet verified.** Needs the private build repo
-  `intorbmn/ummp-build-sandbox`, which this session could not create. Create it, then run
-  `ummp build tests/fixtures/build-demo` and record the result in `docs/phase/phase-08-build.md`.
+- [x] Real GitHub run verified (2026-11-19, 3/3).
+- [ ] Delete old `ummp/*` branches in the build repo automatically (they pile up today).
+- [ ] Per-stage logs when artifact storage is blocked (fallback gives stage results only).
 - [ ] Minecraft **client** launch check (needs a display/GPU; e.g. Xvfb on Linux runners).
 - [ ] **Maven** builds (only Gradle is supported).
 - [ ] **Native** builds (C/C++/Rust parts of a mod; JNI).

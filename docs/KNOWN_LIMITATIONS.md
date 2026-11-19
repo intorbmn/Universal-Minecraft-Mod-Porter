@@ -72,7 +72,7 @@ Each entry names the module and the phase expected to address it.
 - Agent memory across sessions is not implemented.
 
 ## Build & malware scan (Phase 8)
-- The GitHub backend has only been tested against fake `gh`/`git`; no real Actions run yet.
+- If the network blocks GitHub artifact storage, `build` falls back to the job log: stage results only, no per-stage logs or test counts. Each build leaves a `ummp/<mod>-<time>` branch in the build repo (not deleted automatically).
 - Local builds are isolated at process level only (copy, env allow-list, timeout, tree kill);
   a malicious build script still runs with your user's rights. Prefer the GitHub backend.
 - The env allow-list drops proxy variables, so local builds behind a proxy may fail.
