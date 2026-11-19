@@ -125,8 +125,8 @@ const fn skipped(stage: Stage) -> StageResult {
     }
 }
 
-/// `(passed, total)` from JUnit XML `<testsuite tests=".." failures=".." errors="..">`.
-fn junit_counts(dir: &Path) -> Option<(u32, u32)> {
+/// `(passed, total)` from JUnit XML files under `results` `<testsuite tests=".." failures=".." errors="..">`.
+pub(crate) fn junit_counts(results: &Path) -> Option<(u32, u32)> {
     fn attr(tag: &str, name: &str) -> u32 {
         tag.split(&format!(" {name}=\""))
             .nth(1)
@@ -155,12 +155,12 @@ fn junit_counts(dir: &Path) -> Option<(u32, u32)> {
         }
     }
     let mut acc = (0, 0);
-    walk(&dir.join("build/test-results"), &mut acc);
+    walk(results, &mut acc);
     (acc.1 > 0).then_some(acc)
 }
 
-fn newest_crash(dir: &Path) -> Option<super::logs::CrashInfo> {
-    let newest = std::fs::read_dir(dir.join("run/crash-reports"))
+pub(crate) fn newest_crash(reports: &Path) -> Option<super::logs::CrashInfo> {
+    let newest = std::fs::read_dir(reports)
         .ok()?
         .flatten()
         .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())?;
@@ -264,8 +264,8 @@ impl BuildBackend for LocalBackend {
         }
         Ok(BuildOutcome {
             stages,
-            tests: junit_counts(&dir),
-            crash: newest_crash(&dir),
+            tests: junit_counts(&dir.join("build/test-results")),
+            crash: newest_crash(&dir.join("run/crash-reports")),
             workdir: dir,
         })
     }
