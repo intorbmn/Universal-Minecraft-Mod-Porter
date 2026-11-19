@@ -1,5 +1,7 @@
 # Phase 9 — Advanced Technology Adapters (DRAFT)
 
+> Superseded by the approved spec once accepted: `docs/superpowers/specs/2026-11-19-phase9-adapters-design.md`.
+
 ## Intent
 Mods are not only Java. Today UMMP renames APIs in Java/Kotlin source (token rewriter,
 ADR 0007), class names in bytecode (ADR 0009), and Mixin config/targets. Everything else is
