@@ -12,6 +12,7 @@
 //! - Edits are applied only after a checkpoint is taken; any write failure
 //!   restores the checkpoint (ADR 0005, ADR 0006).
 
+use crate::adapter::{AdapterContext, AdapterRegistry};
 use crate::build_script::{migrate_build_file, required_java, BuildFile};
 use crate::checkpoint::{collect_files, CheckpointError, CheckpointStore};
 use crate::descriptor::{migrate_descriptor, DescriptorKind, DescriptorTarget};
@@ -66,6 +67,10 @@ pub struct MigrationRequest {
     pub target_loader: String,
     /// Mappings below this confidence are reported, not applied.
     pub min_confidence: f64,
+    /// Loader the mod uses today; when it differs from `target_loader` the loader
+    /// converter runs (Phase 9). `None` = same loader.
+    #[serde(default)]
+    pub source_loader: Option<String>,
 }
 
 /// One API rename taken from a knowledge-base [`Mapping`].
@@ -652,6 +657,12 @@ pub struct MigrationReport {
     pub breaking_changes: Vec<BreakingChange>,
     pub recipes: Vec<RecipeOutcome>,
     pub warnings: Vec<String>,
+    /// Files removed (e.g. the old descriptor after a loader conversion).
+    #[serde(default)]
+    pub deletes: Vec<PathBuf>,
+    /// Technology findings from the adapters (Phase 9).
+    #[serde(default)]
+    pub technologies: Vec<crate::adapter::TechFinding>,
 }
 
 impl MigrationReport {
@@ -723,6 +734,18 @@ impl MigrationReport {
             }
             out.push('\n');
         }
+        if !self.technologies.is_empty() {
+            let _ = writeln!(out, "## Technologies\n");
+            out.push_str(&crate::adapter::findings_text(&self.technologies));
+            out.push('\n');
+        }
+        if !self.deletes.is_empty() {
+            let _ = writeln!(out, "## Deleted files\n");
+            for d in &self.deletes {
+                let _ = writeln!(out, "- `{}`", d.display());
+            }
+            out.push('\n');
+        }
         if !self.warnings.is_empty() {
             let _ = writeln!(out, "## Warnings\n");
             for w in &self.warnings {
@@ -763,18 +786,24 @@ pub struct RunOptions<'a> {
 pub struct EditSet {
     pub edits: Vec<FileEdit>,
     pub moves: Vec<FileMove>,
+    /// Files to delete (relative paths), e.g. a descriptor replaced by loader conversion.
+    pub deletes: Vec<PathBuf>,
+    /// Technology findings from the adapters (Phase 9).
+    pub technologies: Vec<crate::adapter::TechFinding>,
     pub files_scanned: usize,
     pub warnings: Vec<String>,
 }
 
 pub struct MigrationEngine {
     transformers: Vec<Box<dyn SourceTransformer>>,
+    adapters: AdapterRegistry,
 }
 
 impl Default for MigrationEngine {
     fn default() -> Self {
         Self {
             transformers: vec![Box::new(TokenRenameTransformer)],
+            adapters: AdapterRegistry::default(),
         }
     }
 }
@@ -790,7 +819,17 @@ enum Handler<'a> {
 
 impl MigrationEngine {
     pub fn new(transformers: Vec<Box<dyn SourceTransformer>>) -> Self {
-        Self { transformers }
+        Self {
+            transformers,
+            adapters: AdapterRegistry::default(),
+        }
+    }
+
+    /// Replaces the technology adapters (tests, plugins).
+    #[must_use]
+    pub fn with_adapters(mut self, adapters: AdapterRegistry) -> Self {
+        self.adapters = adapters;
+        self
     }
 
     fn handler(&self, rel: &Path) -> Option<Handler<'_>> {
@@ -820,6 +859,12 @@ impl MigrationEngine {
     ) -> Result<EditSet, MigrationError> {
         let mut set = EditSet::default();
         let files = collect_files(&project.root)?;
+        let cx = AdapterContext {
+            root: &project.root,
+            files: &files,
+            plan: Some(plan),
+            source_loader: plan.request.source_loader.clone(),
+        };
 
         if plan.datapack_renames {
             let existing: std::collections::HashSet<&PathBuf> = files.iter().collect();
@@ -841,7 +886,10 @@ impl MigrationEngine {
             }
         }
 
-        for rel in files {
+        for rel in files.iter().cloned() {
+            if self.adapters.owns(&cx, &rel) {
+                continue;
+            }
             let Some(handler) = self.handler(&rel) else {
                 continue;
             };
@@ -928,6 +976,18 @@ impl MigrationEngine {
                 });
             }
         }
+        for adapter in self.adapters.adapters() {
+            let extra = adapter.edits(&cx)?;
+            for e in extra.edits {
+                // An adapter edit replaces any generic edit of the same file.
+                set.edits.retain(|x| x.path != e.path);
+                set.edits.push(e);
+            }
+            set.moves.extend(extra.moves);
+            set.deletes.extend(extra.deletes);
+            set.warnings.extend(extra.warnings);
+        }
+        set.technologies = self.adapters.findings(&cx);
         Ok(set)
     }
 
@@ -959,6 +1019,11 @@ impl MigrationEngine {
             })();
             moved.map_err(|e| (m.from.clone(), e))?;
         }
+        for path in &set.deletes {
+            resolve_within(&project.root, path)
+                .and_then(|abs| project.fs.remove(&abs))
+                .map_err(|e| (path.clone(), e))?;
+        }
         Ok(())
     }
 
@@ -972,7 +1037,7 @@ impl MigrationEngine {
         store: &mut CheckpointStore,
         opts: &RunOptions<'_>,
     ) -> Result<Option<Uuid>, MigrationError> {
-        if set.edits.is_empty() && set.moves.is_empty() {
+        if set.edits.is_empty() && set.moves.is_empty() && set.deletes.is_empty() {
             return Ok(None);
         }
         let cp = store.snapshot(
@@ -1027,6 +1092,8 @@ impl MigrationEngine {
             breaking_changes: plan.breaking_changes.clone(),
             recipes: plan.recipes.clone(),
             warnings: set.warnings,
+            deletes: set.deletes,
+            technologies: set.technologies,
         })
     }
 }

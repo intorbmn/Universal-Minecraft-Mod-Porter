@@ -41,6 +41,9 @@ pub struct AnalysisReport {
     pub languages: Vec<String>,
     pub dependency_graph: DependencyGraph,
     pub compatibility: CompatibilityMatrix,
+    /// Technologies found by the adapters (Phase 9).
+    #[serde(default)]
+    pub technologies: Vec<crate::adapter::TechFinding>,
 }
 
 impl AnalysisReport {
@@ -82,6 +85,10 @@ impl AnalysisReport {
             for i in &self.compatibility.issues {
                 let _ = writeln!(out, "  [{:?}] {}: {}", i.severity, i.mod_id, i.message);
             }
+        }
+        if !self.technologies.is_empty() {
+            out.push_str("Technologies:\n");
+            out.push_str(&crate::adapter::findings_text(&self.technologies));
         }
         out
     }
@@ -197,6 +204,7 @@ impl AnalyzerEngine {
                 .issues
                 .extend(partial.compatibility.issues);
         }
+        report.technologies = crate::adapter::AdapterRegistry::default().scan_dir(project_root);
         Ok(report)
     }
 }
