@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 6.B descriptor migration (`core/src/descriptor.rs`): retargets Minecraft and loader
+  version requirements in Fabric/Quilt/Forge/NeoForge descriptors, preserving formatting.
+- ADR 0008: simple names after an all-lowercase (package) qualifier are renamed.
 - Phase 6.A migration engine (`core/src/migration.rs`): planner with per-version stages,
   token-aware Java/Kotlin API renamer, unified diffs, Markdown/JSON report, checkpointed apply
   with automatic restore on failure.
