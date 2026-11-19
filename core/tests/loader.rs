@@ -37,16 +37,18 @@ fn golden(name: &str) -> String {
 }
 
 /// Copies fixture `src`, converts it to `to`, applies; returns (work dir, scratch, report, store).
-fn convert(
-    src: &str,
-    from: &str,
-    to: &str,
-) -> (
+type Converted = (
     tempfile::TempDir,
     tempfile::TempDir,
     MigrationReport,
     CheckpointStore,
-) {
+);
+
+fn convert(src: &str, from: &str, to: &str) -> Converted {
+    convert_to(src, from, to, "1.21.1")
+}
+
+fn convert_to(src: &str, from: &str, to: &str, mc: &str) -> Converted {
     let work = tempfile::tempdir().unwrap();
     let snaps = tempfile::tempdir().unwrap();
     copy_tree(&fixtures().join("loader").join(src), work.path());
@@ -55,7 +57,7 @@ fn convert(
         &kb,
         &MigrationRequest {
             source_minecraft: "1.21.1".into(),
-            target_minecraft: "1.21.1".into(),
+            target_minecraft: mc.into(),
             target_loader: to.into(),
             min_confidence: 0.8,
             source_loader: Some(from.into()),
@@ -209,4 +211,58 @@ fn conversion_rollback_identical() {
         .restore(report.checkpoint_id.unwrap(), w.path())
         .unwrap();
     assert_eq!(read_tree(w.path()), original);
+}
+
+#[test]
+fn template_applied_for_known_version() {
+    let (w, _s, report, _) = convert("fabric-src", "fabric", "neoforge");
+    let w = w.path();
+    let build = read(w, "build.gradle");
+    assert!(
+        build.contains("id 'net.neoforged.moddev' version '2.0.148'"),
+        "{build}"
+    );
+    assert!(!build.contains("fabric-loom"), "{build}");
+    let props = read(w, "gradle.properties");
+    for want in [
+        "neo_version=21.1.267",
+        "mod_id=demowidget",
+        "mod_version=1.0.0",
+        "mod_group_id=com.example.demo",
+    ] {
+        assert!(props.contains(want), "missing {want}: {props}");
+    }
+    assert!(read(w, "settings.gradle").contains("rootProject.name = 'demowidget'"));
+    assert!(!report
+        .technologies
+        .iter()
+        .any(|f| f.message.contains("no build template")));
+    // No wrapper in the fixture: the user is told which Gradle to add.
+    assert!(report
+        .technologies
+        .iter()
+        .any(|f| f.handling == Handling::Manual && f.message.contains("Gradle 9.2.1")));
+
+    let (w2, _s2, _, _) = convert("neoforge-src", "neoforge", "fabric");
+    let build = read(w2.path(), "build.gradle");
+    assert!(build.contains("net.fabricmc.fabric-loom-remap"), "{build}");
+    assert!(
+        build.contains("accessWidenerPath = file(\"src/main/resources/demowidget.accesswidener\")"),
+        "{build}"
+    );
+}
+
+#[test]
+fn no_template_is_manual() {
+    let (w, _s, report, _) = convert_to("fabric-src", "fabric", "neoforge", "1.21.4");
+    assert!(read(w.path(), "build.gradle").contains("fabric-loom"));
+    assert!(w
+        .path()
+        .join("src/main/resources/META-INF/neoforge.mods.toml")
+        .exists());
+    assert!(report
+        .technologies
+        .iter()
+        .any(|f| f.handling == Handling::Manual
+            && f.message.contains("no build template for NeoForge 1.21.4")));
 }

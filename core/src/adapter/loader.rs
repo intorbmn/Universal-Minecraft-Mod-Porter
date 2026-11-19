@@ -31,6 +31,96 @@ struct RenameRow {
     to: String,
 }
 
+const TEMPLATES: &str = include_str!("../loader_templates.toml");
+
+/// Build files for one `(loader, minecraft)` pair.
+#[derive(Deserialize)]
+pub struct Template {
+    pub loader: String,
+    pub minecraft: String,
+    pub gradle: String,
+    pub settings_gradle: String,
+    pub gradle_properties: String,
+    pub build_gradle: String,
+}
+
+#[derive(Deserialize)]
+struct TemplateFile {
+    template: Vec<Template>,
+}
+
+/// The build template for `loader` (family) and `minecraft`, if UMMP ships one.
+#[must_use]
+pub fn template(loader: &str, minecraft: &str) -> Option<&'static Template> {
+    static T: OnceLock<TemplateFile> = OnceLock::new();
+    T.get_or_init(|| toml::from_str(TEMPLATES).expect("embedded loader_templates.toml is valid"))
+        .template
+        .iter()
+        .find(|t| t.loader == loader && t.minecraft == minecraft)
+}
+
+const BUILD_FILES: &[&str] = &[
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
+    "gradle.properties",
+    "gradle/wrapper/gradle-wrapper.properties",
+];
+
+/// `key=value` from a properties text.
+fn property(text: &str, keys: &[&str]) -> Option<String> {
+    text.lines().find_map(|l| {
+        let (k, v) = l.split_once('=')?;
+        keys.contains(&k.trim())
+            .then(|| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+    })
+}
+
+/// Lines of the old `dependencies { ... }` block that are not loader/Minecraft setup,
+/// as comments for the user to review.
+fn carried_dependencies(build: &str) -> String {
+    const LOADER: &[&str] = &[
+        "minecraft",
+        "mappings",
+        "fabric-loader",
+        "fabric-api",
+        "neoforge",
+        "net.minecraftforge",
+        "net.neoforged",
+        "net.fabricmc",
+        "forge",
+    ];
+    let mut out = Vec::new();
+    let mut depth = 0_i32;
+    let mut inside = false;
+    for line in build.lines() {
+        let t = line.trim();
+        if !inside && t.starts_with("dependencies") && t.ends_with('{') {
+            inside = true;
+            depth = 1;
+            continue;
+        }
+        if inside {
+            depth += i32::try_from(t.matches('{').count()).unwrap_or(0);
+            depth -= i32::try_from(t.matches('}').count()).unwrap_or(0);
+            if depth <= 0 {
+                inside = false;
+                continue;
+            }
+            if !t.is_empty() && !t.starts_with("//") && !LOADER.iter().any(|w| t.contains(w)) {
+                out.push(format!("    // UMMP: from the old build, review: {t}"));
+            }
+        }
+    }
+    if out.is_empty() {
+        "    // UMMP: no other dependencies in the old build".into()
+    } else {
+        out.join("\n")
+    }
+}
+
 fn data() -> &'static Data {
     static D: OnceLock<Data> = OnceLock::new();
     D.get_or_init(|| toml::from_str(DATA).expect("embedded loader_rules.toml is valid"))
@@ -701,6 +791,91 @@ impl LoaderConverter {
         c
     }
 
+    fn template_of(cx: &AdapterContext<'_>, c: &Conv) -> Option<&'static Template> {
+        template(c.to, &cx.plan?.descriptor_target.minecraft)
+    }
+
+    /// Replaces the build files from the template for the target loader and version.
+    fn build_edits(cx: &AdapterContext<'_>, c: &Conv, t: &Template, set: &mut EditSet) {
+        let old_props = cx.text(Path::new("gradle.properties")).unwrap_or_default();
+        let old_build = ["build.gradle", "build.gradle.kts"]
+            .iter()
+            .find_map(|f| cx.text(Path::new(f)))
+            .unwrap_or_default();
+        let version = Some(c.info.version.clone())
+            .filter(|v| !v.is_empty() && !v.contains("${"))
+            .or_else(|| property(&old_props, &["mod_version", "version"]))
+            .unwrap_or_else(|| "1.0.0".into());
+        let group = property(&old_props, &["maven_group", "mod_group_id", "group"])
+            .or_else(|| {
+                c.info
+                    .entry
+                    .as_ref()
+                    .and_then(|e| e.rsplit_once('.').map(|(p, _)| p.to_string()))
+            })
+            .unwrap_or_else(|| "com.example".into());
+        let access = if c.to == "fabric" && c.access_file.is_some() {
+            let res = c.resources.to_string_lossy().replace('\\', "/");
+            format!(
+                "\nloom {{\n    accessWidenerPath = file(\"{res}/{}.accesswidener\")\n}}\n",
+                c.info.id
+            )
+        } else {
+            String::new()
+        };
+        let fill = |s: &str| {
+            s.replace("@MOD_ID@", &c.info.id)
+                .replace("@VERSION@", &version)
+                .replace("@GROUP@", &group)
+                .replace("@USER_DEPS@", &carried_dependencies(&old_build))
+                .replace("@ACCESS@", &access)
+        };
+        let mut put = |name: &str, kts: Option<&str>, text: String| {
+            if let Some(k) = kts.filter(|k| cx.files.iter().any(|f| f == Path::new(k))) {
+                set.deletes.push(PathBuf::from(k));
+            }
+            let path = PathBuf::from(name);
+            let original = cx.text(&path).unwrap_or_default();
+            if original != text {
+                set.edits.push(FileEdit {
+                    path,
+                    original,
+                    updated: text,
+                    replacements: vec![],
+                });
+            }
+        };
+        put(
+            "build.gradle",
+            Some("build.gradle.kts"),
+            fill(&t.build_gradle),
+        );
+        put(
+            "settings.gradle",
+            Some("settings.gradle.kts"),
+            fill(&t.settings_gradle),
+        );
+        put("gradle.properties", None, fill(&t.gradle_properties));
+        let wrapper = Path::new("gradle/wrapper/gradle-wrapper.properties");
+        if let Some(text) = cx.text(wrapper) {
+            let url = format!(
+                "distributionUrl=https\\://services.gradle.org/distributions/gradle-{}-bin.zip",
+                t.gradle
+            );
+            let updated: String = text
+                .split_inclusive('\n')
+                .map(|l| {
+                    if l.starts_with("distributionUrl=") {
+                        format!("{url}\n")
+                    } else {
+                        l.to_string()
+                    }
+                })
+                .collect();
+            put(&wrapper.to_string_lossy(), None, updated);
+        }
+    }
+
     fn rewrite_with(c: &Conv, rel: &Path, text: &str) -> String {
         let mut out = if c.renames.is_empty() {
             text.to_string()
@@ -791,13 +966,18 @@ impl TechAdapter for LoaderConverter {
             .file_name()
             .map(|n| n.to_string_lossy())
             .unwrap_or_default();
-        let candidate = matches!(
-            name.as_ref(),
-            "fabric.mod.json" | "mods.toml" | "neoforge.mods.toml" | "accesstransformer.cfg"
-        ) || name.ends_with(".accesswidener");
+        let rel_s = rel.to_string_lossy().replace('\\', "/");
+        let build = BUILD_FILES.contains(&rel_s.as_str());
+        let candidate = build
+            || matches!(
+                name.as_ref(),
+                "fabric.mod.json" | "mods.toml" | "neoforge.mods.toml" | "accesstransformer.cfg"
+            )
+            || name.ends_with(".accesswidener");
         candidate
             && self.conv(cx).is_some_and(|c| {
                 c.descriptor == rel
+                    || (build && Self::template_of(cx, &c).is_some())
                     || (c.access_file.as_deref() == Some(rel)
                         && (c.from == "fabric" || c.to == "fabric"))
             })
@@ -864,6 +1044,33 @@ impl TechAdapter for LoaderConverter {
                 None,
                 "main class not found: write the entry point by hand".into(),
             ));
+        }
+        let minecraft = cx
+            .plan
+            .map(|p| p.descriptor_target.minecraft.clone())
+            .unwrap_or_default();
+        match Self::template_of(cx, &c) {
+            None => out.push(finding(
+                Handling::Manual,
+                Path::new("build.gradle"),
+                None,
+                format!(
+                    "no build template for {} {minecraft}: convert build.gradle and gradle.properties by hand",
+                    display(c.to)
+                ),
+            )),
+            Some(t) if !cx.files.iter().any(|f| f == Path::new("gradle/wrapper/gradle-wrapper.properties")) => {
+                out.push(finding(
+                    Handling::Manual,
+                    Path::new("build.gradle"),
+                    None,
+                    format!(
+                        "no Gradle wrapper: add one for Gradle {} (`gradle wrapper --gradle-version {}`)",
+                        t.gradle, t.gradle
+                    ),
+                ));
+            }
+            Some(_) => {}
         }
         if c.to == "forge" && !c.info.mixins.is_empty() {
             out.push(finding(
@@ -944,6 +1151,9 @@ impl TechAdapter for LoaderConverter {
             }
         }
         info.entry = Some(entry.clone());
+        if let Some(t) = Self::template_of(cx, &c) {
+            Self::build_edits(cx, &c, t, &mut set);
+        }
         let target = &plan.descriptor_target;
         let (target_rel, text) = match c.to {
             "fabric" => (
