@@ -78,7 +78,7 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].kind, "step.start");
         assert_eq!(events[1].kind, "step.done");
-        assert!(events[0].id != events[1].id);
+        assert_ne!(events[0].id, events[1].id);
     }
 
     #[test]
