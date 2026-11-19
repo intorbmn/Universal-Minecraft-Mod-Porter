@@ -443,6 +443,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target_minecraft: to,
                 target_loader: loader.to_lowercase(),
                 min_confidence,
+                source_loader: None,
             };
             let plan = MigrationPlanner::plan(&kb, &request)?;
             let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
@@ -490,6 +491,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target_minecraft: to,
                 target_loader: loader.to_lowercase(),
                 min_confidence,
+                source_loader: None,
             };
             let plan = MigrationPlanner::plan(&kb, &request)?;
             let stages: Vec<ClassMap> = plan
@@ -527,6 +529,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target_minecraft: to.clone(),
                 target_loader: loader.to_lowercase(),
                 min_confidence: 0.8,
+                source_loader: None,
             };
             let plan = MigrationPlanner::plan(&kb, &request)?;
             let snap_dir = ai

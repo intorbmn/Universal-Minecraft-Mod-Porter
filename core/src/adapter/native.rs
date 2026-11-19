@@ -41,7 +41,7 @@ fn missing(present: &BTreeSet<&str>) -> Vec<&'static str> {
 pub struct NativeAdapter;
 
 impl TechAdapter for NativeAdapter {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         "native-libs"
     }
 
