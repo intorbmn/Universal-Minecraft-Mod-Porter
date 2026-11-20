@@ -212,7 +212,6 @@ export interface CoreEvent {
 export interface AiKeyStatus {
   saved: boolean;
   masked: string | null;
-  path: string;
   base_url: string | null;
 }
 
