@@ -4,7 +4,7 @@
 **Branch:** `phase-12-api` (based on merged Phase 11 `master`)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADR:** [0015 — CLI output and configuration contract](../decisions/0015-cli-output-and-config.md)
+**ADRs:** [0015 — CLI output and configuration contract](../decisions/0015-cli-output-and-config.md) (preserved); [0016 — interim AI key storage](../decisions/0016-interim-ai-key-file-storage.md)\n**Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)\n**Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
 ## Working method
 
@@ -30,7 +30,7 @@ remain outside `core`.
 | 12.D GitHub Action | NOT STARTED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
 
-## 12.A implementation record
+## D2 / P1 design record\n\n- User approved the Phase 12 design specification on 2026-11-20.\n- Added ADR 0016, status Accepted (interim), for file-backed AI credentials.\n- ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; later Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).\n- Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.\n- No implementation code has been changed yet.\n\n## 12.A implementation record
 
 - Added `cli/src/exit.rs` with the six documented numeric exit statuses.
 - Added `clap_complete` and `ummp completions bash|zsh|fish|powershell`.
