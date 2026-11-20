@@ -983,7 +983,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             build_opts,
         } => {
             let output = config.output_dir(output);
-            let kb = if kb.is_none() && mappings.is_none() {
+            let kb = if kb.is_none() && mappings.is_none() && config.kb.is_none() {
                 println!("No knowledge base given: structural migration only (descriptors, build files, loader conversion).");
                 KnowledgeBase::open(Path::new(":memory:"))?
             } else {
