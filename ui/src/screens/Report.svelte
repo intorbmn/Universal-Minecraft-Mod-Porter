@@ -60,6 +60,12 @@
     <h2>{t('plan.warnings')}</h2>
     <ul>{#each report.warnings as warning (warning)}<li>{warning}</li>{/each}</ul>
   {/if}
+  {#if report.technologies.length}
+    <h2>{t('plan.technologies')}</h2>
+    <ul>{#each report.technologies as finding, i (`${finding.tech}-${finding.file}-${i}`)}
+      <li><strong>{finding.tech}</strong> · {t(`handling.${finding.handling}`)} · {finding.message} <code>{finding.file}</code></li>
+    {/each}</ul>
+  {/if}
 {:else if isBuild}
   <section class="metrics">
     <div><strong>{job.result?.passed ? t('build.passed') : t('build.failed')}</strong><span>{t('build.status')}</span></div>
