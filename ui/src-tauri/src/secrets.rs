@@ -9,7 +9,8 @@ use std::sync::Mutex;
 const SERVICE: &str = "ummp";
 
 /// Only these identifiers can be used as credential names.
-pub const SECRET_NAMES: &[&str] = &["anthropic_api_key", "openai_api_key", "github_token"];
+pub const SECRET_NAMES: &[&str] = &["github_token"];
+const LEGACY_AI_SECRET_NAMES: &[&str] = &["anthropic_api_key", "openai_api_key"];
 
 pub trait SecretStore: Send + Sync {
     fn set(&self, name: &str, value: &str) -> Result<(), String>;
@@ -17,8 +18,10 @@ pub trait SecretStore: Send + Sync {
     fn delete(&self, name: &str) -> Result<(), String>;
 }
 
-fn validate_name(name: &str) -> Result<(), String> {
-    if SECRET_NAMES.contains(&name) {
+fn validate_name(name: &str, legacy_read: bool) -> Result<(), String> {
+    if SECRET_NAMES.contains(&name)
+        || (legacy_read && LEGACY_AI_SECRET_NAMES.contains(&name))
+    {
         Ok(())
     } else {
         Err("unknown credential name".into())
@@ -31,7 +34,7 @@ pub struct OsKeyring;
 
 impl SecretStore for OsKeyring {
     fn set(&self, name: &str, value: &str) -> Result<(), String> {
-        validate_name(name)?;
+        validate_name(name, false)?;
         let entry = keyring::Entry::new(SERVICE, name)
             .map_err(|_| "the operating system credential store is unavailable".to_owned())?;
         entry
@@ -40,7 +43,7 @@ impl SecretStore for OsKeyring {
     }
 
     fn get(&self, name: &str) -> Result<Option<String>, String> {
-        validate_name(name)?;
+        validate_name(name, true)?;
         let entry = keyring::Entry::new(SERVICE, name)
             .map_err(|_| "the operating system credential store is unavailable".to_owned())?;
         match entry.get_password() {
@@ -51,7 +54,7 @@ impl SecretStore for OsKeyring {
     }
 
     fn delete(&self, name: &str) -> Result<(), String> {
-        validate_name(name)?;
+        validate_name(name, true)?;
         let entry = keyring::Entry::new(SERVICE, name)
             .map_err(|_| "the operating system credential store is unavailable".to_owned())?;
         match entry.delete_credential() {
@@ -69,9 +72,17 @@ impl SecretStore for OsKeyring {
 pub struct MemorySecretStore(Mutex<HashMap<String, String>>);
 
 #[cfg(test)]
+impl MemorySecretStore {
+    pub fn set_legacy(&self, name: &str, value: &str) {
+        assert!(LEGACY_AI_SECRET_NAMES.contains(&name));
+        self.0.lock().unwrap().insert(name.to_owned(), value.to_owned());
+    }
+}
+
+#[cfg(test)]
 impl SecretStore for MemorySecretStore {
     fn set(&self, name: &str, value: &str) -> Result<(), String> {
-        validate_name(name)?;
+        validate_name(name, false)?;
         self.0
             .lock()
             .map_err(|_| "memory keyring lock poisoned".to_owned())?
@@ -80,7 +91,7 @@ impl SecretStore for MemorySecretStore {
     }
 
     fn get(&self, name: &str) -> Result<Option<String>, String> {
-        validate_name(name)?;
+        validate_name(name, true)?;
         Ok(self
             .0
             .lock()
@@ -90,7 +101,7 @@ impl SecretStore for MemorySecretStore {
     }
 
     fn delete(&self, name: &str) -> Result<(), String> {
-        validate_name(name)?;
+        validate_name(name, true)?;
         self.0
             .lock()
             .map_err(|_| "memory keyring lock poisoned".to_owned())?
@@ -115,9 +126,11 @@ mod tests {
     }
 
     #[test]
-    fn unknown_secret_names_are_rejected() {
+    fn only_github_token_can_be_written_to_keyring() {
         let store = MemorySecretStore::default();
+        assert!(store.set("anthropic_api_key", "not-allowed").is_err());
         assert!(store.set("settings_json", "not-allowed").is_err());
+        assert!(store.set("github_token", "allowed").is_ok());
     }
 
     #[test]
