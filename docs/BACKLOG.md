@@ -3,6 +3,17 @@
 Items deferred from finished phases. Each line says what is missing and why it was left.
 Move an item into a phase file when it is picked up.
 
+## Phase 10 — Modpack Migration
+- [ ] CurseForge API resolution of unresolved entries (needs an API key).
+- [ ] Build and bundle ported mods automatically into the exported pack.
+- [ ] Prism/MultiMC export refinements (icons, java settings, memory).
+- [ ] Launch an exported pack: server start (`pack-server.yml` in the sandbox repo) and a
+  client launch.
+- [ ] KubeJS / CraftTweaker script migration; `pack_format` bumps for data and resource packs.
+- [ ] Pack diff (old vs new) in the report.
+- [ ] Add required dependencies of Update versions; report upper bounds of version ranges.
+- [ ] Real replacement and config-rule data (today one synthetic sample each).
+
 ## Phase 9 — Advanced Technology Adapters
 - [ ] Build templates for more Minecraft versions (only 1.21.1 today) and for Forge
   (Fabric → Forge converts descriptor/entry, but the build needs a ForgeGradle template).

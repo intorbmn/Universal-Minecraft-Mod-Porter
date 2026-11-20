@@ -1,11 +1,11 @@
 # PROJECT_STATUS — UMMP Progress
 
-Last updated: 2026-11-19
+Last updated: 2026-11-20
 
 Status follows the rule in the master prompt: **COMPLETED only with test evidence
 against the phase's acceptance criteria.** Evidence = `cargo build`, `cargo test --all`
-(170 tests), `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`, all green
-locally on branch `phase-9-adapters`.
+(213 tests), `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`, all green
+locally on branch `phase-10-modpack`.
 
 | Phase | Status | Evidence / note |
 |---|---|---|
@@ -19,13 +19,12 @@ locally on branch `phase-9-adapters`.
 | 7 AI Agent System | COMPLETED | Provider trait + Anthropic/OpenAI-compatible providers, structured output, validated search/replace edits, review + approval gate, checkpointed apply, retry/fallback, budget, cost, audit. 9 eval cases; see `docs/phase/phase-07-ai.md`, ADR 0010 |
 | 8 Build & Testing Engine | COMPLETED | `ummp scan` (static malware risk), `ummp build` local + GitHub Actions (real run 3/3 verified): build, tests, server launch, scored report; see `docs/phase/phase-08-build.md`, ADR 0011, `docs/BACKLOG.md` |
 | 9 Advanced Technology Adapters | COMPLETED | Adapter SDK + 15 technology rules, native report, Groovy/Scala, Mixin member renames, loader conversion (Fabric/Quilt ↔ NeoForge, Forge ↔ NeoForge), `ummp port`. See `docs/phase/phase-09-adapters.md`, ADR 0012 |
-| 10 Modpack Migration | NOT_STARTED | |
+| 10 Modpack Migration | COMPLETED | `ummp pack inspect|migrate|export`: 4 pack formats read and written, parallel analysis, dependency graph, risk gate, planner, optional read-only Modrinth lookups, config migration through `MigrationEngine`, report. See `docs/phase/phase-10-modpack.md`, ADR 0013 |
 | 11 User Interface | NOT_STARTED | |
 | 12 CLI, API & External Integration | NOT_STARTED | CLI has `analyze`, `migrate`, `remap-jar`, `rollback`, `ai-assist`, `ai-debug` (built as part of Phases 4/6) |
 | 13 Optimization & Production Readiness | NOT_STARTED | |
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Next milestone
-Phase 10 — Modpack Migration, paused at the user's request. Follow
-[`docs/guides/phase-10-modpack.md`](guides/phase-10-modpack.md) (guides for 11–14 are in the
-same folder). Phase 9 is merged (PR #6).
+Phase 11 — User Interface (Tauri), after the user reviews and merges the Phase 10 PR. Follow
+[`docs/guides/phase-11-ui.md`](guides/phase-11-ui.md) (guides for 11–14 are in the same folder).
