@@ -132,6 +132,11 @@ async fn rollback(
     blocking(&svc, move |s| commands::rollback(s, &project, checkpoint)).await
 }
 
+#[tauri::command]
+fn open_output(svc: Svc<'_>, id: Uuid) -> Result<(), UiError> {
+    commands::open_output(&svc, id)
+}
+
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn settings(svc: Svc<'_>) -> Settings {
@@ -237,6 +242,7 @@ pub fn run() {
             cancel,
             decide,
             rollback,
+            open_output,
             settings,
             save_settings,
             set_secret,
