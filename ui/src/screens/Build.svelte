@@ -6,6 +6,7 @@
   let { path, onStart }: { path: string; onStart: (jobId: string) => void } = $props();
   let backend = $state<'github' | 'local'>('github');
   let risk = $state<RiskLevel | null>(null);
+  let riskLoaded = $state(false);
   let highAccepted = $state(false);
   let mediumConfirmed = $state(false);
   let loading = $state(false);
@@ -14,9 +15,13 @@
   $effect(() => {
     const local = backend === 'local';
     risk = null;
+    riskLoaded = false;
     error = null;
     api.checkBuildRisk(path, local)
-      .then((value) => (risk = value))
+      .then((value) => {
+        risk = value;
+        riskLoaded = true;
+      })
       .catch((e: UiError) => (error = e));
   });
 
@@ -59,7 +64,7 @@
 <h2>{t('build.risk')}</h2>
 {#if error}
   <div class="error" role="alert">{error.message}</div>
-{:else if risk === null}
+{:else if !riskLoaded}
   <p role="status">{t('build.scanning')}</p>
 {:else}
   <p>{risk ? t(`risk.${risk}`) : t('analysis.riskNone')}</p>
@@ -70,7 +75,7 @@
   <label class="ack"><input type="checkbox" bind:checked={mediumConfirmed} /> {t('build.confirmMedium')}</label>
 {/if}
 <p class="muted">{backend === 'local' ? t('build.localWarning') : t('build.githubWarning')}</p>
-<button class="primary" onclick={start} disabled={loading || risk === null || blocked}>
+<button class="primary" onclick={start} disabled={loading || !riskLoaded || blocked}>
   {loading ? t('build.starting') : t('build.start')}
 </button>
 
