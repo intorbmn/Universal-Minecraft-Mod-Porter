@@ -1,8 +1,8 @@
 //! Phase 11.A: application services facade tests.
 use tempfile::tempdir;
 use ummp_core::jobs::{Job, JobState};
-use ummp_core::persistence::JobDb;
 use ummp_core::modpack::plan::{PackAction, PlanItem};
+use ummp_core::persistence::JobDb;
 use uuid::Uuid;
 
 #[test]
@@ -1011,7 +1011,9 @@ fn high_risk_input_refuses_pack_and_local_build_without_ack() {
     assert_eq!(done.payload["state"], "Succeeded", "{:?}", done.payload);
     assert!(out2.join("instance/mods/a.jar").is_file());
     assert!(
-        done.payload["result"]["items"].as_array().is_some_and(|items| !items.is_empty()),
+        done.payload["result"]["items"]
+            .as_array()
+            .is_some_and(|items| !items.is_empty()),
         "the desktop pack report needs the per-mod decisions: {:?}",
         done.payload
     );
