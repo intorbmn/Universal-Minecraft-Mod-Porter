@@ -19,7 +19,7 @@ pub enum AiProviderKind {
 }
 
 impl AiProviderKind {
-    const fn env_name(self) -> &'static str {
+    pub const fn env_name(self) -> &'static str {
         match self {
             Self::Anthropic => "ANTHROPIC_API_KEY",
             Self::Openai => "OPENAI_API_KEY",
@@ -246,18 +246,20 @@ pub fn resolve_ai_key(
     data_dir: &Path,
     provider: AiProviderKind,
 ) -> Result<Option<Secret>, AppError> {
-    resolve_ai_key_with_env(data_dir, provider, std::env::var(provider.env_name()).ok())
+    let store = FileKeyStore::in_dir(data_dir);
+    resolve_ai_key_from_store(&store, provider, std::env::var(provider.env_name()).ok())
 }
 
-fn resolve_ai_key_with_env(
-    data_dir: &Path,
+/// Resolves environment first, then the injected store. Useful for desktop and test adapters.
+pub fn resolve_ai_key_from_store(
+    store: &dyn AiKeyStore,
     provider: AiProviderKind,
     env_value: Option<String>,
 ) -> Result<Option<Secret>, AppError> {
     if let Some(value) = env_value.filter(|value| !value.trim().is_empty()) {
         return Ok(Some(Secret::new(validate_key(&value)?)));
     }
-    FileKeyStore::in_dir(data_dir).get(provider)
+    store.get(provider)
 }
 
 pub fn default_data_dir() -> Result<PathBuf, AppError> {
@@ -342,7 +344,7 @@ mod tests {
     fn environment_value_overrides_file_without_global_environment_mutation() {
         let dir = tempfile::tempdir().unwrap();
         FileKeyStore::in_dir(dir.path()).set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC)).unwrap();
-        let resolved = resolve_ai_key_with_env(dir.path(), AiProviderKind::Anthropic, Some("env-key-value".into())).unwrap();
+        let resolved = resolve_ai_key_from_store(&FileKeyStore::in_dir(dir.path()), AiProviderKind::Anthropic, Some("env-key-value".into())).unwrap();
         assert_eq!(resolved.unwrap().expose(), "env-key-value");
     }
 
