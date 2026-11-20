@@ -208,7 +208,7 @@ impl CredentialsFile {
         }
     }
 
-    fn key_mut(
+    const fn key_mut(
         file: &mut StoredCredentials,
         provider: AiProviderKind,
     ) -> &mut Option<String> {
