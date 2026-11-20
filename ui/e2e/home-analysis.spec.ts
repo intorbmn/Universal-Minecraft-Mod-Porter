@@ -54,7 +54,7 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
       moves: [], deletes: [], technologies: [], skipped: [], warnings: [], files_scanned: 3,
     };
     (window as any).__TAURI_INTERNALS__ = {
-      invoke: async (cmd: string, args: any) => {
+      invoke: async (cmd: string) => {
         if (cmd === 'analyze') return {
           kind: 'folder',
           mods: [{ id: 'demomod', name: 'Demo Mod', version: '1.0', loader: 'fabric', minecraft: '1.20.1', java: 21 }],
@@ -111,7 +111,7 @@ test('modpack report paginates 300 rows and records first-page render time', asy
   await page.addInitScript(({ completedJob }) => {
     (window as any).__testOpenOutput = false;
     (window as any).__TAURI_INTERNALS__ = {
-      invoke: async (cmd: string, args: any) => {
+      invoke: async (cmd: string) => {
         if (cmd === 'sessions') return [];
         if (cmd === 'targets') return {
           loaders: ['fabric', 'neoforge'],
