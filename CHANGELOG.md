@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 12.A started: stable CLI exit-code definitions, shell completions, `ummp.toml` configuration precedence, TOML support in the shared config loader, and versioned JSON envelopes for analyze/scan. See ADR 0015 and `docs/phase/phase-12-api.md`.
+
+### Added
 - Phase 11.B–11.E: desktop workflow screens for Target, Plan/Diff, Run, Report, Build, AI approval, modpack migration and Settings; OS keyring-backed credentials, output-folder opening, bilingual labels, bounded logs and paginated pack reports. See ADR 0014 and `docs/phase/phase-11-ui.md`. Automated CI is green; Windows runtime validation remains pending.
 
 ### Added
