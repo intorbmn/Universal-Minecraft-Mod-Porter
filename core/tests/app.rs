@@ -2,6 +2,7 @@
 use tempfile::tempdir;
 use ummp_core::jobs::{Job, JobState};
 use ummp_core::persistence::JobDb;
+use ummp_core::modpack::plan::{PackAction, PlanItem};
 use uuid::Uuid;
 
 #[test]
