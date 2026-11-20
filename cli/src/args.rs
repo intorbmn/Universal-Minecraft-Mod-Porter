@@ -80,7 +80,34 @@ pub struct Cli {
 }
 
 #[derive(Subcommand)]
+pub enum AiKeyCmd {
+    /// Read a key without echoing it and save it for both CLI and desktop.
+    Set {
+        #[arg(long, value_parser = ["anthropic", "openai"], default_value = "anthropic")]
+        provider: String,
+        /// Optional OpenAI-compatible endpoint.
+        #[arg(long)]
+        base_url: Option<String>,
+    },
+    /// Show saved providers and masked keys. Never prints a full key.
+    Status {
+        #[arg(long, value_parser = ["anthropic", "openai"])]
+        provider: Option<String>,
+    },
+    /// Delete one provider key, or both when no provider is selected.
+    Delete {
+        #[arg(long, value_parser = ["anthropic", "openai"])]
+        provider: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum Commands {
+    /// Manage shared AI provider credentials.
+    AiKey {
+        #[command(subcommand)]
+        cmd: AiKeyCmd,
+    },
     /// Generate shell completions.
     Completions { shell: Shell },
     /// Detect loader, Minecraft/Java versions, dependencies and build system.
