@@ -2,16 +2,20 @@
 //! and job events are forwarded to the window as `ummp://event`.
 
 mod commands;
+mod secrets;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use commands::UiError;
+use secrets::{OsKeyring, SecretStore};
 use tauri::{AppHandle, Emitter, Manager, State};
 use ummp_core::app::views::{
-    AnalysisView, JobView, PlanView, RiskView, SessionView, TargetsView,
+    AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
-use ummp_core::app::{AppServices, PlanRequest, PortRequest, Settings};
+use ummp_core::app::{
+    AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Settings,
+};
 use ummp_core::events::{Event, EventHandler};
 use uuid::Uuid;
 
@@ -29,6 +33,7 @@ impl EventHandler for WindowForwarder {
 }
 
 type Svc<'a> = State<'a, Arc<AppServices>>;
+type Secrets<'a> = State<'a, Arc<dyn SecretStore>>;
 
 async fn blocking<T, F>(svc: &Svc<'_>, f: F) -> Result<T, UiError>
 where
@@ -41,6 +46,20 @@ where
         .map_err(|e| UiError {
             kind: "internal",
             message: format!("worker stopped: {e}"),
+        })?
+}
+
+async fn secret_blocking<T, F>(store: &Secrets<'_>, f: F) -> Result<T, UiError>
+where
+    T: Send + 'static,
+    F: FnOnce(&dyn SecretStore) -> Result<T, UiError> + Send + 'static,
+{
+    let store = Arc::clone(store.inner());
+    tauri::async_runtime::spawn_blocking(move || f(store.as_ref()))
+        .await
+        .map_err(|e| UiError {
+            kind: "internal",
+            message: format!("credential worker stopped: {e}"),
         })?
 }
 
@@ -107,6 +126,68 @@ async fn rollback(
     blocking(&svc, move |s| commands::rollback(s, &project, checkpoint)).await
 }
 
+#[tauri::command]
+fn settings(svc: Svc<'_>) -> Settings {
+    commands::settings(&svc)
+}
+
+#[tauri::command]
+async fn save_settings(svc: Svc<'_>, value: Settings) -> Result<(), UiError> {
+    blocking(&svc, move |s| commands::save_settings(s, value)).await
+}
+
+#[tauri::command]
+async fn set_secret(store: Secrets<'_>, name: String, value: String) -> Result<(), UiError> {
+    secret_blocking(&store, move |s| commands::set_secret(s, &name, &value)).await
+}
+
+#[tauri::command]
+async fn has_secret(store: Secrets<'_>, name: String) -> Result<bool, UiError> {
+    secret_blocking(&store, move |s| commands::has_secret(s, &name)).await
+}
+
+#[tauri::command]
+async fn delete_secret(store: Secrets<'_>, name: String) -> Result<(), UiError> {
+    secret_blocking(&store, move |s| commands::delete_secret(s, &name)).await
+}
+
+#[tauri::command]
+async fn check_build_risk(
+    svc: Svc<'_>,
+    path: PathBuf,
+    local: bool,
+) -> Result<Option<RiskLevel>, UiError> {
+    blocking(&svc, move |s| commands::check_build_risk(s, &path, local)).await
+}
+
+#[tauri::command]
+fn start_build(svc: Svc<'_>, request: BuildJobRequest) -> Result<Uuid, UiError> {
+    commands::start_build(&svc, request)
+}
+
+#[tauri::command]
+fn start_pack(svc: Svc<'_>, request: PackRequest) -> Result<Uuid, UiError> {
+    commands::start_pack(&svc, request)
+}
+
+#[tauri::command]
+async fn start_ai_assist(
+    svc: Svc<'_>,
+    store: Secrets<'_>,
+    request: PlanRequest,
+) -> Result<Uuid, UiError> {
+    let svc = Arc::clone(svc.inner());
+    let store = Arc::clone(store.inner());
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::start_ai_assist(&svc, store.as_ref(), request)
+    })
+    .await
+    .map_err(|e| UiError {
+        kind: "internal",
+        message: format!("AI setup worker stopped: {e}"),
+    })?
+}
+
 /// Starts the desktop app.
 ///
 /// # Panics
@@ -120,6 +201,7 @@ pub fn run() {
             let svc = Arc::new(AppServices::open(Settings::new(dir))?);
             svc.subscribe(Arc::new(WindowForwarder(app.handle().clone())));
             app.manage(svc);
+            app.manage(Arc::new(OsKeyring) as Arc<dyn SecretStore>);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -132,7 +214,16 @@ pub fn run() {
             start_migrate_in_place,
             job,
             cancel,
-            rollback
+            rollback,
+            settings,
+            save_settings,
+            set_secret,
+            has_secret,
+            delete_secret,
+            check_build_risk,
+            start_build,
+            start_pack,
+            start_ai_assist
         ])
         .run(tauri::generate_context!())
         .expect("error while running the UMMP desktop app");
