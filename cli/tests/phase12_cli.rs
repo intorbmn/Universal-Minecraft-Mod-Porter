@@ -37,7 +37,7 @@ fn config_rejects_api_key_fields_without_echoing_values() {
     let output = ummp(&["--config", path.to_str().unwrap(), "adapters"]);
     assert_eq!(output.status.code(), Some(5));
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("unknown field"));
+    assert!(stderr.contains("secret-like fields"));
     assert!(!stderr.contains("synthetic-secret-value"));
 }
 
