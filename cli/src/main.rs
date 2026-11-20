@@ -88,7 +88,8 @@ fn run_pack_migrate(
     for w in &out.written {
         println!("Wrote: {}", w.display());
     }
-    Ok(out.exit_code())
+    let code = out.exit_code();
+    Ok(if code == ExitCode::Partial.value() { ExitCode::Partial.value() } else { code })
 }
 
 /// Asks on the terminal for each proposed change.
@@ -478,7 +479,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
     }
 }
 
-fn map_app_error(error: ummp_core::app::AppError) -> CliFailure {
+fn map_app_error(error: &ummp_core::app::AppError) -> CliFailure {
     let code = match &error {
         ummp_core::app::AppError::Input(_) => ExitCode::InvalidInput,
         ummp_core::app::AppError::Refused(_) => ExitCode::Refused,
@@ -495,10 +496,10 @@ fn app_services(config: &CliConfig) -> Result<ummp_core::app::AppServices, Box<d
     settings.output_root.clone_from(&config.output_root);
     settings.sandbox_repo.clone_from(&config.sandbox_repo);
     settings.ai_provider.clone_from(&config.ai_provider);
-    AppServices::open(settings).map_err(|error| Box::new(map_app_error(error)) as Box<dyn std::error::Error>)
+    AppServices::open(settings).map_err(|error| Box::new(map_app_error(&error)) as Box<dyn std::error::Error>)
 }
 
-fn command_name(command: &Commands) -> &'static str {
+const fn command_name(command: &Commands) -> &'static str {
     match command {
         Commands::Completions { .. } => "completions",
         Commands::Analyze { .. } => "analyze",
@@ -520,10 +521,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     let config = if matches!(&command, Commands::Completions { .. }) {
         CliConfig::default()
     } else {
-        match config_path.as_deref() {
-            Some(path) => CliConfig::load_with_path(Some(path)),
-            None => CliConfig::load(),
-        }
+        config_path
+            .as_deref()
+            .map_or_else(CliConfig::load, |path| CliConfig::load_with_path(Some(path)))
         .map_err(|error| {
             CliFailure::new(ExitCode::InvalidInput, format!("invalid configuration: {error}"))
         })?
@@ -545,7 +545,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         Commands::Analyze { path } => {
             if json_mode {
                 let services = app_services(&config)?;
-                output::set_result(services.analyze(&path).map_err(map_app_error)?);
+                output::set_result(services.analyze(&path).map_err(|error| map_app_error(&error))?);
             } else {
                 let project = pm.open(&path)?;
                 let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
@@ -755,7 +755,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         Commands::Scan { path } => {
             if json_mode {
                 let services = app_services(&config)?;
-                let report = services.scan(&path).map_err(map_app_error)?;
+                let report = services.scan(&path).map_err(|error| map_app_error(&error))?;
                 if report.level == Some(ummp_core::app::views::RiskLevel::High) {
                     exit_code = ExitCode::Refused.value();
                 }
