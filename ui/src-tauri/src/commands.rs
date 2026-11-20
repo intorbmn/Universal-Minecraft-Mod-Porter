@@ -201,6 +201,7 @@ pub struct AiKeyStatus {
     pub saved: bool,
     pub masked: Option<String>,
     pub path: String,
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -230,6 +231,7 @@ pub fn ai_key_status(
         saved: masked.is_some(),
         masked,
         path: data_dir.join(CREDENTIALS_FILE).to_string_lossy().into_owned(),
+        base_url: store.openai_base_url().map_err(UiError::from)?,
     })
 }
 
