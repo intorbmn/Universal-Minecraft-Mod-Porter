@@ -11,6 +11,9 @@
     ? job.result.report : null) as ReportView | null);
   let buildReport = $derived(typeof job.result?.report === 'string' ? job.result.report : null);
   let isBuild = $derived(typeof job.result?.passed === 'boolean');
+  let isAi = $derived(Array.isArray(job.result?.proposed));
+  let proposedCount = $derived(Array.isArray(job.result?.proposed) ? job.result.proposed.length : 0);
+  let appliedCount = $derived(Array.isArray(job.result?.applied) ? job.result.applied.length : 0);
   let output = $derived(typeof job.result?.output === 'string'
     ? job.result.output
     : typeof job.result?.workdir === 'string' ? job.result.workdir : null);
@@ -53,9 +56,9 @@
     <div><strong>{String(job.result?.stages_passed ?? 0)}/{String(job.result?.stages_run ?? 0)}</strong><span>{t('build.stages')}</span></div>
   </section>
   {#if buildReport}<h2>{t('build.report')}</h2><pre>{buildReport}</pre>{/if}
-{:else if Array.isArray(job.result?.proposed)}
+{:else if isAi}
   <h2>{t('ai.summary')}</h2>
-  <p>{t('ai.proposed')}: {String(job.result.proposed.length)} · {t('ai.applied')}: {String(Array.isArray(job.result.applied) ? job.result.applied.length : 0)} · {t('ai.rejected')}: {String(job.result.rejected ?? 0)}</p>
+  <p>{t('ai.proposed')}: {proposedCount} · {t('ai.applied')}: {appliedCount} · {t('ai.rejected')}: {String(job.result?.rejected ?? 0)}</p>
 {:else}
   <p class="muted">{t('report.noMigrationReport')}</p>
 {/if}
