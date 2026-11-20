@@ -579,7 +579,9 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
             let key = read_api_key()?;
             let warning = store.set(kind, &ummp_core::app::Secret::new(key))?;
             if kind == AiProviderKind::Openai {
-                store.set_openai_base_url(base_url.as_deref())?;
+                if let Some(url) = base_url.as_deref() {
+                    store.set_openai_base_url(Some(url))?;
+                }
             }
             let result = serde_json::json!({
                 "provider": provider,
@@ -597,16 +599,16 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
             }
         }
         AiKeyCmd::Status { provider } => {
-            let providers = provider.map_or_else(
-                || vec![("anthropic", AiProviderKind::Anthropic), ("openai", AiProviderKind::Openai)],
-                |name| match parse_ai_provider(&name) {
-                    Ok(kind) => vec![(if kind == AiProviderKind::Anthropic { "anthropic" } else { "openai" }, kind)],
-                    Err(error) => vec![("", { let _ = error; AiProviderKind::Anthropic })],
-                },
-            );
-            if providers.iter().any(|(name, _)| name.is_empty()) {
-                return Err(CliFailure::new(ExitCode::InvalidInput, "provider must be anthropic or openai").into());
-            }
+            let providers = match provider {
+                None => vec![
+                    ("anthropic", AiProviderKind::Anthropic),
+                    ("openai", AiProviderKind::Openai),
+                ],
+                Some(name) => {
+                    let kind = parse_ai_provider(&name)?;
+                    vec![(name.as_str(), kind)]
+                }
+            };
             let entries = providers.into_iter().map(|(name, kind)| {
                 serde_json::json!({
                     "provider": name,
@@ -629,10 +631,10 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
             }
         }
         AiKeyCmd::Delete { provider } => {
-            let providers = provider.map_or_else(
-                || vec![AiProviderKind::Anthropic, AiProviderKind::Openai],
-                |name| vec![parse_ai_provider(&name).unwrap_or(AiProviderKind::Anthropic)],
-            );
+            let providers = match provider {
+                None => vec![AiProviderKind::Anthropic, AiProviderKind::Openai],
+                Some(name) => vec![parse_ai_provider(&name)?],
+            };
             for kind in providers {
                 store.delete(kind)?;
                 if kind == AiProviderKind::Openai {
