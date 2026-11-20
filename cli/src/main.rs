@@ -543,6 +543,17 @@ fn parse_ai_provider(value: &str) -> Result<AiProviderKind, CliFailure> {
     }
 }
 
+#[cfg(unix)]
+struct TerminalEchoGuard;
+
+#[cfg(unix)]
+impl Drop for TerminalEchoGuard {
+    fn drop(&mut self) {
+        let _ = Command::new("stty").arg("echo").status();
+        eprintln!();
+    }
+}
+
 fn read_api_key() -> Result<String, Box<dyn std::error::Error>> {
     if !std::io::stdin().is_terminal() {
         let mut value = String::new();
@@ -558,14 +569,7 @@ fn read_api_key() -> Result<String, Box<dyn std::error::Error>> {
         if !status.success() {
             return Err("could not disable terminal echo".into());
         }
-        struct EchoGuard;
-        impl Drop for EchoGuard {
-            fn drop(&mut self) {
-                let _ = Command::new("stty").arg("echo").status();
-                eprintln!();
-            }
-        }
-        let _echo_guard = EchoGuard;
+        let _echo_guard = TerminalEchoGuard;
         let mut value = String::new();
         std::io::stdin().lock().read_line(&mut value)?;
         Ok(value.trim().to_owned())
