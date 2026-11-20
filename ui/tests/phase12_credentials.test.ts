@@ -11,7 +11,7 @@ describe('shared AI credentials', () => {
     invoke.mockImplementation(async (command: string) => {
       if (command === 'settings') return { ai_provider: 'anthropic' };
       if (command === 'ai_key_status') {
-        return { saved: false, masked: null, path: '/tmp/credentials.json', base_url: null };
+        return { saved: false, masked: null, base_url: null };
       }
       return undefined;
     });
