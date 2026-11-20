@@ -2,6 +2,7 @@ use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 mod config;
 mod exit;
+mod output;
 
 use config::CliConfig;
 use exit::{CliFailure, ExitCode};
@@ -34,6 +35,26 @@ use ummp_core::port::{port, PortOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::scan::{scan_path, Severity};
 use uuid::Uuid;
+
+macro_rules! println {
+    ($($arg:tt)*) => {{
+        if output::is_json_mode() {
+            std::eprintln!($($arg)*);
+        } else {
+            std::println!($($arg)*);
+        }
+    }};
+}
+
+macro_rules! print {
+    ($($arg:tt)*) => {{
+        if output::is_json_mode() {
+            std::eprint!($($arg)*);
+        } else {
+            std::print!($($arg)*);
+        }
+    }};
+}
 
 #[derive(Subcommand)]
 enum PackCmd {
@@ -132,6 +153,9 @@ fn run_pack_migrate(
 #[derive(Parser)]
 #[command(name = "ummp", version, about = "Universal Minecraft Mod Porter")]
 struct Cli {
+    /// Emit a versioned JSON envelope; human-readable output moves to stderr.
+    #[arg(long, global = true)]
+    json: bool,
     /// Explicit TOML configuration file.
     #[arg(long, global = true, value_name = "PATH")]
     config: Option<PathBuf>,
@@ -147,9 +171,6 @@ enum Commands {
     Analyze {
         /// Project root path (source tree or a folder of JARs).
         path: PathBuf,
-        /// Print the machine-readable JSON report instead of text.
-        #[arg(long)]
-        json: bool,
     },
     /// Plan and run a source migration. Dry run unless `--apply` is given.
     #[command(group(ArgGroup::new("knowledge").required(true).args(["kb", "mappings"])))]
@@ -251,8 +272,6 @@ enum Commands {
     Scan {
         /// Project folder or JAR file.
         path: PathBuf,
-        #[arg(long)]
-        json: bool,
     },
     /// Build, test and start a dedicated server; on GitHub Actions unless `--local`.
     Build {
@@ -434,7 +453,9 @@ fn open_configured_kb(
 }
 
 fn gate(args: &AiArgs) -> Box<dyn ApprovalGate> {
-    if args.approve_reviewed {
+    if output::is_json_mode() {
+        Box::new(DenyAll)
+    } else if args.approve_reviewed {
         Box::new(ApproveReviewed)
     } else if std::io::stdin().is_terminal() {
         Box::new(PromptGate)
@@ -599,11 +620,31 @@ fn main() {
             std::process::exit(code);
         }
     };
+    let json_mode = cli.json;
+    let command = command_name(&cli.command);
+    output::set_json_mode(json_mode);
     let code = match run(cli) {
-        Ok(code) => code,
+        Ok(code) => {
+            if json_mode {
+                output::success(command, code);
+            }
+            code
+        }
         Err(error) => {
-            eprintln!("error: {error}");
-            error.downcast_ref::<CliFailure>().map_or(ExitCode::Error.value(), |e| e.code.value())
+            let failure = error.downcast_ref::<CliFailure>();
+            let code = failure.map_or(ExitCode::Error.value(), |e| e.code.value());
+            if json_mode {
+                let kind = match code {
+                    2 => "refused",
+                    4 => "build_failed",
+                    5 => "invalid_input",
+                    _ => "error",
+                };
+                output::failure(kind, &error.to_string());
+            } else {
+                eprintln!("error: {error}");
+            }
+            code
         }
     };
     std::process::exit(code);
@@ -729,8 +770,36 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
     }
 }
 
+fn app_services(config: &CliConfig) -> Result<ummp_core::app::AppServices, Box<dyn std::error::Error>> {
+    use ummp_core::app::{AppServices, Settings};
+
+    let mut settings = Settings::new(config::data_dir());
+    settings.kb_path.clone_from(&config.kb);
+    settings.output_root.clone_from(&config.output_root);
+    settings.sandbox_repo.clone_from(&config.sandbox_repo);
+    settings.ai_provider.clone_from(&config.ai_provider);
+    AppServices::open(settings).map_err(Into::into)
+}
+
+fn command_name(command: &Commands) -> &'static str {
+    match command {
+        Commands::Completions { .. } => "completions",
+        Commands::Analyze { .. } => "analyze",
+        Commands::Migrate { .. } => "migrate",
+        Commands::RemapJar { .. } => "remap-jar",
+        Commands::AiAssist { .. } => "ai-assist",
+        Commands::AiDebug { .. } => "ai-debug",
+        Commands::Scan { .. } => "scan",
+        Commands::Build { .. } => "build",
+        Commands::Port { .. } => "port",
+        Commands::Adapters => "adapters",
+        Commands::Pack { .. } => "pack",
+        Commands::Rollback { .. } => "rollback",
+    }
+}
+
 fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
-    let Cli { config: config_path, command } = cli;
+    let Cli { json: json_mode, config: config_path, command } = cli;
     let config = if matches!(&command, Commands::Completions { .. }) {
         CliConfig::default()
     } else {
@@ -750,16 +819,14 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             let mut command = Cli::command();
             generate(shell, &mut command, "ummp", &mut std::io::stdout());
         }
-        Commands::Analyze { path, json } => {
-            let project = pm.open(&path)?;
-            let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
-            let report = AnalyzerEngine::default().analyze(&project.root, &fs)?;
-            if json {
-                let result: serde_json::Value = serde_json::from_str(&report.to_json()?)?;
-                println!("{}", serde_json::to_string(&serde_json::json!({
-                    "schema": 1, "command": "analyze", "result": result
-                }))?);
+        Commands::Analyze { path } => {
+            if json_mode {
+                let services = app_services(&config)?;
+                output::set_result(services.analyze(&path)?);
             } else {
+                let project = pm.open(&path)?;
+                let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+                let report = AnalyzerEngine::default().analyze(&project.root, &fs)?;
                 print!("{}", report.to_text());
             }
         }
@@ -962,17 +1029,20 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             print_ai_report(&report, &cfg);
         }
 
-        Commands::Scan { path, json } => {
-            let report = scan_path(&path)?;
-            if json {
-                println!("{}", serde_json::to_string(&serde_json::json!({
-                    "schema": 1, "command": "scan", "result": report
-                }))?);
+        Commands::Scan { path } => {
+            if json_mode {
+                let services = app_services(&config)?;
+                let report = services.scan(&path)?;
+                if report.level == Some(ummp_core::app::views::RiskLevel::High) {
+                    exit_code = ExitCode::Refused.value();
+                }
+                output::set_result(report);
             } else {
+                let report = scan_path(&path)?;
                 print!("{}", report.to_text());
-            }
-            if report.risk() == Some(Severity::High) {
-                exit_code = ExitCode::Refused.value();
+                if report.risk() == Some(Severity::High) {
+                    exit_code = ExitCode::Refused.value();
+                }
             }
         }
 
