@@ -144,6 +144,9 @@ enum Commands {
     Analyze {
         /// Project root path (source tree or a folder of JARs).
         path: PathBuf,
+        /// Print the machine-readable JSON report instead of text.
+        #[arg(long)]
+        json: bool,
     },
     /// Plan and run a source migration. Dry run unless `--apply` is given.
     #[command(group(ArgGroup::new("knowledge").required(true).args(["kb", "mappings"])))]
@@ -245,6 +248,8 @@ enum Commands {
     Scan {
         /// Project folder or JAR file.
         path: PathBuf,
+        #[arg(long)]
+        json: bool,
     },
     /// Build, test and start a dedicated server; on GitHub Actions unless `--local`.
     Build {
@@ -710,7 +715,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             let mut command = Cli::command();
             generate(shell, &mut command, "ummp", &mut std::io::stdout());
         }
-        Commands::Analyze { path } => {
+        Commands::Analyze { path, json } => {
             let project = pm.open(&path)?;
             let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
             let report = AnalyzerEngine::default().analyze(&project.root, &fs)?;
@@ -919,7 +924,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             print_ai_report(&report, &cfg);
         }
 
-        Commands::Scan { path } => {
+        Commands::Scan { path, json } => {
             let report = scan_path(&path)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
