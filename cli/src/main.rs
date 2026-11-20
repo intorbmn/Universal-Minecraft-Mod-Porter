@@ -778,7 +778,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             report,
         } => {
             let project = pm.open(&path)?;
-            let kb = open_configured_kb(kb, mappings, config)?;
+            let kb = open_configured_kb(kb, mappings, &config)?;
             let request = MigrationRequest {
                 source_minecraft: from,
                 target_minecraft: to,
@@ -828,7 +828,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             mappings,
             min_confidence,
         } => {
-            let kb = open_configured_kb(kb, mappings, config)?;
+            let kb = open_configured_kb(kb, mappings, &config)?;
             let request = MigrationRequest {
                 source_minecraft: from,
                 target_minecraft: to,
@@ -866,7 +866,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             ai,
         } => {
             let project = pm.open(&path)?;
-            let kb = open_configured_kb(kb, mappings, config)?;
+            let kb = open_configured_kb(kb, mappings, &config)?;
             let request = MigrationRequest {
                 source_minecraft: from.clone(),
                 target_minecraft: to.clone(),
@@ -1000,7 +1000,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 println!("No knowledge base given: structural migration only (descriptors, build files, loader conversion).");
                 KnowledgeBase::open(Path::new(":memory:"))?
             } else {
-                open_configured_kb(kb, mappings, config)?
+                open_configured_kb(kb, mappings, &config)?
             };
             let result = port(
                 &PortOptions {
