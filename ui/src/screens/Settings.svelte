@@ -102,7 +102,10 @@
       <option value="openai">OpenAI</option>
     </select>
     <label for="language">{t('settings.language')}</label>
-    <select id="language" bind:value={language}>
+    <select id="language" value={language} onchange={(e) => {
+      language = e.currentTarget.value as 'vi' | 'en';
+      setLang(language);
+    }}>
       <option value="en">English</option>
       <option value="vi">Tiếng Việt</option>
     </select>
