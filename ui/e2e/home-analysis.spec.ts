@@ -98,3 +98,62 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
   await page.getByRole('button', { name: 'Roll back in-place changes' }).click();
   await expect(page.getByRole('button', { name: 'Rolled back' })).toBeVisible();
 });
+
+
+test('modpack report paginates 300 rows and records first-page render time', async ({ page }) => {
+  const items = Array.from({ length: 300 }, (_, i) => ({
+    path: `mods/mod-${i}.jar`,
+    mod_id: `mod-${i}`,
+    action: { action: 'keep' },
+    reason: 'already compatible',
+  }));
+  const job = {
+    id: 'job-pack', session: 'session-pack', step: 'done', state: 'Succeeded',
+    progress: { done: 3, total: 3 }, log: [], error: null,
+    result: { output: '/tmp/pack-out', written: [], manual: 0, items, exit_code: 0 },
+  };
+  await page.addInitScript(({ completedJob }) => {
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string) => {
+        if (cmd === 'sessions') return [];
+        if (cmd === 'targets') return {
+          loaders: ['fabric', 'neoforge'],
+          versions: [{ minecraft: '1.21.1', loaders: ['fabric', 'neoforge'] }],
+        };
+        if (cmd === 'start_pack') return 'job-pack';
+        if (cmd === 'job') return completedJob;
+        if (cmd === 'plugin:event|listen') return 1;
+        if (cmd === 'plugin:event|unlisten') return null;
+        return null;
+      },
+      transformCallback: () => 0,
+      unregisterCallback: () => undefined,
+    };
+  }, { completedJob: job });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Modpack' }).click();
+  await page.getByLabel('Modpack file or folder').fill('/packs/demo.mrpack');
+  await page.evaluate(() => performance.mark('pack-start'));
+  await page.getByRole('button', { name: 'Migrate modpack' }).click();
+  await expect(page.getByRole('heading', { name: 'Modpack migration report' })).toBeVisible();
+  await expect(page.getByText('mod-0')).toBeVisible();
+  await expect(page.getByText('mod-50')).toHaveCount(0);
+  const elapsed = await page.evaluate(() => performance.now() - performance.getEntriesByName('pack-start')[0].startTime);
+  test.info().annotations.push({ type: 'pack-first-page-render-ms', description: elapsed.toFixed(1) });
+  expect(elapsed).toBeLessThan(2000);
+});
+
+test('keyboard focus starts on the Home navigation control and remains visible', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string) => cmd === 'sessions' ? [] : null,
+      transformCallback: () => 0,
+    };
+  });
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  const focused = page.locator(':focus');
+  await expect(focused).toHaveRole('button', { name: 'Home' });
+  const outline = await focused.evaluate((element) => getComputedStyle(element).outlineStyle);
+  expect(outline).not.toBe('none');
+});
