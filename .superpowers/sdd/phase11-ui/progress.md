@@ -1,4 +1,4 @@
-# Phase 11 ledger
+# SDD ledger — plan: docs/superpowers/plans/2026-11-20-phase11-ui.md
 
 - 2026-11-20: Ruling: the handed-over patch (`phase_11_ui_patch.md`) is unusable as a git patch (markdown rendering stripped generics and mangled indentation); 11.A1-A3 rebuilt by hand from its text and its test names, tests first - cost if wrong: small naming drift from the previous author's code
 - 2026-11-20: Ruling: Rust 1.97 via `RUSTUP_TOOLCHAIN=stable`, not a rustup download - static.rust-lang.org blocked in sandbox - cost if wrong: clippy/fmt output may differ from pinned 1.97.0 by a patch version
@@ -42,3 +42,17 @@ Task B1 (desktop shell, Home, Analysis): complete. `ui/` (Svelte 5 + Vite 8 + TS
 - Ruling: the Vite template's demo files (`ui/src/assets`, `ui/src/lib/Counter.svelte`, `ui/public/*`, `ui/index.html` title) were not deleted because the sandbox's rm safety check refused the cleanup — cost: dead files; delete by hand.
 - NOT done in B1: Tauri window never launched (no display in sandbox); `tauri dev` is unverified; icons are the Tauri defaults; CI job `desktop` not yet run on GitHub.
 - 11.B COMPLETE. PAUSED by the user's request. Next: 11.C.
+
+
+## Phase 11 continuation — manual execution
+
+- 2026-11-20: Ruling: required Claude Code skills are unavailable in this session; the user explicitly approved continuing without installation. Apply the practices manually and record verification honestly — cost if wrong: missed specialist guidance, mitigated by the approved design/plan, task ledger, tests and review gates.
+- 2026-11-20: Ruling: keep implementation minimal; add no new abstraction or dependency unless an existing contract cannot be met — reduces maintenance surface — cost if wrong: a future feature may need a deliberate extension.
+- 2026-11-20: Ruling: enable push CI for `phase-11-ui` because the existing workflow only ran on `main`/ `master`; a branch push must produce evidence before PR — cost if wrong: additional CI minutes on this feature branch.
+- 2026-11-20: Ruling: `core/src/build/github.rs` needs an explicit `crate::app::Secret` import for the new optional credential field — the field otherwise does not resolve — cost if wrong: none; fixed in commit `eed44999`.
+- Task 11.C: Target, Plan/Diff, Run and Report screens are present. Playwright coverage includes target → preview → in-place review gate → run → report → rollback and keyboard focus; DiffView has a collapse/expand unit test. Fresh execution is pending.
+- Task 11.D: Build and Settings screens are present. Tests cover High-risk local-build acknowledgement, immediate language switching, English fallback, and the in-memory secret store. Fresh execution is pending.
+- Task 11.E: AI approval supports explicit A/R decisions; PackReport paginates 300 rows at 50 per page and Playwright records first-page render time. Fresh execution is pending.
+- Task 11.F: `.github/workflows/desktop-release.yml` exists for manual Windows MSI/NSIS packaging. It has not yet been dispatched; unsigned installer and real Windows smoke test remain open.
+- Task 11.G: ADR 0014 exists. Phase record, project status, known limitations, backlog, SAD, CLAUDE layout and changelog are being aligned. No PR exists; do not merge.
+- Verification gate: GitHub reported zero workflow runs for `phase-11-ui` before the branch push trigger was added. No tests are claimed as run by this continuation until the new workflow reports results.
