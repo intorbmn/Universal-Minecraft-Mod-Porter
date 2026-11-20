@@ -68,6 +68,22 @@
     <dd>{analysis.languages.join(', ') || t('analysis.none')}</dd>
   </dl>
 
+  <h2>{t('analysis.technologies')}</h2>
+  {#if analysis.technologies.length}
+    <ul class="technologies">
+      {#each analysis.technologies as finding, i (`${finding.tech}-${finding.file}-${i}`)}
+        <li>
+          <span class="handling" data-handling={finding.handling}>{t(`handling.${finding.handling}`)}</span>
+          <strong>{finding.tech}</strong>
+          <span>{finding.message}</span>
+          <code>{finding.file}{finding.line ? `:${finding.line}` : ''}</code>
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <p class="muted">{t('analysis.none')}</p>
+  {/if}
+
   <h2>{t('analysis.risk')}</h2>
   {#if risk.level}
     <RiskBadge level={risk.level} />
