@@ -274,6 +274,7 @@ impl AppServices {
                 "output": slash(&outcome.output),
                 "written": outcome.written.iter().map(|p| slash(p)).collect::<Vec<_>>(),
                 "manual": outcome.plan.manual_count(),
+                "items": outcome.plan.items,
                 "exit_code": outcome.exit_code(),
             }))
         })
