@@ -21,10 +21,16 @@ pub fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, Confi
     serde_json::from_slice(&bytes).map_err(|e| ConfigError::Parse(e.to_string()))
 }
 
+pub fn load_toml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, ConfigError> {
+    let text = std::fs::read_to_string(path)?;
+    toml::from_str(&text).map_err(|e| ConfigError::Parse(e.to_string()))
+}
+
 pub fn load_any<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, ConfigError> {
     match path.extension().and_then(|s| s.to_str()) {
         Some("yaml" | "yml") => load_yaml(path),
         Some("json") => load_json(path),
+        Some("toml") => load_toml(path),
         _ => Err(ConfigError::Parse("unknown config format".into())),
     }
 }
@@ -55,6 +61,15 @@ mod tests {
         let path = dir.path().join("config.json");
         fs::write(&path, r#"{"value": 42}"#).unwrap();
         let cfg: TestConfig = load_json(&path).unwrap();
+        assert_eq!(cfg.value, 42);
+    }
+
+    #[test]
+    fn test_load_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "value = 42").unwrap();
+        let cfg: TestConfig = load_any(&path).unwrap();
         assert_eq!(cfg.value, 42);
     }
 
