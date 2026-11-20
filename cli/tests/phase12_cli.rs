@@ -16,6 +16,14 @@ fn invalid_arguments_use_exit_code_five() {
 }
 
 #[test]
+fn build_rejects_non_project_input_with_code_five() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing-project");
+    let output = ummp(&["build", missing.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(5));
+}
+
+#[test]
 fn help_is_successful() {
     let output = ummp(&["--help"]);
     assert_eq!(output.status.code(), Some(0));
