@@ -10,7 +10,7 @@ pub mod views;
 
 use crate::adapter::{loader, Handling};
 use crate::ai::orchestrator::OrchestratorError;
-use crate::analyzer::AnalyzerEngine;
+use crate::analyzer::{inspect_jar, AnalyzerEngine};
 use crate::checkpoint::CheckpointError;
 use crate::filesystem::{FileSystem, LocalFileSystem};
 use crate::migration::{
@@ -212,7 +212,25 @@ impl AppServices {
     /// # Errors
     /// Returns [`AppError::Input`] when the path is wrong or holds no mod.
     pub fn analyze(&self, input: &Path) -> Result<AnalysisView, AppError> {
-        let kind = check_input(input, false)?;
+        let kind = check_input(input, true)?;
+        if kind == InputKind::Jar {
+            let m = inspect_jar(input, &LocalFileSystem).map_err(input_err)?;
+            return Ok(AnalysisView {
+                kind: "jar".into(),
+                mods: vec![ModView {
+                    id: m.metadata.mod_id,
+                    name: m.metadata.name,
+                    version: m.metadata.version,
+                    loader: loader_label(&m.detected_loader)
+                        .map_or_else(|| format!("{:?}", m.detected_loader), str::to_owned),
+                    minecraft: m.metadata.minecraft.to_string(),
+                    java: m.detected_java.map(|j| j.major),
+                }],
+                build_system: None,
+                languages: Vec::new(),
+                technologies: Vec::new(),
+            });
+        }
         let staging = tempfile::tempdir()?;
         let root = stage_source(input, staging.path())?;
         let project = DefaultProjectManager.open(&root).map_err(input_err)?;
