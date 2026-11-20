@@ -62,13 +62,20 @@ Help and version output return 0. Invalid command-line syntax returns 5.
 
 ## JSON
 
-The JSON envelope is versioned with `schema: 1` and contains `command` and `result`.
-At this point in Phase 12.A, the versioned envelope is implemented for `analyze --json`
-and `scan --json`. The global `--json` contract and structured output for every command
-remain open work; do not assume other commands are machine-readable yet.
-
-Example:
+Use `--json` globally, before or after the subcommand. The envelope is versioned with
+`schema: 1`; human-readable command logs are sent to stderr.
 
 ```sh
-ummp scan ./my-mod --json
+ummp --json scan ./my-mod
+ummp analyze ./my-mod --json
 ```
+
+`analyze` and `scan` return their application `*View` result objects. Other commands
+currently return an envelope containing the process `exit_code` while their detailed
+result views are being migrated. Errors use:
+
+```json
+{"schema":1,"error":{"kind":"invalid_input","message":"..."}}
+```
+
+Shell completion generation cannot be combined with `--json`.
