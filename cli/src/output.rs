@@ -25,7 +25,8 @@ pub fn set_result<T: Serialize>(value: T) {
 }
 
 pub fn success(command: &str, exit_code: i32) {
-    let result = RESULT.with(|result| result.borrow_mut().take())
+    let result = RESULT
+        .with(|result| result.borrow_mut().take())
         .unwrap_or_else(|| json!({ "exit_code": exit_code }));
     println!(
         "{}",
@@ -61,7 +62,12 @@ mod tests {
             "command": "scan",
             "result": {"level": "low"},
         });
-        let mut keys = value.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+        let mut keys = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         keys.sort();
         assert_eq!(keys, vec!["command", "result", "schema"]);
     }
