@@ -346,6 +346,7 @@ pub fn start_ai_assist(
 mod tests {
     use super::*;
     use crate::secrets::MemorySecretStore;
+    use ummp_core::app::credentials::FileKeyStore;
     use tempfile::tempdir;
 
     fn services(dir: &Path) -> AppServices {
@@ -426,6 +427,32 @@ mod tests {
         assert!(!returned_settings.contains("test-secret-value"));
         delete_secret(&store, "anthropic_api_key").unwrap();
         assert!(!has_secret(&store, "anthropic_api_key").unwrap());
+    }
+
+    #[test]
+    fn legacy_ai_keyring_entry_moves_to_shared_store_once() {
+        let dir = tempdir().unwrap();
+        let legacy = MemorySecretStore::default();
+        let keys = FileKeyStore::in_dir(dir.path());
+        legacy.set_legacy("anthropic_api_key", "sk-ant-test-0000000000000000");
+
+        migrate_legacy_ai_keys(&legacy, &keys);
+
+        assert_eq!(
+            keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
+            "sk-ant-test-0000000000000000"
+        );
+        assert_eq!(legacy.get("anthropic_api_key").unwrap(), None);
+
+        keys.set(AiProviderKind::Anthropic, &Secret::new("new-key-1234567890"))
+            .unwrap();
+        legacy.set_legacy("anthropic_api_key", "old-key-1234567890");
+        migrate_legacy_ai_keys(&legacy, &keys);
+        assert_eq!(
+            keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
+            "new-key-1234567890"
+        );
+        assert_eq!(legacy.get("anthropic_api_key").unwrap().as_deref(), Some("old-key-1234567890"));
     }
 
     #[test]
