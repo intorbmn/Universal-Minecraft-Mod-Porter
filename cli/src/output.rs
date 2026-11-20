@@ -63,7 +63,7 @@ mod tests {
         });
         let mut keys = value.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
         keys.sort();
-        assert_eq!(keys, ["command", "result", "schema"]);
+        assert_eq!(keys, vec!["command", "result", "schema"]);
     }
 
     #[test]
