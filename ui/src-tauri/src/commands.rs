@@ -446,6 +446,26 @@ mod tests {
     }
 
     #[test]
+    fn ai_key_commands_return_only_masked_credentials() {
+        let dir = tempdir().unwrap();
+        let keys = FileKeyStore::in_dir(dir.path());
+        let saved = ai_key_save(
+            &keys,
+            "anthropic",
+            "sk-ant-test-0000000000000000",
+            None,
+        )
+        .unwrap();
+        assert_eq!(saved.masked, "sk-ant-…0000");
+        let status = ai_key_status(&keys, "anthropic").unwrap();
+        assert!(status.saved);
+        assert_eq!(status.masked.as_deref(), Some("sk-ant-…0000"));
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(!json.contains("sk-ant-test-0000000000000000"));
+        assert!(!json.contains("credentials.json"));
+    }
+
+    #[test]
     fn legacy_ai_keyring_entry_moves_to_shared_store_once() {
         let dir = tempdir().unwrap();
         let legacy = MemorySecretStore::default();
