@@ -94,9 +94,8 @@ pub fn rollback(
     Ok(svc.rollback(project, checkpoint)?)
 }
 
-pub fn open_output(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
-    let job = svc.job(id)?;
-    let result = job.result.ok_or_else(|| UiError {
+fn job_output_path(job: &JobView) -> Result<std::path::PathBuf, UiError> {
+    let result = job.result.as_ref().ok_or_else(|| UiError {
         kind: "not_found",
         message: "this job has no output folder".into(),
     })?;
@@ -108,8 +107,8 @@ pub fn open_output(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
             kind: "not_found",
             message: "this job has no output folder".into(),
         })?;
-    let path = Path::new(raw);
-    let metadata = std::fs::metadata(path).map_err(|e| UiError {
+    let path = std::path::PathBuf::from(raw);
+    let metadata = std::fs::metadata(&path).map_err(|e| UiError {
         kind: "not_found",
         message: format!("output folder is unavailable: {e}"),
     })?;
@@ -119,7 +118,13 @@ pub fn open_output(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
             message: "job output is not a folder".into(),
         });
     }
-    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| UiError {
+    Ok(path)
+}
+
+pub fn open_output(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
+    let job = svc.job(id)?;
+    let path = job_output_path(&job)?;
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| UiError {
         kind: "internal",
         message: format!("could not open the output folder: {e}"),
     })
