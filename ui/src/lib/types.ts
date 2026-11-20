@@ -19,12 +19,27 @@ export interface ModView {
   java: number | null;
 }
 
+export type Handling = 'auto' | 'assisted' | 'manual';
+
+export interface TechFinding {
+  tech: string;
+  handling: Handling;
+  file: string;
+  line: number | null;
+  message: string;
+}
+
+export interface SkippedView {
+  description: string;
+  reason: string;
+}
+
 export interface AnalysisView {
   kind: 'folder' | 'zip' | 'jar';
   mods: ModView[];
   build_system: string | null;
   languages: string[];
-  technologies: unknown[];
+  technologies: TechFinding[];
 }
 
 export interface FindingView {
@@ -75,8 +90,8 @@ export interface PlanView {
   files: FileDiffView[];
   moves: { from: string; to: string }[];
   deletes: string[];
-  technologies: unknown[];
-  skipped: { description: string; reason: string }[];
+  technologies: TechFinding[];
+  skipped: SkippedView[];
   warnings: string[];
   files_scanned: number;
 }
@@ -89,7 +104,7 @@ export interface ReportView {
   skipped_mappings: number;
   breaking_changes: number;
   warnings: string[];
-  technologies: unknown[];
+  technologies: TechFinding[];
   checkpoint_id: string | null;
 }
 
