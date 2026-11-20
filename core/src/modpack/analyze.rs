@@ -45,7 +45,7 @@ fn analyze_entry(e: &PackEntry) -> Option<EntryResult> {
         }
         Err(err) => {
             let w = format!("{}: scan failed: {err}", e.path);
-            r.warning = Some(r.warning.map_or(w.clone(), |p| format!("{p}; {w}")));
+            r.warning = Some(r.warning.map_or_else(|| w.clone(), |p| format!("{p}; {w}")));
         }
     }
     r.technologies = technologies(jar);
@@ -129,6 +129,8 @@ pub fn analyze_pack(pack: &mut Pack, opts: &AnalyzeOptions) -> Result<(), PackEr
     let chunk = todo.len().div_ceil(n.max(1)).max(1);
     let entries = &pack.entries;
     let mut results: Vec<(usize, EntryResult)> = std::thread::scope(|s| {
+        // Every thread must be spawned before the first join, so the handles are collected.
+        #[allow(clippy::needless_collect)]
         let handles: Vec<_> = todo
             .chunks(chunk)
             .map(|idxs| {
@@ -142,7 +144,7 @@ pub fn analyze_pack(pack: &mut Pack, opts: &AnalyzeOptions) -> Result<(), PackEr
         handles
             .into_iter()
             .flat_map(|h| h.join().unwrap_or_default())
-            .collect()
+            .collect::<Vec<_>>()
     });
     results.sort_by_key(|(i, _)| *i);
     for (i, r) in results {

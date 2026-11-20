@@ -96,7 +96,8 @@ fn path_segment(s: &str) -> String {
 }
 
 fn parse_version(v: &Value) -> Result<RemoteVersion, PackError> {
-    let bad = |what: &str| PackError::Index(format!("unexpected Modrinth response: missing {what}"));
+    let bad =
+        |what: &str| PackError::Index(format!("unexpected Modrinth response: missing {what}"));
     let text = |k: &str| v[k].as_str().map(str::to_string).ok_or_else(|| bad(k));
     let files = v["files"].as_array().ok_or_else(|| bad("files"))?;
     let file = files

@@ -164,7 +164,9 @@ fn rename_json_key(text: &str, key: &str, to: &str, reps: &mut Vec<Replacement>)
         let prev = text[..i].trim_end().chars().last();
         if next == Some(':') && matches!(prev, Some('{' | ',') | None) {
             out.push_str(&text[last..i]);
-            out.push_str(&format!("\"{to}\""));
+            out.push_str("\"");
+            out.push_str(to);
+            out.push_str("\"");
             last = end;
             reps.push(Replacement {
                 line: text[..i].matches('\n').count() + 1,
@@ -225,7 +227,10 @@ pub fn migrate_config(
     // path -> (original, current, replacements); several rules may touch one file.
     let mut files: BTreeMap<PathBuf, (String, String, Vec<Replacement>)> = BTreeMap::new();
     let mut set = EditSet::default();
-    for rule in rules.iter().filter(|r| applies(r, active, source_mc, target_mc)) {
+    for rule in rules
+        .iter()
+        .filter(|r| applies(r, active, source_mc, target_mc))
+    {
         let rel = safe_rel(&rule.file)?;
         let abs = crate::filesystem::resolve_within(out, &rel)
             .map_err(|_| PackError::UnsafePath(rule.file.clone()))?;
@@ -236,7 +241,9 @@ pub fn migrate_config(
             .extension()
             .map(|e| e.to_string_lossy().to_ascii_lowercase())
             .unwrap_or_default();
-        if !rule.rename_key.is_empty() && !matches!(kind.as_str(), "toml" | "json" | "properties" | "cfg") {
+        if !rule.rename_key.is_empty()
+            && !matches!(kind.as_str(), "toml" | "json" | "properties" | "cfg")
+        {
             report.warnings.push(format!(
                 "{}: key renames are not supported for .{kind} files",
                 rule.file

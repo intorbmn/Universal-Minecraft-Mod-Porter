@@ -17,10 +17,141 @@ use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
+use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
+use ummp_core::modpack::graph::PackGraph;
+use ummp_core::modpack::plan::Side;
+use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
+use ummp_core::modpack::{import_with, ImportOptions, PackFormat};
 use ummp_core::port::{port, PortOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::scan::{scan_path, Severity};
 use uuid::Uuid;
+
+#[derive(Subcommand)]
+enum PackCmd {
+    /// Read a pack (.mrpack, CurseForge .zip, Prism instance or folder) and report. Writes nothing.
+    Inspect {
+        pack: PathBuf,
+        #[arg(long)]
+        from_loader: Option<String>,
+        #[arg(long)]
+        from_mc: Option<String>,
+    },
+    /// Migrate a pack to another Minecraft version and/or loader.
+    Migrate {
+        pack: PathBuf,
+        /// Target Minecraft version.
+        #[arg(long)]
+        to: String,
+        /// Target loader: forge, fabric, neoforge or quilt.
+        #[arg(long)]
+        loader: String,
+        #[arg(long)]
+        from_loader: Option<String>,
+        #[arg(long)]
+        from_mc: Option<String>,
+        /// Ask Modrinth (read-only) for versions of each mod that fit the target.
+        #[arg(long)]
+        online: bool,
+        /// Folder with `<mod-id>/` or `<mod-id>.zip` sources for mods you want ported.
+        #[arg(long)]
+        sources: Option<PathBuf>,
+        /// client, server or both.
+        #[arg(long, default_value = "both")]
+        side: String,
+        /// Output folder (default: <packs root>/<pack>-<mc>-<loader>-<time>).
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Continue even when a JAR is rated High risk (you reviewed it; the report keeps the rating).
+        #[arg(long)]
+        allow_risk: bool,
+        #[arg(long)]
+        loader_version: Option<String>,
+        /// Comma list of mrpack,curseforge,prism,folder.
+        #[arg(long, value_delimiter = ',', default_value = "mrpack,folder")]
+        format: Vec<String>,
+        /// Knowledge base for porting mods from `--sources`.
+        #[arg(long)]
+        kb: Option<PathBuf>,
+        #[arg(long)]
+        mappings: Option<PathBuf>,
+        #[arg(long, default_value_t = 0.8)]
+        min_confidence: f64,
+    },
+    /// Convert a pack to another format without changing versions.
+    Export {
+        pack: PathBuf,
+        #[arg(long)]
+        to_format: String,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+}
+
+fn pack_format(s: &str) -> Result<PackFormat, Box<dyn std::error::Error>> {
+    match s {
+        "mrpack" => Ok(PackFormat::Mrpack),
+        "curseforge" => Ok(PackFormat::CurseForge),
+        "prism" => Ok(PackFormat::Prism),
+        "folder" => Ok(PackFormat::Folder),
+        other => {
+            Err(format!("unknown pack format {other:?} (mrpack, curseforge, prism, folder)").into())
+        }
+    }
+}
+
+/// Runs the pipeline and prints the short summary; returns the exit code.
+fn run_pack_migrate(
+    opts: &MigrateOptions,
+    kb: &KnowledgeBase,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    let index: Box<dyn ummp_core::modpack::plan::ModIndex> = if opts.online {
+        Box::new(ummp_ai_providers::ModrinthIndex::new())
+    } else {
+        Box::new(NoIndex)
+    };
+    let out = migrate_pack(opts, index.as_ref(), kb)?;
+    let r = &out.report;
+    println!("Output: {}", out.output.display());
+    println!(
+        "Mods: {} keep, {} update, {} port, {} replace, {} remove, {} manual",
+        r.count("keep"),
+        r.count("update"),
+        r.count("port"),
+        r.count("replace"),
+        r.count("remove"),
+        r.count("manual")
+    );
+    if let Some(why) = &out.plan.refused {
+        eprintln!(
+            "Refused: {why}\nReview the findings, then run again with --allow-risk to continue."
+        );
+    }
+    for w in &out.written {
+        println!("Wrote: {}", w.display());
+    }
+    Ok(out.exit_code())
+}
+
+/// Index used offline: the planner never calls it, and if it did it would find nothing.
+struct NoIndex;
+impl ummp_core::modpack::plan::ModIndex for NoIndex {
+    fn versions(
+        &self,
+        _: &str,
+        _: &str,
+        _: &ummp_core::metadata::Loader,
+    ) -> Result<Vec<ummp_core::modpack::plan::RemoteVersion>, ummp_core::modpack::PackError> {
+        Ok(Vec::new())
+    }
+    fn by_hash(
+        &self,
+        _: &str,
+    ) -> Result<Option<ummp_core::modpack::plan::RemoteVersion>, ummp_core::modpack::PackError>
+    {
+        Ok(None)
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "ummp", version, about = "Universal Minecraft Mod Porter")]
@@ -185,6 +316,13 @@ enum Commands {
     },
     /// List technology adapters and how far each one goes.
     Adapters,
+    /// Modpacks: inspect, migrate to another Minecraft version/loader, convert between formats.
+    /// Exit codes: 0 done, 2 refused (High-risk JAR, use --allow-risk), 3 done but some mods
+    /// are left for you (see UMMP_PACK_REPORT.md).
+    Pack {
+        #[command(subcommand)]
+        cmd: PackCmd,
+    },
     /// Restore the project to a checkpoint taken by `migrate --apply`.
     Rollback {
         /// Project root path.
@@ -541,6 +679,137 @@ fn main() {
     }
 }
 
+fn side(s: &str) -> Result<Side, Box<dyn std::error::Error>> {
+    match s {
+        "client" => Ok(Side::Client),
+        "server" => Ok(Side::Server),
+        "both" => Ok(Side::Both),
+        other => Err(format!("unknown side {other:?} (client, server, both)").into()),
+    }
+}
+
+fn run_pack(cmd: PackCmd) -> Result<i32, Box<dyn std::error::Error>> {
+    match cmd {
+        PackCmd::Inspect {
+            pack,
+            from_loader,
+            from_mc,
+        } => {
+            let work = tempfile::tempdir()?;
+            let mut p = import_with(
+                &pack,
+                work.path(),
+                &ImportOptions {
+                    from_mc,
+                    from_loader: from_loader.as_deref().map(parse_loader).transpose()?,
+                    ..ImportOptions::default()
+                },
+            )?;
+            analyze_pack(&mut p, &AnalyzeOptions { threads: 4 })?;
+            let g = PackGraph::build(&p.entries);
+            println!(
+                "{} ({:?}): Minecraft {}, loader {}",
+                p.name,
+                p.format,
+                p.mc.as_deref().unwrap_or("?"),
+                p.loader
+                    .as_ref()
+                    .map_or_else(|| "?".to_string(), |l| format!("{l:?}"))
+            );
+            for e in &p.entries {
+                let risk = e.risk.map_or(String::new(), |r| format!(" risk={r:?}"));
+                println!("  {} [{}]{risk}", e.path, e.display_id());
+            }
+            for w in &p.warnings {
+                println!("warning: {w}");
+            }
+            for i in &g.issues {
+                println!("issue: {i:?}");
+            }
+            Ok(0)
+        }
+        PackCmd::Migrate {
+            pack,
+            to,
+            loader,
+            from_loader,
+            from_mc,
+            online,
+            sources,
+            side: s,
+            output,
+            allow_risk,
+            loader_version,
+            format,
+            kb,
+            mappings,
+            min_confidence,
+        } => {
+            let kb = if kb.is_none() && mappings.is_none() {
+                KnowledgeBase::open(Path::new(":memory:"))?
+            } else {
+                open_kb(kb, mappings)?
+            };
+            let formats = format
+                .iter()
+                .map(|f| pack_format(f))
+                .collect::<Result<Vec<_>, _>>()?;
+            run_pack_migrate(
+                &MigrateOptions {
+                    input: pack,
+                    to,
+                    loader,
+                    from_loader,
+                    from_mc,
+                    online,
+                    sources,
+                    side: side(&s)?,
+                    output,
+                    allow_risk,
+                    loader_version,
+                    formats,
+                    threads: 4,
+                    min_confidence,
+                },
+                &kb,
+            )
+        }
+        PackCmd::Export {
+            pack,
+            to_format,
+            output,
+        } => {
+            let work = tempfile::tempdir()?;
+            let p = import_with(&pack, work.path(), &ImportOptions::default())?;
+            let (Some(mc), Some(loader)) = (p.mc.clone(), p.loader) else {
+                return Err(
+                    "cannot tell the pack's Minecraft version or loader; use `pack migrate`".into(),
+                );
+            };
+            let kb = KnowledgeBase::open(Path::new(":memory:"))?;
+            run_pack_migrate(
+                &MigrateOptions {
+                    input: pack,
+                    to: mc,
+                    loader: format!("{loader:?}").to_lowercase(),
+                    from_loader: None,
+                    from_mc: None,
+                    online: false,
+                    sources: None,
+                    side: Side::Both,
+                    output,
+                    allow_risk: false,
+                    loader_version: None,
+                    formats: vec![pack_format(&to_format)?],
+                    threads: 4,
+                    min_confidence: 0.8,
+                },
+                &kb,
+            )
+        }
+    }
+}
+
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let pm = DefaultProjectManager;
 
@@ -820,6 +1089,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             println!("Report: {}", result.output.join("UMMP_REPORT.md").display());
             if build && !run_build(&result.output, build_opts)? {
                 std::process::exit(1);
+            }
+        }
+
+        Commands::Pack { cmd } => {
+            let code = run_pack(cmd)?;
+            if code != 0 {
+                std::process::exit(code);
             }
         }
 

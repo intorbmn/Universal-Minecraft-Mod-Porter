@@ -27,7 +27,9 @@ fn fake_server(responses: Vec<(u16, String)>) -> (String, Arc<Mutex<Vec<String>>
                 }
                 head.push(b[0]);
             }
-            log.lock().unwrap().push(String::from_utf8_lossy(&head).into_owned());
+            log.lock()
+                .unwrap()
+                .push(String::from_utf8_lossy(&head).into_owned());
             let reply = format!(
                 "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
@@ -85,7 +87,13 @@ fn by_hash_parses_version_file() {
     assert_eq!(v.sha1, "ab".repeat(20));
     assert_eq!(v.required_deps, vec!["libdemo".to_string()]);
     let req = seen.lock().unwrap()[0].clone();
-    assert!(req.starts_with(&format!("GET /v2/version_file/{}?algorithm=sha1 ", "ab".repeat(20))), "{req}");
+    assert!(
+        req.starts_with(&format!(
+            "GET /v2/version_file/{}?algorithm=sha1 ",
+            "ab".repeat(20)
+        )),
+        "{req}"
+    );
 }
 
 #[test]
@@ -96,14 +104,23 @@ fn by_hash_unknown_file_is_none() {
 
 #[test]
 fn versions_request_has_loader_and_game_version_params() {
-    let body = format!("[{},{}]", version_json("demoproj", "2.0.0"), version_json("demoproj", "1.0.0"));
+    let body = format!(
+        "[{},{}]",
+        version_json("demoproj", "2.0.0"),
+        version_json("demoproj", "1.0.0")
+    );
     let (base, seen) = fake_server(vec![(200, body)]);
-    let vs = client(&base).versions("demoproj", "1.21.1", &Loader::Fabric).unwrap();
+    let vs = client(&base)
+        .versions("demoproj", "1.21.1", &Loader::Fabric)
+        .unwrap();
     assert_eq!(vs.len(), 2);
     assert_eq!(vs[0].version, "2.0.0"); // order of the response is kept: newest first
     let req = seen.lock().unwrap()[0].clone();
     let line = decode(req.lines().next().unwrap());
-    assert!(line.starts_with("GET /v2/project/demoproj/version?"), "{line}");
+    assert!(
+        line.starts_with("GET /v2/project/demoproj/version?"),
+        "{line}"
+    );
     assert!(line.contains(r#"loaders=["fabric"]"#), "{line}");
     assert!(line.contains(r#"game_versions=["1.21.1"]"#), "{line}");
 }
@@ -111,16 +128,23 @@ fn versions_request_has_loader_and_game_version_params() {
 #[test]
 fn project_id_cannot_inject_into_the_path() {
     let (base, seen) = fake_server(vec![(200, "[]".into())]);
-    let _ = client(&base).versions("../../x?y=1", "1.21.1", &Loader::Fabric).unwrap();
+    let _ = client(&base)
+        .versions("../../x?y=1", "1.21.1", &Loader::Fabric)
+        .unwrap();
     let req = seen.lock().unwrap()[0].clone();
     let line = req.lines().next().unwrap();
-    assert!(line.starts_with("GET /v2/project/..%2F..%2Fx%3Fy%3D1/version?"), "{line}");
+    assert!(
+        line.starts_with("GET /v2/project/..%2F..%2Fx%3Fy%3D1/version?"),
+        "{line}"
+    );
 }
 
 #[test]
 fn sends_user_agent() {
     let (base, seen) = fake_server(vec![(200, "[]".into())]);
-    let _ = client(&base).versions("demoproj", "1.21.1", &Loader::Fabric).unwrap();
+    let _ = client(&base)
+        .versions("demoproj", "1.21.1", &Loader::Fabric)
+        .unwrap();
     let req = seen.lock().unwrap()[0].to_ascii_lowercase();
     assert!(
         req.contains("user-agent: intorbmn/universal-minecraft-mod-porter/"),
@@ -131,13 +155,21 @@ fn sends_user_agent() {
 #[test]
 fn http_429_retried_once_then_error() {
     let (base, seen) = fake_server(vec![(429, "{}".into()), (429, "{}".into())]);
-    let err = client(&base).versions("demoproj", "1.21.1", &Loader::Fabric).unwrap_err();
-    assert!(matches!(err, PackError::Index(ref m) if m.contains("429")), "{err:?}");
+    let err = client(&base)
+        .versions("demoproj", "1.21.1", &Loader::Fabric)
+        .unwrap_err();
+    assert!(
+        matches!(err, PackError::Index(ref m) if m.contains("429")),
+        "{err:?}"
+    );
     assert_eq!(seen.lock().unwrap().len(), 2, "exactly one retry");
 
     // A 429 followed by success is fine.
     let (base, seen) = fake_server(vec![(429, "{}".into()), (200, "[]".into())]);
-    assert!(client(&base).versions("demoproj", "1.21.1", &Loader::Fabric).unwrap().is_empty());
+    assert!(client(&base)
+        .versions("demoproj", "1.21.1", &Loader::Fabric)
+        .unwrap()
+        .is_empty());
     assert_eq!(seen.lock().unwrap().len(), 2);
 }
 
@@ -145,7 +177,9 @@ fn http_429_retried_once_then_error() {
 fn invalid_json_is_error_not_panic() {
     for body in ["not json", r#"{"unexpected":true}"#, r#"[{"id":1}]"#] {
         let (base, _) = fake_server(vec![(200, body.into())]);
-        let err = client(&base).versions("demoproj", "1.21.1", &Loader::Fabric).unwrap_err();
+        let err = client(&base)
+            .versions("demoproj", "1.21.1", &Loader::Fabric)
+            .unwrap_err();
         assert!(matches!(err, PackError::Index(_)), "{body}: {err:?}");
     }
     let (base, _) = fake_server(vec![(200, "garbage".into())]);

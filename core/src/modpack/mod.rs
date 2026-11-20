@@ -11,6 +11,7 @@ pub mod formats;
 pub mod graph;
 pub mod plan;
 pub mod report;
+pub mod run;
 
 use crate::analyzer::ModAnalysis;
 use crate::metadata::Loader;

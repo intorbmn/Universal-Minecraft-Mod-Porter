@@ -56,8 +56,11 @@ fn real_class() -> Option<Vec<u8>> {
         .get_or_init(|| {
             let dir = tempfile::tempdir().ok()?;
             let src = dir.path().join("Mod.java");
-            std::fs::write(&src, "package p;\npublic class Mod { public int size() { return 4; } }\n")
-                .ok()?;
+            std::fs::write(
+                &src,
+                "package p;\npublic class Mod { public int size() { return 4; } }\n",
+            )
+            .ok()?;
             let ok = std::process::Command::new("javac")
                 .arg("-d")
                 .arg(dir.path())
@@ -82,17 +85,20 @@ fn forge_jar(id: &str, mc: &str) -> Vec<u8> {
 }
 
 fn sha1_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
     Sha1::digest(bytes)
         .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+        .fold(String::new(), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        })
 }
 
 fn hex(len: usize) -> String {
     "ab".repeat(len / 2)
 }
 
-fn index(files: serde_json::Value) -> Vec<u8> {
+fn index(files: &serde_json::Value) -> Vec<u8> {
     json!({
         "formatVersion": 1, "game": "minecraft", "versionId": "1.0.0", "name": "Demo Pack",
         "summary": "synthetic",
@@ -149,12 +155,9 @@ fn imports_mrpack_files_and_overrides() {
         &zip_bytes(&[
             (
                 "modrinth.index.json",
-                index(json!([remote_file("mods/demowidget-1.0.0.jar")])),
+                index(&json!([remote_file("mods/demowidget-1.0.0.jar")])),
             ),
-            (
-                "overrides/config/demowidget.toml",
-                b"size = 4\n".to_vec(),
-            ),
+            ("overrides/config/demowidget.toml", b"size = 4\n".to_vec()),
             ("overrides/mods/extra.jar", extra.clone()),
         ]),
     );
@@ -183,7 +186,9 @@ fn imports_mrpack_files_and_overrides() {
     assert_eq!(local.sha1.as_deref(), Some(sha1_hex(&extra).as_str()));
     assert!(local.local.as_ref().unwrap().exists());
 
-    assert!(p.overrides.contains(&PathBuf::from("config/demowidget.toml")));
+    assert!(p
+        .overrides
+        .contains(&PathBuf::from("config/demowidget.toml")));
     assert_eq!(
         std::fs::read_to_string(p.root.join("config/demowidget.toml")).unwrap(),
         "size = 4\n"
@@ -192,12 +197,17 @@ fn imports_mrpack_files_and_overrides() {
 
 #[test]
 fn rejects_mrpack_with_path_traversal() {
-    for bad in ["../evil.jar", "/abs.jar", "C:\\x.jar", "mods/../../evil.jar"] {
+    for bad in [
+        "../evil.jar",
+        "/abs.jar",
+        "C:\\x.jar",
+        "mods/../../evil.jar",
+    ] {
         let tmp = tempfile::tempdir().unwrap();
         let pack = write(
             tmp.path(),
             "bad.mrpack",
-            &zip_bytes(&[("modrinth.index.json", index(json!([remote_file(bad)])))]),
+            &zip_bytes(&[("modrinth.index.json", index(&json!([remote_file(bad)])))]),
         );
         let work = tmp.path().join("work");
         let err = import(&pack, &work).unwrap_err();
@@ -218,7 +228,7 @@ fn rejects_zip_slip_in_overrides() {
         tmp.path(),
         "slip.mrpack",
         &zip_bytes(&[
-            ("modrinth.index.json", index(json!([]))),
+            ("modrinth.index.json", index(&json!([]))),
             ("overrides/../../evil.txt", b"x".to_vec()),
         ]),
     );
@@ -239,7 +249,7 @@ fn rejects_mrpack_hash_mismatch() {
         &zip_bytes(&[
             (
                 "modrinth.index.json",
-                index(json!([remote_file("mods/x.jar")])),
+                index(&json!([remote_file("mods/x.jar")])),
             ),
             ("mods/x.jar", b"not the declared bytes".to_vec()),
         ]),
@@ -253,7 +263,7 @@ fn rejects_mrpack_hash_mismatch() {
     let pack = write(
         tmp.path(),
         "m.mrpack",
-        &zip_bytes(&[("modrinth.index.json", index(json!([f])))]),
+        &zip_bytes(&[("modrinth.index.json", index(&json!([f])))]),
     );
     let err = import(&pack, &tmp.path().join("work2")).unwrap_err();
     assert!(matches!(err, PackError::Invalid(_)), "{err:?}");
@@ -266,7 +276,7 @@ fn caps_archive_entry_size() {
         tmp.path(),
         "big.mrpack",
         &zip_bytes(&[
-            ("modrinth.index.json", index(json!([]))),
+            ("modrinth.index.json", index(&json!([]))),
             ("overrides/big.bin", vec![0u8; 2 * 1024 * 1024]),
         ]),
     );
@@ -361,7 +371,9 @@ fn imports_plain_folder_majority_loader() {
     assert_eq!(p.loader, Some(Loader::Fabric));
     assert_eq!(p.mc.as_deref(), Some("1.20.1"));
     assert_eq!(p.entries.len(), 3);
-    assert!(p.overrides.contains(&PathBuf::from("kubejs/server_scripts/x.js")));
+    assert!(p
+        .overrides
+        .contains(&PathBuf::from("kubejs/server_scripts/x.js")));
 
     // --from-loader / --from-mc win over detection.
     let opts = ImportOptions {
@@ -482,9 +494,13 @@ fn graph_reports_side_mismatch() {
         }
     }
     let g = PackGraph::build(&p.entries);
-    assert!(g.issues.iter().any(|i| matches!(i,
+    assert!(
+        g.issues.iter().any(|i| matches!(i,
         PackIssue::SideMismatch { mod_id, requires, side }
-            if mod_id == "a" && requires == "lib" && *side == "server")), "{:?}", g.issues);
+            if mod_id == "a" && requires == "lib" && *side == "server")),
+        "{:?}",
+        g.issues
+    );
 }
 
 #[test]
@@ -508,13 +524,24 @@ fn pack_with_high_risk_jar_is_refused() {
             ("evil.jar", evil),
         ],
     );
-    let evil = p.entries.iter().find(|e| e.path == "mods/evil.jar").unwrap();
+    let evil = p
+        .entries
+        .iter()
+        .find(|e| e.path == "mods/evil.jar")
+        .unwrap();
     assert_eq!(evil.risk, Some(Severity::High));
-    let good = p.entries.iter().find(|e| e.path == "mods/good.jar").unwrap();
+    let good = p
+        .entries
+        .iter()
+        .find(|e| e.path == "mods/good.jar")
+        .unwrap();
     assert_eq!(good.risk, None);
 
     let err = gate(&p, false).unwrap_err();
-    assert!(matches!(err, PackError::Refused(ref m) if m.contains("evil.jar")), "{err:?}");
+    assert!(
+        matches!(err, PackError::Refused(ref m) if m.contains("evil.jar")),
+        "{err:?}"
+    );
     assert!(gate(&p, true).is_ok());
 }
 
@@ -628,7 +655,9 @@ fn remote(project: &str, version: &str) -> RemoteVersion {
         project: project.into(),
         version: version.into(),
         file_name: format!("{project}-{version}.jar"),
-        url: format!("https://cdn.modrinth.com/data/{project}/versions/{version}/{project}-{version}.jar"),
+        url: format!(
+            "https://cdn.modrinth.com/data/{project}/versions/{version}/{project}-{version}.jar"
+        ),
         // Distinct, non-repeating values so a swapped hash or a truncated one shows up.
         sha1: sha1_hex(format!("{project}{version}1").as_bytes()),
         sha512: format!(
@@ -641,7 +670,7 @@ fn remote(project: &str, version: &str) -> RemoteVersion {
             .to_string(),
         size: 100,
         required_deps: vec![],
-        env: Default::default(),
+        env: ummp_core::modpack::Env::default(),
     }
 }
 
@@ -681,7 +710,10 @@ fn plan_keeps_mod_that_supports_target() {
     let plan = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
     assert!(matches!(action(&plan, "mods/a.jar"), PackAction::Keep));
     // A mod built for another version is not kept just because it exists.
-    assert!(matches!(action(&plan, "mods/old.jar"), PackAction::Manual { .. }));
+    assert!(matches!(
+        action(&plan, "mods/old.jar"),
+        PackAction::Manual { .. }
+    ));
     assert!(plan.items.iter().all(|i| !i.reason.is_empty()));
 }
 
@@ -690,8 +722,10 @@ fn plan_updates_when_index_has_target_version() {
     let tmp = tempfile::tempdir().unwrap();
     let p = analyzed(tmp.path(), &[("a.jar", fabric_jar("a", "1.20.1", &[]))]);
     let mut idx = FakeIndex::default();
-    idx.versions
-        .insert("a|1.21.1|fabric".into(), vec![remote("a", "2.0.0"), remote("a", "1.9.0")]);
+    idx.versions.insert(
+        "a|1.21.1|fabric".into(),
+        vec![remote("a", "2.0.0"), remote("a", "1.9.0")],
+    );
     let mut inp = input("1.21.1", &[]);
     inp.online = true;
     let plan = plan(&p, &inp, &idx).unwrap();
@@ -703,13 +737,19 @@ fn plan_updates_when_index_has_target_version() {
     let mut inp = input("1.99", &[]);
     inp.online = true;
     let plan = ummp_core::modpack::plan::plan(&p, &inp, &idx).unwrap();
-    assert!(matches!(action(&plan, "mods/a.jar"), PackAction::Manual { .. }));
+    assert!(matches!(
+        action(&plan, "mods/a.jar"),
+        PackAction::Manual { .. }
+    ));
 }
 
 #[test]
 fn plan_ports_when_source_supplied() {
     let tmp = tempfile::tempdir().unwrap();
-    let p = analyzed(tmp.path(), &[("dw.jar", fabric_jar("demowidget", "1.20.1", &[]))]);
+    let p = analyzed(
+        tmp.path(),
+        &[("dw.jar", fabric_jar("demowidget", "1.20.1", &[]))],
+    );
     let sources = tmp.path().join("sources");
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/loader/fabric-src");
     copy_dir(&fixture, &sources.join("demowidget"));
@@ -738,7 +778,10 @@ fn copy_dir(from: &Path, to: &Path) {
 #[test]
 fn plan_replaces_by_rule() {
     let tmp = tempfile::tempdir().unwrap();
-    let p = analyzed(tmp.path(), &[("a.jar", fabric_jar("demowidget", "1.20.1", &[]))]);
+    let p = analyzed(
+        tmp.path(),
+        &[("a.jar", fabric_jar("demowidget", "1.20.1", &[]))],
+    );
     let rules = vec![ReplacementRule {
         from: "demowidget".into(),
         to: "demogadget".into(),
@@ -752,20 +795,28 @@ fn plan_replaces_by_rule() {
     ));
     // Online, the replacement is resolved to a downloadable version.
     let mut idx = FakeIndex::default();
-    idx.versions
-        .insert("demogadget|1.21.1|fabric".into(), vec![remote("demogadget", "1.0.0")]);
+    idx.versions.insert(
+        "demogadget|1.21.1|fabric".into(),
+        vec![remote("demogadget", "1.0.0")],
+    );
     let mut inp = input("1.21.1", &rules);
     inp.online = true;
     let plan2 = ummp_core::modpack::plan::plan(&p, &inp, &idx).unwrap();
     assert!(matches!(
         action(&plan2, "mods/a.jar"),
-        PackAction::Replace { resolved: Some(_), .. }
+        PackAction::Replace {
+            resolved: Some(_),
+            ..
+        }
     ));
     // A rule for another loader does not apply.
     let mut other = rules.clone();
     other[0].loader = Some("forge".into());
     let plan3 = ummp_core::modpack::plan::plan(&p, &input("1.21.1", &other), &PanicIndex).unwrap();
-    assert!(matches!(action(&plan3, "mods/a.jar"), PackAction::Manual { .. }));
+    assert!(matches!(
+        action(&plan3, "mods/a.jar"),
+        PackAction::Manual { .. }
+    ));
 }
 
 #[test]
@@ -774,7 +825,9 @@ fn plan_marks_manual_with_reason() {
     let p = analyzed(tmp.path(), &[("a.jar", fabric_jar("a", "1.20.1", &[]))]);
     let plan = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
     match action(&plan, "mods/a.jar") {
-        PackAction::Manual { reason } => assert!(reason.contains("no version for 1.21.1/fabric"), "{reason}"),
+        PackAction::Manual { reason } => {
+            assert!(reason.contains("no version for 1.21.1/fabric"), "{reason}");
+        }
         other => panic!("{other:?}"),
     }
 }
@@ -791,11 +844,17 @@ fn plan_rechecks_dependencies_after_decisions() {
         ],
     );
     let plan = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
-    assert!(matches!(action(&plan, "mods/lib.jar"), PackAction::Manual { .. }));
+    assert!(matches!(
+        action(&plan, "mods/lib.jar"),
+        PackAction::Manual { .. }
+    ));
     // a would be kept on its own, but its dependency is left to the user; c follows a.
     for (path, missing) in [("mods/a.jar", "lib"), ("mods/c.jar", "a")] {
         match action(&plan, path) {
-            PackAction::Manual { reason } => assert!(reason.contains(&format!("missing {missing}")), "{path}: {reason}"),
+            PackAction::Manual { reason } => assert!(
+                reason.contains(&format!("missing {missing}")),
+                "{path}: {reason}"
+            ),
             other => panic!("{path}: {other:?}"),
         }
     }
@@ -833,7 +892,9 @@ fn plan_removes_high_risk_and_refuses() {
     ]);
     let p = analyzed(tmp.path(), &[("evil.jar", evil)]);
     let pl = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
-    assert!(matches!(action(&pl, "mods/evil.jar"), PackAction::Remove { reason } if reason.contains("malware risk")));
+    assert!(
+        matches!(action(&pl, "mods/evil.jar"), PackAction::Remove { reason } if reason.contains("malware risk"))
+    );
     assert!(pl.refused.is_some());
     let mut inp = input("1.21.1", &[]);
     inp.allow_risk = true;
@@ -850,16 +911,22 @@ fn plan_keeps_remote_entry_when_target_equals_pack() {
         "demo.mrpack",
         &zip_bytes(&[(
             "modrinth.index.json",
-            index(json!([remote_file("mods/demowidget-1.0.0.jar")])),
+            index(&json!([remote_file("mods/demowidget-1.0.0.jar")])),
         )]),
     );
     let p = import(&pack, &tmp.path().join("work")).unwrap();
     // Same mc + loader as the pack: the listed file is still valid.
     let same = plan(&p, &input("1.20.1", &[]), &PanicIndex).unwrap();
-    assert!(matches!(action(&same, "mods/demowidget-1.0.0.jar"), PackAction::Keep));
+    assert!(matches!(
+        action(&same, "mods/demowidget-1.0.0.jar"),
+        PackAction::Keep
+    ));
     // Another version: nothing is known about it offline.
     let other = ummp_core::modpack::plan::plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
-    assert!(matches!(action(&other, "mods/demowidget-1.0.0.jar"), PackAction::Manual { .. }));
+    assert!(matches!(
+        action(&other, "mods/demowidget-1.0.0.jar"),
+        PackAction::Manual { .. }
+    ));
 }
 
 #[test]
@@ -870,7 +937,9 @@ fn plan_removes_wrong_side_mod() {
     let mut inp = input("1.21.1", &[]);
     inp.side = Side::Server;
     let pl = plan(&p, &inp, &PanicIndex).unwrap();
-    assert!(matches!(action(&pl, "mods/a.jar"), PackAction::Remove { reason } if reason.contains("wrong side")));
+    assert!(
+        matches!(action(&pl, "mods/a.jar"), PackAction::Remove { reason } if reason.contains("wrong side"))
+    );
     let _ = PackRules::builtin().unwrap();
 }
 
@@ -880,14 +949,17 @@ fn plan_removes_wrong_side_mod() {
 
 use std::collections::BTreeSet;
 use ummp_core::migration::MigrationError;
-use ummp_core::modpack::config::{
-    copy_overrides, migrate_config, ConfigRule, KeyRename,
-};
+use ummp_core::modpack::config::{copy_overrides, migrate_config, ConfigRule, KeyRename};
 
 fn tree(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut v: Vec<_> = all_files(root)
         .into_iter()
-        .map(|p| (p.strip_prefix(root).unwrap().to_path_buf(), std::fs::read(&p).unwrap()))
+        .map(|p| {
+            (
+                p.strip_prefix(root).unwrap().to_path_buf(),
+                std::fs::read(&p).unwrap(),
+            )
+        })
         .collect();
     v.sort();
     v
@@ -899,7 +971,10 @@ fn rule(mod_id: &str, file: &str, from: &str, to: &str) -> ConfigRule {
         since_mc: "1.21".into(),
         file: file.into(),
         rename_file: None,
-        rename_key: vec![KeyRename { from: from.into(), to: to.into() }],
+        rename_key: vec![KeyRename {
+            from: from.into(),
+            to: to.into(),
+        }],
     }
 }
 
@@ -928,19 +1003,41 @@ fn config_rule_renames_key() {
         tmp.path(),
         &[
             ("config/demowidget.toml", toml),
-            ("config/demowidget.json", "{\"size\": 4, \"nested\": {\"size\": 5}, \"sizes\": 1}"),
-            ("config/demowidget.properties", "size=4\n# size=ignored\nsize.x=1\n"),
-            ("config/demowidget.cfg", "general {\n    I:size=4\n    S:\"size\"=x\n    I:sizes=2\n}\n"),
+            (
+                "config/demowidget.json",
+                "{\"size\": 4, \"nested\": {\"size\": 5}, \"sizes\": 1}",
+            ),
+            (
+                "config/demowidget.properties",
+                "size=4\n# size=ignored\nsize.x=1\n",
+            ),
+            (
+                "config/demowidget.cfg",
+                "general {\n    I:size=4\n    S:\"size\"=x\n    I:sizes=2\n}\n",
+            ),
         ],
     );
     let rules = vec![
         rule("demowidget", "config/demowidget.toml", "size", "capacity"),
         rule("demowidget", "config/demowidget.json", "size", "capacity"),
-        rule("demowidget", "config/demowidget.properties", "size", "capacity"),
+        rule(
+            "demowidget",
+            "config/demowidget.properties",
+            "size",
+            "capacity",
+        ),
         rule("demowidget", "config/demowidget.cfg", "size", "capacity"),
     ];
     let snaps = tempfile::tempdir().unwrap();
-    let rep = migrate_config(&out, &rules, &ids(&["demowidget"]), "1.20.1", "1.21.1", snaps.path()).unwrap();
+    let rep = migrate_config(
+        &out,
+        &rules,
+        &ids(&["demowidget"]),
+        "1.20.1",
+        "1.21.1",
+        snaps.path(),
+    )
+    .unwrap();
     assert_eq!(rep.changes.len(), 4);
     assert!(rep.checkpoint.is_some());
 
@@ -953,7 +1050,10 @@ fn config_rule_renames_key() {
         read("config/demowidget.json"),
         "{\"capacity\": 4, \"nested\": {\"capacity\": 5}, \"sizes\": 1}"
     );
-    assert_eq!(read("config/demowidget.properties"), "capacity=4\n# size=ignored\nsize.x=1\n");
+    assert_eq!(
+        read("config/demowidget.properties"),
+        "capacity=4\n# size=ignored\nsize.x=1\n"
+    );
     assert_eq!(
         read("config/demowidget.cfg"),
         "general {\n    I:capacity=4\n    S:\"capacity\"=x\n    I:sizes=2\n}\n"
@@ -964,11 +1064,35 @@ fn config_rule_renames_key() {
     let out2 = config_out(tmp2.path(), &[("config/demowidget.toml", "size = 4\n")]);
     let snaps2 = tempfile::tempdir().unwrap();
     let before = tree(&out2);
-    let r = migrate_config(&out2, &rules[..1], &ids(&["other"]), "1.20.1", "1.21.1", snaps2.path()).unwrap();
+    let r = migrate_config(
+        &out2,
+        &rules[..1],
+        &ids(&["other"]),
+        "1.20.1",
+        "1.21.1",
+        snaps2.path(),
+    )
+    .unwrap();
     assert!(r.changes.is_empty() && r.checkpoint.is_none());
-    let r = migrate_config(&out2, &rules[..1], &ids(&["demowidget"]), "1.20.1", "1.20.4", snaps2.path()).unwrap();
+    let r = migrate_config(
+        &out2,
+        &rules[..1],
+        &ids(&["demowidget"]),
+        "1.20.1",
+        "1.20.4",
+        snaps2.path(),
+    )
+    .unwrap();
     assert!(r.changes.is_empty());
-    let r = migrate_config(&out2, &rules[..1], &ids(&["demowidget"]), "1.21.1", "1.21.4", snaps2.path()).unwrap();
+    let r = migrate_config(
+        &out2,
+        &rules[..1],
+        &ids(&["demowidget"]),
+        "1.21.1",
+        "1.21.4",
+        snaps2.path(),
+    )
+    .unwrap();
     assert!(r.changes.is_empty(), "already past the change");
     assert_eq!(tree(&out2), before);
 }
@@ -985,11 +1109,22 @@ fn config_without_rule_is_copied_unchanged() {
         ],
     );
     let snaps = tempfile::tempdir().unwrap();
-    let rep = migrate_config(&out, &[], &ids(&["demowidget"]), "1.20.1", "1.21.1", snaps.path()).unwrap();
+    let rep = migrate_config(
+        &out,
+        &[],
+        &ids(&["demowidget"]),
+        "1.20.1",
+        "1.21.1",
+        snaps.path(),
+    )
+    .unwrap();
     assert!(rep.changes.is_empty() && rep.moves.is_empty());
     let t = tree(&out);
     assert_eq!(t.len(), 3);
-    assert!(t.iter().any(|(p, b)| p == Path::new("kubejs/server_scripts/x.js") && b == b"// script\r\nlet a = 1;\r\n"));
+    assert!(t
+        .iter()
+        .any(|(p, b)| p == Path::new("kubejs/server_scripts/x.js")
+            && b == b"// script\r\nlet a = 1;\r\n"));
 }
 
 #[test]
@@ -997,16 +1132,33 @@ fn config_rollback_restores_original() {
     let tmp = tempfile::tempdir().unwrap();
     let out = config_out(
         tmp.path(),
-        &[("config/demowidget.toml", "size = 4\n"), ("config/blocker", "i am a file")],
+        &[
+            ("config/demowidget.toml", "size = 4\n"),
+            ("config/blocker", "i am a file"),
+        ],
     );
     let before = tree(&out);
     // The edit is written first; the move then fails because `config/blocker` is a file.
     let mut r = rule("demowidget", "config/demowidget.toml", "size", "capacity");
     r.rename_file = Some("config/blocker/demowidget.toml".into());
     let snaps = tempfile::tempdir().unwrap();
-    let err = migrate_config(&out, &[r], &ids(&["demowidget"]), "1.20.1", "1.21.1", snaps.path()).unwrap_err();
+    let err = migrate_config(
+        &out,
+        &[r],
+        &ids(&["demowidget"]),
+        "1.20.1",
+        "1.21.1",
+        snaps.path(),
+    )
+    .unwrap_err();
     assert!(
-        matches!(err, PackError::Migration(MigrationError::ApplyFailed { rolled_back: true, .. })),
+        matches!(
+            err,
+            PackError::Migration(MigrationError::ApplyFailed {
+                rolled_back: true,
+                ..
+            })
+        ),
         "{err:?}"
     );
     assert_eq!(tree(&out), before);
@@ -1062,41 +1214,56 @@ fn export_round_trips() {
     let mut got: Vec<_> = back.entries.iter().map(|e| e.path.clone()).collect();
     got.sort();
     assert_eq!(got, ["mods/a.jar", "mods/b-2.0.0.jar"]);
-    let b = back.entries.iter().find(|e| e.path == "mods/b-2.0.0.jar").unwrap();
+    let b = back
+        .entries
+        .iter()
+        .find(|e| e.path == "mods/b-2.0.0.jar")
+        .unwrap();
     let rv = remote("b", "2.0.0");
     assert_eq!(b.sha1.as_deref(), Some(rv.sha1.as_str()));
     assert_eq!(b.sha512.as_deref(), Some(rv.sha512.as_str()));
     assert_eq!(b.downloads, [rv.url]);
-    assert!(b.local.is_none(), "an updated mod is listed by URL, never bundled");
-    let a = back.entries.iter().find(|e| e.path == "mods/a.jar").unwrap();
+    assert!(
+        b.local.is_none(),
+        "an updated mod is listed by URL, never bundled"
+    );
+    let a = back
+        .entries
+        .iter()
+        .find(|e| e.path == "mods/a.jar")
+        .unwrap();
     assert!(a.local.is_some());
 }
 
 #[test]
 fn exported_index_has_required_fields() {
     let tmp = tempfile::tempdir().unwrap();
-    let (p, pl) = export_fixture(tmp.path());
-    let out = build_output(&p, &pl, "0.16.2").unwrap();
+    let (pack, pl) = export_fixture(tmp.path());
+    let out = build_output(&pack, &pl, "0.16.2").unwrap();
     let inst = tmp.path().join("inst");
     write_folder(&out, &inst).unwrap();
     let file = tmp.path().join("pack.mrpack");
     write_mrpack(&out, &inst, &file).unwrap();
-    let mut z = zip::ZipArchive::new(std::fs::File::open(&file).unwrap()).unwrap();
-    let mut s = String::new();
-    std::io::Read::read_to_string(&mut z.by_name("modrinth.index.json").unwrap(), &mut s).unwrap();
-    let v: serde_json::Value = serde_json::from_str(&s).unwrap();
-    assert_eq!(v["formatVersion"], 1);
-    assert_eq!(v["game"], "minecraft");
-    assert_eq!(v["dependencies"]["minecraft"], "1.21.1");
-    assert_eq!(v["dependencies"]["fabric-loader"], "0.16.2");
-    let f = &v["files"][0];
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(&file).unwrap()).unwrap();
+    let mut text = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("modrinth.index.json").unwrap(),
+        &mut text,
+    )
+    .unwrap();
+    let doc: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(doc["formatVersion"], 1);
+    assert_eq!(doc["game"], "minecraft");
+    assert_eq!(doc["dependencies"]["minecraft"], "1.21.1");
+    assert_eq!(doc["dependencies"]["fabric-loader"], "0.16.2");
+    let f = &doc["files"][0];
     assert_eq!(f["path"], "mods/b-2.0.0.jar");
     assert_eq!(f["hashes"]["sha1"].as_str().unwrap().len(), 40);
     assert_eq!(f["hashes"]["sha512"].as_str().unwrap().len(), 128);
     assert!(f["downloads"][0].as_str().unwrap().starts_with("https://"));
     assert!(f["fileSize"].as_u64().unwrap() > 0);
     assert!(f["env"]["client"].is_string() && f["env"]["server"].is_string());
-    z.by_name("overrides/mods/a.jar").unwrap();
+    archive.by_name("overrides/mods/a.jar").unwrap();
     assert!(matches!(out.entries[0].source, OutSource::Local(_)));
 }
 
@@ -1108,7 +1275,10 @@ fn report_lists_every_mod_once_with_action_and_reason() {
     assert_eq!(r.rows.len(), 3);
     let md = r.to_markdown();
     for (id, act) in [("a", "keep"), ("b", "update"), ("c", "manual")] {
-        let rows: Vec<_> = md.lines().filter(|l| l.starts_with(&format!("| {id} |"))).collect();
+        let rows: Vec<_> = md
+            .lines()
+            .filter(|l| l.starts_with(&format!("| {id} |")))
+            .collect();
         assert_eq!(rows.len(), 1, "{id} must appear exactly once:\n{md}");
         assert!(rows[0].contains(&format!("| {act} |")), "{}", rows[0]);
         let cols: Vec<_> = rows[0].split(" | ").collect();
@@ -1117,5 +1287,8 @@ fn report_lists_every_mod_once_with_action_and_reason() {
     assert!(md.contains("- manual: 1"));
     assert!(md.contains("- w1"));
     r.rows[0].reason = "x|y".into();
-    assert!(r.to_markdown().contains("x\\|y"), "pipes in cells are escaped");
+    assert!(
+        r.to_markdown().contains("x\\|y"),
+        "pipes in cells are escaped"
+    );
 }

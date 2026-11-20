@@ -1,7 +1,7 @@
 //! Readers (and, from 10.F, writers) for the four pack formats.
 
 use super::{
-    fmt_mc, join_safe, rel_string, safe_rel, sha1_hex, sha512_hex, walk_files, Env, EntryKind,
+    fmt_mc, join_safe, rel_string, safe_rel, sha1_hex, sha512_hex, walk_files, EntryKind, Env,
     ImportOptions, Limits, Pack, PackEntry, PackError, PackFormat, Support,
 };
 use crate::analyzer::inspect_jar;
@@ -285,7 +285,9 @@ pub fn read_mrpack(
         for url in &f.downloads {
             match https_host(url) {
                 Some(h) if ALLOWED_DOWNLOAD_HOSTS.contains(&h) => {}
-                Some(h) => warnings.push(format!("{path}: download host {h} is not on the mrpack allow-list")),
+                Some(h) => warnings.push(format!(
+                    "{path}: download host {h} is not on the mrpack allow-list"
+                )),
                 None => warnings.push(format!("{path}: download URL {url} is not https")),
             }
         }
@@ -500,12 +502,18 @@ pub fn read_instance(dir: &Path, opts: &ImportOptions) -> Result<Pack, PackError
     for c in &mmc.components {
         match c.uid.as_str() {
             "net.minecraft" => mc.clone_from(&c.version),
-            "net.minecraftforge" => (loader, loader_version) = (Some(Loader::Forge), c.version.clone()),
-            "net.neoforged" => (loader, loader_version) = (Some(Loader::NeoForge), c.version.clone()),
+            "net.minecraftforge" => {
+                (loader, loader_version) = (Some(Loader::Forge), c.version.clone());
+            }
+            "net.neoforged" => {
+                (loader, loader_version) = (Some(Loader::NeoForge), c.version.clone());
+            }
             "net.fabricmc.fabric-loader" => {
                 (loader, loader_version) = (Some(Loader::Fabric), c.version.clone());
             }
-            "org.quiltmc.quilt-loader" => (loader, loader_version) = (Some(Loader::Quilt), c.version.clone()),
+            "org.quiltmc.quilt-loader" => {
+                (loader, loader_version) = (Some(Loader::Quilt), c.version.clone());
+            }
             _ => {}
         }
     }
@@ -521,7 +529,9 @@ pub fn read_instance(dir: &Path, opts: &ImportOptions) -> Result<Pack, PackError
         .iter()
         .map(|n| dir.join(n))
         .find(|p| p.is_dir())
-        .ok_or_else(|| PackError::Invalid("instance has no .minecraft or minecraft folder".into()))?;
+        .ok_or_else(|| {
+            PackError::Invalid("instance has no .minecraft or minecraft folder".into())
+        })?;
     let mut pack = Pack {
         name,
         version: String::new(),
@@ -594,7 +604,9 @@ fn apply_detection(pack: &mut Pack, opts: &ImportOptions) {
         let mut versions: BTreeMap<String, usize> = BTreeMap::new();
         for e in &pack.entries {
             let Some(jar) = &e.local else { continue };
-            let Ok(a) = inspect_jar(jar, &fs) else { continue };
+            let Ok(a) = inspect_jar(jar, &fs) else {
+                continue;
+            };
             match loaders.iter_mut().find(|(l, _)| *l == a.detected_loader) {
                 Some((_, n)) => *n += 1,
                 None => loaders.push((a.detected_loader.clone(), 1)),
@@ -691,8 +703,10 @@ fn out_source(e: &PackEntry) -> OutSource {
         .map_or_else(|| remote_of(e), |p| OutSource::Local(p.clone()))
 }
 
-/// What goes into the new pack: kept entries as they are, updated and resolved replacements
-/// by URL and hash, other files unchanged. Removed, manual, ported (source only) and
+/// What goes into the new pack.
+///
+/// Kept entries stay as they are, updated and resolved replacements go in by URL and hash,
+/// other files are unchanged. Removed, manual, ported (source only) and
 /// unresolved-replacement mods are left out; the report lists them.
 ///
 /// # Errors
@@ -767,7 +781,7 @@ pub fn build_output(
     })
 }
 
-fn support_str(s: Support) -> &'static str {
+const fn support_str(s: Support) -> &'static str {
     match s {
         Support::Required => "required",
         Support::Optional => "optional",
@@ -860,7 +874,11 @@ pub fn write_mrpack(out: &OutPack, instance: &Path, file: &Path) -> Result<(), P
     }
     let mut z = zip::ZipWriter::new(File::create(file)?);
     z.start_file("modrinth.index.json", zip::write::FileOptions::default())?;
-    z.write_all(serde_json::to_string_pretty(&index).map_err(|e| PackError::Invalid(e.to_string()))?.as_bytes())?;
+    z.write_all(
+        serde_json::to_string_pretty(&index)
+            .map_err(|e| PackError::Invalid(e.to_string()))?
+            .as_bytes(),
+    )?;
     add_dir_to_zip(&mut z, instance, "overrides/")?;
     z.finish()?;
     Ok(())
@@ -911,7 +929,11 @@ pub fn write_curseforge(
     }
     let mut z = zip::ZipWriter::new(File::create(file)?);
     z.start_file("manifest.json", zip::write::FileOptions::default())?;
-    z.write_all(serde_json::to_string_pretty(&manifest).map_err(|e| PackError::Invalid(e.to_string()))?.as_bytes())?;
+    z.write_all(
+        serde_json::to_string_pretty(&manifest)
+            .map_err(|e| PackError::Invalid(e.to_string()))?
+            .as_bytes(),
+    )?;
     add_dir_to_zip(&mut z, instance, "overrides/")?;
     z.finish()?;
     Ok(warnings)
@@ -954,7 +976,10 @@ pub fn write_prism(out: &OutPack, instance: &Path, dir: &Path) -> Result<Vec<Str
     )?;
     std::fs::write(
         dir.join("instance.cfg"),
-        format!("[General]\nConfigVersion=1.2\nInstanceType=OneSix\nname={}\n", out.name),
+        format!(
+            "[General]\nConfigVersion=1.2\nInstanceType=OneSix\nname={}\n",
+            out.name
+        ),
     )?;
     copy_tree(instance, &dir.join("minecraft"))?;
     Ok(out

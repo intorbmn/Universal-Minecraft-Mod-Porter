@@ -4,6 +4,7 @@ use super::graph::PackIssue;
 use super::plan::{PackAction, PackPlan};
 use super::{EntryKind, Pack};
 use serde::Serialize;
+use std::fmt::Write as _;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ReportRow {
@@ -84,7 +85,9 @@ impl PackReport {
             from: format!(
                 "{} {}",
                 pack.mc.as_deref().unwrap_or("?"),
-                pack.loader.as_ref().map_or("?".to_string(), |l| format!("{l:?}"))
+                pack.loader
+                    .as_ref()
+                    .map_or_else(|| "?".to_string(), |l| format!("{l:?}"))
             ),
             to: format!("{} {:?}", plan.target.mc, plan.target.loader),
             rows,
@@ -101,15 +104,19 @@ impl PackReport {
     #[must_use]
     pub fn to_markdown(&self) -> String {
         let cell = |s: &str| s.replace('|', "\\|").replace('\n', " ");
-        let mut s = format!("# UMMP pack report: {}\n\n{} -> {}\n\n", self.name, self.from, self.to);
+        let mut s = format!(
+            "# UMMP pack report: {}\n\n{} -> {}\n\n",
+            self.name, self.from, self.to
+        );
         s.push_str("## Summary\n\n");
         for a in ["keep", "update", "port", "replace", "remove", "manual"] {
-            s.push_str(&format!("- {a}: {}\n", self.count(a)));
+            let _ = writeln!(s, "- {a}: {}", self.count(a));
         }
         s.push_str("\n## Mods\n\n| Mod | File | Version | Action | Reason | Risk | Technologies |\n|---|---|---|---|---|---|---|\n");
         for r in &self.rows {
-            s.push_str(&format!(
-                "| {} | {} | {} | {} | {} | {} | {} |\n",
+            let _ = writeln!(
+                s,
+                "| {} | {} | {} | {} | {} | {} | {} |",
                 cell(&r.mod_id),
                 cell(&r.path),
                 cell(&r.version),
@@ -117,13 +124,13 @@ impl PackReport {
                 cell(&r.reason),
                 cell(&r.risk),
                 cell(&r.technologies.join(", "))
-            ));
+            );
         }
         for (title, list) in [("Conflicts", &self.conflicts), ("Warnings", &self.warnings)] {
             if !list.is_empty() {
-                s.push_str(&format!("\n## {title}\n\n"));
+                let _ = write!(s, "\n## {title}\n\n");
                 for l in list {
-                    s.push_str(&format!("- {l}\n"));
+                    let _ = writeln!(s, "- {l}");
                 }
             }
         }

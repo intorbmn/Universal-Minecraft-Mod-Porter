@@ -1,10 +1,12 @@
-//! Per-mod decisions for a pack migration (guide §6). Rules run in order and the first match
+//! Per-mod decisions for a pack migration (guide §6).
+//!
+//! Rules run in order and the first match
 //! wins; every decision carries a reason for the report. A second pass re-checks the
 //! dependencies of the planned pack until nothing changes.
 
 use super::config::ReplacementRule;
 use super::graph::BUILTIN_IDS;
-use super::{fmt_mc, safe_rel, Env, EntryKind, Pack, PackEntry, PackError, Support};
+use super::{fmt_mc, safe_rel, EntryKind, Env, Pack, PackEntry, PackError, Support};
 use crate::metadata::Loader;
 use crate::migration::compare_versions;
 use crate::scan::Severity;
@@ -133,11 +135,7 @@ impl PackPlan {
             .filter(|i| {
                 matches!(
                     i.action,
-                    PackAction::Manual { .. }
-                        | PackAction::Replace {
-                            resolved: None,
-                            ..
-                        }
+                    PackAction::Manual { .. } | PackAction::Replace { resolved: None, .. }
                 )
             })
             .count()
@@ -205,9 +203,17 @@ fn decide(
         let why = if resolved.is_some() {
             format!("replaced by {} ({})", rule.to, rule.note)
         } else if inp.online {
-            format!("replaced by {}: no version for {}/{}", rule.to, t.mc, loader_slug(&t.loader))
+            format!(
+                "replaced by {}: no version for {}/{}",
+                rule.to,
+                t.mc,
+                loader_slug(&t.loader)
+            )
         } else {
-            format!("replaced by {}: install it yourself or run with --online", rule.to)
+            format!(
+                "replaced by {}: install it yourself or run with --online",
+                rule.to
+            )
         };
         return (
             PackAction::Replace {
@@ -239,7 +245,13 @@ fn decide(
     if inp.online {
         match find_update(e, t, index) {
             Ok(Some(rv)) => {
-                let why = format!("{} {} supports {}/{}", rv.project, rv.version, t.mc, loader_slug(&t.loader));
+                let why = format!(
+                    "{} {} supports {}/{}",
+                    rv.project,
+                    rv.version,
+                    t.mc,
+                    loader_slug(&t.loader)
+                );
                 return (PackAction::Update(rv), why);
             }
             Ok(None) => {}
@@ -268,7 +280,14 @@ fn decide(
             PackAction::Remove {
                 reason: "wrong side".into(),
             },
-            format!("not supported on the {} side", if inp.side == Side::Client { "client" } else { "server" }),
+            format!(
+                "not supported on the {} side",
+                if inp.side == Side::Client {
+                    "client"
+                } else {
+                    "server"
+                }
+            ),
         );
     }
     // 7. Left to the user.
@@ -277,11 +296,20 @@ fn decide(
     } else if e.mod_info.is_none() {
         "no descriptor available offline: provide the JAR or run with --online".into()
     } else if let Some(err) = lookup_error {
-        format!("no version for {}/{} (lookup failed: {err})", t.mc, loader_slug(&t.loader))
+        format!(
+            "no version for {}/{} (lookup failed: {err})",
+            t.mc,
+            loader_slug(&t.loader)
+        )
     } else {
         format!("no version for {}/{}", t.mc, loader_slug(&t.loader))
     };
-    (PackAction::Manual { reason: reason.clone() }, reason)
+    (
+        PackAction::Manual {
+            reason: reason.clone(),
+        },
+        reason,
+    )
 }
 
 fn find_update(
@@ -297,18 +325,17 @@ fn find_update(
     else {
         return Ok(None);
     };
-    Ok(index.versions(&project, &t.mc, &t.loader)?.into_iter().next())
+    Ok(index
+        .versions(&project, &t.mc, &t.loader)?
+        .into_iter()
+        .next())
 }
 
 /// Plans every mod of `pack` for `inp.target`.
 ///
 /// # Errors
 /// Currently none; index failures become `Manual` decisions with the failure in the reason.
-pub fn plan(
-    pack: &Pack,
-    inp: &PlanInput<'_>,
-    index: &dyn ModIndex,
-) -> Result<PackPlan, PackError> {
+pub fn plan(pack: &Pack, inp: &PlanInput<'_>, index: &dyn ModIndex) -> Result<PackPlan, PackError> {
     let mods: Vec<&PackEntry> = pack
         .entries
         .iter()

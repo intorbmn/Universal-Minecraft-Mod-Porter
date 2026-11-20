@@ -122,7 +122,8 @@ impl PackGraph {
                     }
                 }
             }
-            g.requires.insert((*id).to_string(), reqs.into_iter().collect());
+            g.requires
+                .insert((*id).to_string(), reqs.into_iter().collect());
         }
         g.issues.extend(cycles(&g.requires));
         g.issues.sort_by(|a, b| issue_key(a).cmp(&issue_key(b)));
