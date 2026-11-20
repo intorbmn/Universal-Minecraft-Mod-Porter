@@ -13,7 +13,13 @@ fn ummp(args: &[&str]) -> Output {
 fn explicit_toml_config_is_loaded() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("custom.toml");
-    std::fs::write(&path, "ai_provider = \"openai\"\nopenai_base_url = \"http://localhost:11434/v1\"").unwrap();
+    std::fs::write(
+        &path,
+        r#"ai_provider = "openai"
+openai_base_url = "http://localhost:11434/v1"
+"#,
+    )
+    .unwrap();
     let output = ummp(&["--config", path.to_str().unwrap(), "adapters"]);
     assert_eq!(
         output.status.code(),
