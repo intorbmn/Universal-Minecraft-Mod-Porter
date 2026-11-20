@@ -39,8 +39,10 @@ remain outside `core`.
 - Applied configured output root, sandbox repository and AI provider to existing commands.
 - Extended `core::config::load_any` with TOML support (the `toml` dependency already existed).
 - Added a versioned `schema: 1` JSON envelope for `analyze --json` and `scan --json`.
-- Added CLI integration tests for invalid-argument/help exit codes, completions and the scan
-  JSON envelope. CI now runs on `phase-12-api`.
+- Added typed failure mapping for safety refusal (2), invalid command input (5), and build
+  backend/stage failure (4); generic failures remain 1.
+- Added CLI integration tests for invalid-argument/help/build-input exit codes, completions,
+  TOML flag precedence and the scan JSON envelope. CI now runs on `phase-12-api`.
 
 ## Outstanding 12.A acceptance
 
