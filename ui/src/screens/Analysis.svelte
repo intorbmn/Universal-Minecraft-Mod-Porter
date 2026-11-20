@@ -4,7 +4,7 @@
   import RiskBadge from '../lib/RiskBadge.svelte';
   import type { AnalysisView, RiskView, UiError } from '../lib/types';
 
-  let { input }: { input: string } = $props();
+  let { input, onContinue }: { input: string; onContinue: () => void } = $props();
   let analysis = $state<AnalysisView | null>(null);
   let risk = $state<RiskView | null>(null);
   let error = $state<UiError | null>(null);
@@ -88,4 +88,5 @@
   {:else}
     <p>{t('analysis.riskNone')}</p>
   {/if}
+  <button class="primary" onclick={onContinue}>{t('analysis.continue')}</button>
 {/if}
