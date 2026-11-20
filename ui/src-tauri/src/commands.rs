@@ -176,10 +176,14 @@ pub fn start_build(
     store: &dyn SecretStore,
     request: BuildJobRequest,
 ) -> Result<Uuid, UiError> {
-    let token = store
-        .get("github_token")
-        .map_err(|message| UiError { kind: "internal", message })?
-        .map(Secret::new);
+    let token = if request.local {
+        None
+    } else {
+        store
+            .get("github_token")
+            .map_err(|message| UiError { kind: "internal", message })?
+            .map(Secret::new)
+    };
     Ok(svc.start_build_with_token(request, token)?)
 }
 
