@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { t } from '../i18n.svelte';
   let { steps, current }: { steps: string[]; current: string } = $props();
 </script>
 
 <ol class="stepper" aria-label="Job progress">
   {#each steps as step, i (step)}
     <li class:current={step === current} class:done={steps.indexOf(current) > i}>
-      <span>{i + 1}</span>{step}
+      <span>{i + 1}</span>{t(step)}
     </li>
   {/each}
 </ol>
