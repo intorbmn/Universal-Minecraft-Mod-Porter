@@ -30,7 +30,10 @@ pub struct CliFailure {
 impl CliFailure {
     #[must_use]
     pub fn new(code: ExitCode, message: impl Into<String>) -> Self {
-        Self { code, message: message.into() }
+        Self {
+            code,
+            message: message.into(),
+        }
     }
 }
 
