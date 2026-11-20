@@ -1,6 +1,6 @@
 # Phase 12 — CLI, API & Integration: design
 
-**Status:** awaiting user approval  
+**Status:** approved by the user (2026-11-20)  
 **Date:** 2026-11-20  
 **Branch:** `phase-12-api`  
 **Scope authority:** `docs/guides/phase-12-api.md` (Phase 12 guide overrides this design if they disagree).
@@ -236,9 +236,9 @@ The branch HEAD is `9e5dcb18050a727ec5cddd7e0e388ab6f9ace1e4`; current master is
 
 ## 9. Delivery and acceptance
 
-- PR 1 contains 12.0 + completed 12.A, including ADR 0015 and docs.
-- PR 2 contains 12.B + 12.C, including ADR 0016 (REST) and ADR 0017 (MCP).
-- PR 3 contains 12.D + 12.E, including ADR 0018 (plugin protocol).
+- PR 1 contains 12.0 + completed 12.A, including ADR 0016 and docs.
+- PR 2 contains 12.B + 12.C, including ADR 0017 (REST) and ADR 0018 (MCP).
+- PR 3 contains 12.D + 12.E, including ADR 0019 (plugin protocol).
 - Each PR is opened only after tests, docs, review and CI are ready. Wait for the user to review and merge before beginning the next PR.
 - The phase is complete only after every guide acceptance item and starred mutation check has recorded evidence, the Action has a real run, the user confirms the shared AI key on their machine, and the user agrees to the MCP real-world check.
 - Do not start Phase 13.
