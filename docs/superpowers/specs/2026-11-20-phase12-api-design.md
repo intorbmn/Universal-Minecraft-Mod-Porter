@@ -111,7 +111,7 @@ CLI:
 - AI commands resolve environment first, then saved credentials. OpenAI base URL comes from the credentials file unless explicitly overridden.
 - Missing-key guidance names `ummp ai-key set` and the desktop AI screen.
 
-ADR 0015 is reserved for **AI API keys in a user credentials file**, status **Accepted (interim)**. ADR 0014 becomes “partly superseded by 0015”. Keep final storage choice in BACKLOG until the user chooses it.
+ADR 0015 is **AI API keys in a user credentials file**, status **Accepted (interim)**. ADR 0014 becomes “partly superseded by 0015”. Keep final storage choice in BACKLOG until the user chooses it.
 
 ### 5.2 12.A — CLI contract
 
