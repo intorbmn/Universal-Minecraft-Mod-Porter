@@ -167,10 +167,9 @@ async fn check_build_risk(
     blocking(&svc, move |s| commands::check_build_risk(s, &path, local)).await
 }
 
-#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
-fn start_build(svc: Svc<'_>, request: BuildJobRequest) -> Result<Uuid, UiError> {
-    commands::start_build(&svc, request)
+async fn start_build(svc: Svc<'_>, request: BuildJobRequest) -> Result<Uuid, UiError> {
+    blocking(&svc, move |s| commands::start_build(s, request)).await
 }
 
 #[allow(clippy::needless_pass_by_value)]
