@@ -114,7 +114,7 @@ test('modpack report paginates 300 rows and records first-page render time', asy
   };
   await page.addInitScript(({ completedJob }) => {
     (window as any).__TAURI_INTERNALS__ = {
-      invoke: async (cmd: string) => {
+      invoke: async (cmd: string, args: any) => {
         if (cmd === 'sessions') return [];
         if (cmd === 'targets') return {
           loaders: ['fabric', 'neoforge'],
@@ -204,7 +204,7 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
           progress: { done: 3, total: 4 }, log: [], result: null, error: null,
         };
         if (cmd === 'decide') {
-          decisions.push(Boolean((arguments as any)[1]?.approve));
+          decisions.push(Boolean(args?.approve));
           return null;
         }
         if (cmd === 'plugin:event|listen') return 1;
