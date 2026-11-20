@@ -132,6 +132,9 @@ fn run_pack_migrate(
 #[derive(Parser)]
 #[command(name = "ummp", version, about = "Universal Minecraft Mod Porter")]
 struct Cli {
+    /// Explicit TOML configuration file.
+    #[arg(long, global = true, value_name = "PATH")]
+    config: Option<PathBuf>,
     #[command(subcommand)]
     command: Commands,
 }
@@ -703,15 +706,18 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
 }
 
 fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
-    let config = if matches!(&cli.command, Commands::Completions { .. }) {
+    let Cli { config: config_path, command } = cli;
+    let config = if matches!(&command, Commands::Completions { .. }) {
         CliConfig::default()
     } else {
-        CliConfig::load()?
+        CliConfig::load_with_path(config_path.as_deref()).map_err(|error| {
+            CliFailure::new(ExitCode::InvalidInput, format!("invalid configuration: {error}"))
+        })?
     };
     let pm = DefaultProjectManager;
     let mut exit_code = ExitCode::Ok.value();
 
-    match cli.command {
+    match command {
         Commands::Completions { shell } => {
             let mut command = Cli::command();
             generate(shell, &mut command, "ummp", &mut std::io::stdout());
