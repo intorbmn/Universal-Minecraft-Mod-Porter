@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Phase 11.B: desktop app scaffold in `ui/` (Svelte 5 + Vite + Tauri 2, separate Cargo workspace
+  `ui/src-tauri`): Home and Analysis screens, Vietnamese/English UI, `AppServices::sessions`,
+  CI job `desktop`. Other screens come in 11.C-11.E.
+
 ### Changed
 - Phase 11.A: the CLI now shares one set of helpers with the desktop app
   (`ummp_core::app::helpers` and `::snapshots`: knowledge-base opening, snapshot store,

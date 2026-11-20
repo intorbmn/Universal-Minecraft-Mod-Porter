@@ -1040,3 +1040,78 @@ fn sessions_lists_recent_jobs_newest_first_with_output() {
     assert!(all[0].output.as_deref().unwrap().ends_with("out2"));
     assert_eq!(svc.sessions(1).unwrap().len(), 1, "the limit applies");
 }
+
+fn view_golden(name: &str) -> serde_json::Value {
+    let file = fixture("golden/app-views").join(format!("{name}.json"));
+    serde_json::from_slice(
+        &std::fs::read(&file).unwrap_or_else(|e| panic!("{}: {e}", file.display())),
+    )
+    .unwrap()
+}
+
+#[test]
+fn view_shapes_match_golden_json() {
+    use ummp_core::app::views::{
+        AnalysisView, FindingView, ModView, RiskLevel, RiskView, SessionView, TargetVersion,
+        TargetsView,
+    };
+    let analysis = AnalysisView {
+        kind: "zip".into(),
+        mods: vec![ModView {
+            id: "demomod".into(),
+            name: "Demo Mod".into(),
+            version: "1.0.0".into(),
+            loader: "forge".into(),
+            minecraft: "1.16.5".into(),
+            java: Some(8),
+        }],
+        build_system: Some("gradle".into()),
+        languages: vec!["java".into()],
+        technologies: vec![],
+    };
+    assert_eq!(
+        serde_json::to_value(&analysis).unwrap(),
+        view_golden("analysis")
+    );
+    let risk = RiskView {
+        level: Some(RiskLevel::High),
+        findings: vec![FindingView {
+            rule: "demo.rule".into(),
+            severity: RiskLevel::High,
+            file: "demo/DemoWidget.class".into(),
+            evidence: "DemoWidget".into(),
+        }],
+    };
+    assert_eq!(serde_json::to_value(&risk).unwrap(), view_golden("risk"));
+    let sessions = vec![
+        SessionView {
+            id: Uuid::from_u128(1),
+            state: JobState::Succeeded,
+            step: "done".into(),
+            output: Some("/tmp/out".into()),
+            error: None,
+        },
+        SessionView {
+            id: Uuid::from_u128(2),
+            state: JobState::Failed,
+            step: "port".into(),
+            output: None,
+            error: Some("boom".into()),
+        },
+    ];
+    assert_eq!(
+        serde_json::to_value(&sessions).unwrap(),
+        view_golden("sessions")
+    );
+    let targets = TargetsView {
+        loaders: vec!["fabric".into(), "forge".into()],
+        versions: vec![TargetVersion {
+            minecraft: "1.20.1".into(),
+            loaders: vec!["fabric".into(), "forge".into()],
+        }],
+    };
+    assert_eq!(
+        serde_json::to_value(&targets).unwrap(),
+        view_golden("targets")
+    );
+}

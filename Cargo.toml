@@ -1,6 +1,7 @@
 [workspace]
 members = ["core", "cli", "providers"]
 resolver = "2"
+exclude = ["ui/src-tauri"]
 default-members = ["cli"]
 
 [workspace.lints.rust]
