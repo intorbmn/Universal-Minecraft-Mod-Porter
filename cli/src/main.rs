@@ -348,7 +348,9 @@ fn run_build(
 
 fn main() {
     tracing_subscriber::fmt::init();
-    let json_requested = std::env::args_os().any(|arg| arg == "--json");
+    let arguments = std::env::args().skip(1).collect::<Vec<_>>();
+    let json_requested = arguments.iter().any(|arg| arg == "--json");
+    let ai_key_set = arguments.windows(2).any(|pair| pair == ["ai-key", "set"]);
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => {
@@ -360,7 +362,14 @@ fn main() {
             } else {
                 ExitCode::InvalidInput.value()
             };
-            if json_requested {
+            if ai_key_set {
+                let message = "invalid ai-key set arguments; provide the key through hidden input or stdin, never as a command-line argument";
+                if json_requested {
+                    output::failure("invalid_input", message);
+                } else {
+                    eprintln!("error: {message}");
+                }
+            } else if json_requested {
                 output::failure("invalid_input", &error.to_string());
             } else {
                 let _ = error.print();
