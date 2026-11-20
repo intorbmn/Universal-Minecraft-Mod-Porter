@@ -401,10 +401,23 @@ fn provider(args: &AiArgs, config: &CliConfig) -> Result<Box<dyn AiProvider>, Bo
         "openai" => {
             let url = config
                 .openai_base_url(args.base_url.clone())
-                .ok_or_else(|| CliFailure::new(ExitCode::InvalidInput, "OpenAI needs --base-url or openai_base_url in ummp.toml"))?;
+                .ok_or_else(|| {
+                    CliFailure::new(
+                        ExitCode::InvalidInput,
+                        "OpenAI needs --base-url or openai_base_url in ummp.toml",
+                    )
+                })?;
             Box::new(OpenAiCompatibleProvider::new(&url))
         }
-        other => return Err(CliFailure::new(ExitCode::InvalidInput, format!("unknown provider '{other}'")).into()),
+        other => {
+            return Err(
+                CliFailure::new(
+                    ExitCode::InvalidInput,
+                    format!("unknown provider '{other}'"),
+                )
+                .into(),
+            );
+        }
     })
 }
 
