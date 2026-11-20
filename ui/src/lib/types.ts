@@ -98,6 +98,15 @@ export interface ProgressView {
   total: number;
 }
 
+export interface JobApprovalView {
+  job: string;
+  approval: string;
+  path: string;
+  diff: string;
+  reviewer_approved: boolean;
+  concerns: string[];
+}
+
 export interface JobView {
   id: string;
   session: string;
