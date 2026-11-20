@@ -121,6 +121,15 @@ fn env_value(env: &mut impl FnMut(&str) -> Option<String>, key: &str) -> Option<
     env(key).filter(|value| !value.trim().is_empty())
 }
 
+#[must_use]
+pub fn data_dir() -> PathBuf {
+    default_data_dir().unwrap_or_else(|| {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(".ummp")
+    })
+}
+
 fn default_data_dir() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("UMMP_DATA_DIR") {
         return Some(PathBuf::from(path));
