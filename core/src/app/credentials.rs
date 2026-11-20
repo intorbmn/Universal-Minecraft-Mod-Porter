@@ -36,6 +36,8 @@ pub trait AiKeyStore: Send + Sync {
     ) -> Result<Option<String>, AppError>;
     fn delete(&self, provider: AiProviderKind) -> Result<(), AppError>;
     fn masked(&self, provider: AiProviderKind) -> Result<Option<String>, AppError>;
+    fn openai_base_url(&self) -> Result<Option<String>, AppError>;
+    fn set_openai_base_url(&self, value: Option<&str>) -> Result<(), AppError>;
 }
 
 pub struct FileKeyStore {
@@ -83,6 +85,14 @@ impl AiKeyStore for FileKeyStore {
 
     fn masked(&self, provider: AiProviderKind) -> Result<Option<String>, AppError> {
         self.credentials.masked(provider)
+    }
+
+    fn openai_base_url(&self) -> Result<Option<String>, AppError> {
+        self.credentials.openai_base_url()
+    }
+
+    fn set_openai_base_url(&self, value: Option<&str>) -> Result<(), AppError> {
+        self.credentials.set_openai_base_url(value)
     }
 }
 
