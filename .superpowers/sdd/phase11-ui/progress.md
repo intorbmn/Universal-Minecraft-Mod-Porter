@@ -56,3 +56,18 @@ Task B1 (desktop shell, Home, Analysis): complete. `ui/` (Svelte 5 + Vite 8 + TS
 - Task 11.F: `.github/workflows/desktop-release.yml` exists for manual Windows MSI/NSIS packaging. It has not yet been dispatched; unsigned installer and real Windows smoke test remain open.
 - Task 11.G: ADR 0014 exists. Phase record, project status, known limitations, backlog, SAD, CLAUDE layout and changelog are being aligned. No PR exists; do not merge.
 - Verification gate: GitHub reported zero workflow runs for `phase-11-ui` before the branch push trigger was added. No tests are claimed as run by this continuation until the new workflow reports results.
+
+
+## Phase 11 verification and final review
+
+- 2026-11-20: Ruling: use the GitHub Actions run as the acceptance source because no local repository checkout/runtime is available in this session — avoids claiming unexecuted local tests — cost if wrong: CI environment may differ from a user's Windows desktop.
+- 2026-11-20: Ruling: serialize fake GitHub CLI integration tests with a test-only mutex after repeated Linux `ETXTBSY` failures; keep production process spawning direct — isolates the runner race without adding production retry behavior.
+- 2026-11-20: Ruling: compile `MemorySecretStore` only under `cfg(test)`; it is a test fixture, not a production secret backend — removes dead-code lint without suppressing Clippy.
+- 2026-11-20: Ruling: add `uuid` as a direct Tauri dependency and synchronize the desktop lockfile — `ui/src-tauri/src/lib.rs` uses UUID types directly.
+- 2026-11-20: Ruling: ZIP port requests derive the archive flag from the input extension; AI assist remains disabled for ZIP inputs because the AI service accepts a source directory — prevents treating a ZIP as a folder and avoids unsupported AI requests.
+- 2026-11-20: Ruling: the AI screen starts the job once and passes the returned job ID to the parent; the parent only navigates to Run — prevents duplicate AI jobs.
+- 2026-11-20: Ruling: align exact frontend dependency pins with the committed lockfile so `npm ci` is deterministic — cost if wrong: updates frontend package versions; verified by green npm install/check/test/build.
+- 2026-11-20: Ruling: keep the Phase 11 PR in draft until a maintainer completes the Windows installer and real runtime smoke test — automated Linux/browser CI cannot prove Windows Credential Manager, WebView2, installer or OS opener behavior.
+- CI #44709516766 on `7607ab2c`: root Rust 248 tests passed; Tauri Rust 12 tests passed; Vitest 4 files / 11 tests passed; Playwright 6 tests passed; npm production audit found 0 vulnerabilities; root and desktop build, clippy and format checks passed.
+- CI artifacts: `ummp-phase11-playwright` (Home, Plan/Diff, PackReport screenshots) and `ummp-desktop-cargo-lockfile` were uploaded successfully.
+- 11.C–11.E: automated implementation and test gates complete. 11.F: manual Windows release dispatch/install/smoke test remains. 11.G: documentation aligned; draft PR is the review handoff. Do not merge.
