@@ -115,7 +115,7 @@ impl CredentialsFile {
 
     pub fn get(&self, provider: AiProviderKind) -> Result<Option<Secret>, AppError> {
         let file = self.read()?;
-        Ok(self.key(&file, provider).map(Secret::new))
+        Ok(Self::key(&file, provider).map(Secret::new))
     }
 
     /// Saves one provider key and returns a non-fatal provider-specific warning, if any.
@@ -126,9 +126,9 @@ impl CredentialsFile {
     ) -> Result<Option<String>, AppError> {
         let value = validate_key(key.expose())?;
         let warning = (provider == AiProviderKind::Anthropic && !value.starts_with("sk-ant-"))
-            .then(|| "This key does not use the usual sk-ant- prefix; it will still be saved.".to_owned());
+            .then_some("This key does not use the usual sk-ant- prefix; it will still be saved.".to_owned());
         let mut file = self.read()?;
-        *self.key_mut(&mut file, provider) = Some(value);
+        *Self::key_mut(&mut file, provider) = Some(value);
         self.write(&file)?;
         Ok(warning)
     }
@@ -195,18 +195,17 @@ impl CredentialsFile {
         Ok(())
     }
 
-    fn key<'a>(&self, file: &'a StoredCredentials, provider: AiProviderKind) -> Option<&'a str> {
+    fn key(file: &StoredCredentials, provider: AiProviderKind) -> Option<&str> {
         match provider {
             AiProviderKind::Anthropic => file.anthropic_api_key.as_deref(),
             AiProviderKind::Openai => file.openai_api_key.as_deref(),
         }
     }
 
-    fn key_mut<'a>(
-        &self,
-        file: &'a mut StoredCredentials,
+    fn key_mut(
+        file: &mut StoredCredentials,
         provider: AiProviderKind,
-    ) -> &'a mut Option<String> {
+    ) -> &mut Option<String> {
         match provider {
             AiProviderKind::Anthropic => &mut file.anthropic_api_key,
             AiProviderKind::Openai => &mut file.openai_api_key,
@@ -296,12 +295,12 @@ fn validate_key(key: &str) -> Result<String, AppError> {
 fn mask(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     if chars.len() < 16 {
-        return format!("…{}", chars.iter().rev().take(2).rev().collect::<String>());
+        return format!("…{}", chars.iter().rev().take(2).rev().copied().collect::<String>());
     }
     format!(
         "{}…{}",
-        chars.iter().take(7).collect::<String>(),
-        chars.iter().rev().take(4).rev().collect::<String>()
+        chars.iter().take(7).copied().collect::<String>(),
+        chars.iter().rev().take(4).rev().copied().collect::<String>()
     )
 }
 
