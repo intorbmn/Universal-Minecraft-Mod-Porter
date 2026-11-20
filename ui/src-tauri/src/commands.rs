@@ -9,7 +9,7 @@ use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
-use ummp_core::app::credentials::{AiKeyStore, AiProviderKind, CREDENTIALS_FILE};
+use ummp_core::app::credentials::{resolve_ai_key_from_store, AiKeyStore, AiProviderKind, CREDENTIALS_FILE};
 use ummp_core::app::{
     AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Secret, Settings,
 };
@@ -312,15 +312,18 @@ pub fn start_ai_assist(
         .ai_provider
         .unwrap_or_else(|| "anthropic".into());
     let kind = ai_provider(&provider_name)?;
-    let key = keys
-        .get(kind)
-        .map_err(UiError::from)?
-        .ok_or_else(|| UiError {
-            kind: "refused",
-            message: format!(
-                "No {provider_name} API key is saved. Enter it in the AI screen or save it with `ummp ai-key set`."
-            ),
-        })?;
+    let key = resolve_ai_key_from_store(
+        keys,
+        kind,
+        std::env::var(kind.env_name()).ok(),
+    )
+    .map_err(UiError::from)?
+    .ok_or_else(|| UiError {
+        kind: "refused",
+        message: format!(
+            "No {provider_name} API key is saved. Enter it in the AI screen or save it with `ummp ai-key set`."
+        ),
+    })?;
     let provider: Arc<dyn AiProvider> = match kind {
         AiProviderKind::Anthropic => Arc::new(AnthropicProvider::with_api_key(
             key.expose().to_owned(),
