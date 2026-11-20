@@ -22,6 +22,9 @@ Modular monolith. Layers: Domain → Application → Infrastructure/Presentation
 | AI Agent System | provider abstraction, agents, context, cost tracking, approval gate |
 | Plugin System | registry, loader, lifecycle, capability discovery, sandbox |
 
+## Desktop presentation (Phase 11)
+The Tauri 2 desktop shell in `ui/` is a presentation adapter, not a second application layer. Svelte screens call typed commands through `ui/src/lib/api.ts`; Tauri commands forward to `core/src/app/` and return `UiError` values. Core job events are forwarded to the window as `ummp://event`. OS credentials are accessed through the `SecretStore` trait and are never serialized into settings or returned to the web view. Rust and TypeScript view/event contracts share JSON golden fixtures.
+
 ## Key patterns
 - **Adapter**: wraps a specific loader/build/ai technology behind an interface.
 - **Strategy**: interchangeable implementations (e.g. Gradle vs Maven runner).
