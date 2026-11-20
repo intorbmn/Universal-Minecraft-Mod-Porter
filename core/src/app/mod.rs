@@ -4,6 +4,7 @@
 pub mod approval;
 pub mod helpers;
 pub mod jobs;
+pub mod runs;
 pub mod snapshots;
 pub mod views;
 
@@ -151,6 +152,8 @@ pub struct PortRequest {
     pub zip: bool,
     pub min_confidence: f64,
 }
+
+pub use runs::{BuildJobRequest, PackRequest};
 
 const SETTINGS_FILE: &str = "settings.json";
 const JOBS_FILE: &str = "jobs.db";

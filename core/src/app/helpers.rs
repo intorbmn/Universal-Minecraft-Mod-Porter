@@ -184,3 +184,25 @@ pub fn side(s: &str) -> Result<Side, AppError> {
         ))),
     }
 }
+
+/// Index used offline: the planner never calls it, and if it did it would find nothing.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoIndex;
+
+impl crate::modpack::plan::ModIndex for NoIndex {
+    fn versions(
+        &self,
+        _: &str,
+        _: &str,
+        _: &crate::metadata::Loader,
+    ) -> Result<Vec<crate::modpack::plan::RemoteVersion>, crate::modpack::PackError> {
+        Ok(Vec::new())
+    }
+
+    fn by_hash(
+        &self,
+        _: &str,
+    ) -> Result<Option<crate::modpack::plan::RemoteVersion>, crate::modpack::PackError> {
+        Ok(None)
+    }
+}
