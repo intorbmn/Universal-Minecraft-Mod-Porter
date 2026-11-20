@@ -88,5 +88,9 @@
   {:else}
     <p>{t('analysis.riskNone')}</p>
   {/if}
-  <button class="primary" onclick={onContinue}>{t('analysis.continue')}</button>
+  {#if analysis.kind === 'jar'}
+    <p class="muted">{t('analysis.jarOnly')}</p>
+  {:else}
+    <button class="primary" onclick={onContinue}>{t('analysis.continue')}</button>
+  {/if}
 {/if}
