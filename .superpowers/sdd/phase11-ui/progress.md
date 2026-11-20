@@ -54,7 +54,7 @@ Task B1 (desktop shell, Home, Analysis): complete. `ui/` (Svelte 5 + Vite 8 + TS
 - Task 11.D: Build and Settings screens are present. Tests cover High-risk local-build acknowledgement, immediate language switching, English fallback, and the in-memory secret store. Fresh execution is pending.
 - Task 11.E: AI approval supports explicit A/R decisions; PackReport paginates 300 rows at 50 per page and Playwright records first-page render time. Fresh execution is pending.
 - Task 11.F: `.github/workflows/desktop-release.yml` exists for manual Windows MSI/NSIS packaging. It has not yet been dispatched; unsigned installer and real Windows smoke test remain open.
-- Task 11.G: ADR 0014 exists. Phase record, project status, known limitations, backlog, SAD, CLAUDE layout and changelog are being aligned. No PR exists; do not merge.
+- Task 11.G: ADR 0014 exists. Phase record, project status, known limitations, backlog, SAD, CLAUDE layout and changelog are being aligned. Draft PR #11 is open; do not merge.
 - Verification gate: GitHub reported zero workflow runs for `phase-11-ui` before the branch push trigger was added. No tests are claimed as run by this continuation until the new workflow reports results.
 
 
@@ -69,5 +69,6 @@ Task B1 (desktop shell, Home, Analysis): complete. `ui/` (Svelte 5 + Vite 8 + TS
 - 2026-11-20: Ruling: align exact frontend dependency pins with the committed lockfile so `npm ci` is deterministic — cost if wrong: updates frontend package versions; verified by green npm install/check/test/build.
 - 2026-11-20: Ruling: keep the Phase 11 PR in draft until a maintainer completes the Windows installer and real runtime smoke test — automated Linux/browser CI cannot prove Windows Credential Manager, WebView2, installer or OS opener behavior.
 - CI #44709516766 on `7607ab2c`: root Rust 248 tests passed; Tauri Rust 12 tests passed; Vitest 4 files / 11 tests passed; Playwright 6 tests passed; npm production audit found 0 vulnerabilities; root and desktop build, clippy and format checks passed.
+- Latest PR-head verification: push run #44710620730 and pull-request run #44710673870 both passed on `0eeafe63a2fdd04d9f25d410c3b20f8d4760d265`; both jobs (`build-test-lint`, `desktop`) succeeded and both expected CI artifacts were uploaded.
 - CI artifacts: `ummp-phase11-playwright` (Home, Plan/Diff, PackReport screenshots) and `ummp-desktop-cargo-lockfile` were uploaded successfully.
 - 11.C–11.E: automated implementation and test gates complete. 11.F: manual Windows release dispatch/install/smoke test remains. 11.G: documentation aligned; draft PR is the review handoff. Do not merge.
