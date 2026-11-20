@@ -6,6 +6,7 @@ use super::logs::analyze_log;
 use super::{
     BuildBackend, BuildError, BuildOutcome, BuildRequest, Stage, StageResult, StageStatus,
 };
+use crate::app::Secret;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -99,6 +100,8 @@ pub struct GithubBackend {
     pub git: PathBuf,
     pub poll: Duration,
     pub workdir: PathBuf,
+    /// Optional credential supplied by the desktop OS keyring; redacted in Debug.
+    pub token: Option<Secret>,
 }
 
 /// The workflow that runs `stages` with Java `java`, each limited to `timeout_secs`.
@@ -133,11 +136,23 @@ fn status_of(s: &str) -> StageStatus {
 
 /// Runs a trusted local tool (`gh`, `git`) and returns its stdout.
 fn tool(program: &Path, args: &[&str], cwd: &Path) -> Result<String, BuildError> {
-    let out = Command::new(program)
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .map_err(|e| BuildError::Tool(format!("cannot run {}: {e}. {NO_GH}", program.display())))?;
+    tool_with_token(program, args, cwd, None)
+}
+
+fn tool_with_token(
+    program: &Path,
+    args: &[&str],
+    cwd: &Path,
+    token: Option<&Secret>,
+) -> Result<String, BuildError> {
+    let mut command = Command::new(program);
+    if let Some(token) = token {
+        command.env("GH_TOKEN", token.expose());
+    }
+    let out =
+        command.args(args).current_dir(cwd).output().map_err(|e| {
+            BuildError::Tool(format!("cannot run {}: {e}. {NO_GH}", program.display()))
+        })?;
     if !out.status.success() {
         return Err(BuildError::Tool(format!(
             "`{} {}` failed: {}",
@@ -171,23 +186,25 @@ impl GithubBackend {
     /// Stage results from the job log; the log is saved as `<art>/job.log` (it holds the
     /// tail of each failed stage's log).
     fn stages_from_job_log(&self, run_id: &str, dir: &Path, art: &Path) -> Option<String> {
-        let jobs = tool(
+        let jobs = tool_with_token(
             &self.gh,
             &[
                 "api",
                 &format!("repos/{}/actions/runs/{run_id}/jobs", self.repo),
             ],
             dir,
+            self.token.as_ref(),
         )
         .ok()?;
         let job = serde_json::from_str::<Jobs>(&jobs).ok()?.jobs.first()?.id;
-        let log = tool(
+        let log = tool_with_token(
             &self.gh,
             &[
                 "api",
                 &format!("repos/{}/actions/jobs/{job}/logs", self.repo),
             ],
             dir,
+            self.token.as_ref(),
         )
         .ok()?;
         if std::fs::create_dir_all(art).is_ok() {
@@ -200,7 +217,7 @@ impl GithubBackend {
     fn wait_for_run(&self, branch: &str, dir: &Path, limit: Duration) -> Result<u64, BuildError> {
         let deadline = Instant::now() + limit;
         loop {
-            let out = tool(
+            let out = tool_with_token(
                 &self.gh,
                 &[
                     "run",
@@ -215,6 +232,7 @@ impl GithubBackend {
                     "1",
                 ],
                 dir,
+                self.token.as_ref(),
             )?;
             let runs: Vec<Run> = serde_json::from_str(&out)
                 .map_err(|e| BuildError::Tool(format!("unexpected `gh run list` output: {e}")))?;
@@ -236,10 +254,16 @@ impl GithubBackend {
 impl BuildBackend for GithubBackend {
     fn run(&self, req: &BuildRequest) -> Result<BuildOutcome, BuildError> {
         let here = Path::new(".");
-        tool(&self.gh, &["--version"], here)?;
+        tool_with_token(&self.gh, &["--version"], here, self.token.as_ref())?;
         // Checks login and access to the build repo in one REST call.
         let repo_api = format!("repos/{}", self.repo);
-        tool(&self.gh, &["api", &repo_api, "--jq", ".full_name"], here).map_err(|e| {
+        tool_with_token(
+            &self.gh,
+            &["api", &repo_api, "--jq", ".full_name"],
+            here,
+            self.token.as_ref(),
+        )
+        .map_err(|e| {
             BuildError::Tool(format!(
                 "Cannot reach build repo {} with the GitHub CLI ({e}). Create the repo and run \
                  `gh auth login`, or build on this machine with --local",
@@ -286,7 +310,7 @@ impl BuildBackend for GithubBackend {
             ],
             &dir,
         )?;
-        tool(
+        tool_with_token(
             &self.git,
             &[
                 "-c",
@@ -300,6 +324,7 @@ impl BuildBackend for GithubBackend {
                 &refspec,
             ],
             &dir,
+            self.token.as_ref(),
         )?;
 
         let stage_count = u32::try_from(req.stages.len()).unwrap_or(u32::MAX);
@@ -307,7 +332,7 @@ impl BuildBackend for GithubBackend {
         let id = self.wait_for_run(&branch, &dir, limit)?.to_string();
         let art = dir.join("ummp-artifact");
         let art_s = art.to_string_lossy().into_owned();
-        let downloaded = tool(
+        let downloaded = tool_with_token(
             &self.gh,
             &[
                 "run",
@@ -321,6 +346,7 @@ impl BuildBackend for GithubBackend {
                 &art_s,
             ],
             &dir,
+            self.token.as_ref(),
         );
         let json = match downloaded {
             Ok(_) => std::fs::read_to_string(art.join("stages.json")).ok(),

@@ -11,6 +11,7 @@ pub enum JobState {
     Failed,
     Skipped,
     TimedOut,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +55,10 @@ impl Job {
 
     pub const fn mark_failed(&mut self) {
         self.state = JobState::Failed;
+    }
+
+    pub const fn mark_cancelled(&mut self) {
+        self.state = JobState::Cancelled;
     }
 
     pub const fn retry(&mut self) -> bool {

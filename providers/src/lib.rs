@@ -250,6 +250,15 @@ impl OpenAiCompatibleProvider {
         }
     }
 
+    /// Provider with an explicit API key. The caller owns the credential lifecycle.
+    pub fn with_api_key(base_url: &str, api_key: String) -> Self {
+        Self {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            api_key: Some(api_key),
+            agent: agent(Duration::from_mins(10)),
+        }
+    }
+
     pub fn request_body(req: &AiRequest) -> Value {
         json!({
             "model": req.model,

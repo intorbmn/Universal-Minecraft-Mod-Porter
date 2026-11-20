@@ -3,6 +3,23 @@
 Items deferred from finished phases. Each line says what is missing and why it was left.
 Move an item into a phase file when it is picked up.
 
+## Phase 11 — Desktop UI
+- [ ] Capture and commit 2–3 real Tauri/Playwright screenshots after the first verified Windows
+  launch; no synthetic mockups should be presented as runtime screenshots.
+- [ ] Complete a manual Windows smoke test: MSI install/uninstall, NSIS install/uninstall,
+  Credential Manager set/read/delete, file/folder picker, local and GitHub build risk gates,
+  AI approve/reject, modpack export, output-folder opener, cancel, and rollback.
+- [ ] Sign MSI/NSIS packages and publish checksums; current installers are unsigned.
+- [ ] Add macOS and Linux packaging/release workflows and validate Keychain/Secret Service.
+- [ ] Add auto-update and release-channel selection.
+- [ ] Add custom OpenAI-compatible base URL, local Ollama, model selection, and optional
+  prompt customization to Settings/AI assist.
+- [ ] Reopen recent sessions into a complete job/event timeline (currently only a summary list).
+- [ ] Replace bounded 200-line log tail with virtual scrolling and historical paging.
+- [ ] Accessibility audit with keyboard-only, screen reader, high contrast, and reduced motion.
+- [ ] Add drag-and-drop for JAR/source ZIP/project folders and a persistent recent-path picker.
+- [ ] Test very large unified diffs and reports with real-world 1,000+ file projects.
+
 ## Phase 10 — Modpack Migration
 - [ ] CurseForge API resolution of unresolved entries (needs an API key).
 - [ ] Build and bundle ported mods automatically into the exported pack.
@@ -55,3 +72,10 @@ Move an item into a phase file when it is picked up.
 ## Phase 6 — Migration engine
 - [ ] Real mapping dataset in the knowledge base (risks R1/R4).
 - [ ] Method/field renames in bytecode and Mixin injector targets (member mappings).
+
+
+## Phase 11 — Desktop UI follow-up
+- [ ] Replace the default Tauri icons with approved UMMP branding.
+- [ ] Add screenshots after a verified Windows desktop launch.
+- [ ] Record a Windows install and sample-mod smoke test before treating Phase 11 as accepted.
+- [ ] Consider interrupting active Gradle/GitHub build processes; current job cancellation is checked between steps only.

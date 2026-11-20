@@ -26,6 +26,8 @@ version (for example in a sandbox without access to static.rust-lang.org), check
 `rustc -V` under `RUSTUP_TOOLCHAIN=stable` prints the pinned version, then run the commands
 with that variable set. Never unpin the toolchain to get around this.
 
+CI has two independent jobs: the root Rust workspace and the desktop workspace (`ui/src-tauri` plus npm/Vitest/Playwright). The desktop Linux job installs GTK/WebKit and `libdbus-1-dev` for Tauri and the Secret Service keyring backend. Windows MSI/NSIS packaging is a separate manually dispatched workflow (`.github/workflows/desktop-release.yml`).
+
 ## Rules that are easy to break
 - **A status is COMPLETED only with test evidence** against the phase's acceptance criteria.
   Writing code without running the tests is not enough. Earlier phases were wrongly marked
@@ -35,7 +37,7 @@ with that variable set. Never unpin the toolchain to get around this.
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
   milestone, report it, and wait for the user to review.
-- Every significant decision gets an ADR in `docs/decisions/` (next number: 0014).
+- Every significant decision gets an ADR in `docs/decisions/` (next number: 0015).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
 - Edits are applied only by `MigrationEngine` after a checkpoint (ADR 0005/0006). This
@@ -74,8 +76,10 @@ skip the practice.
 ## Layout
 | Path | Contents |
 |---|---|
-| `core/src/` | `project`, `filesystem`, `metadata`, `session`, `events`, `checkpoint`, `jobs`/`persistence`, `analyzer`, `knowledge`, `migration`, `descriptor`, `build_script`, `resources`, `mixin`, `bytecode`, `ai` (provider trait, agents, orchestrator), `build` (process runner, log/crash analyzers, local and GitHub backends, report), `scan` (malware-risk rules in `scan_rules.toml`), `adapter` (technology adapters: rules, native, loader conversion; data in `adapter_rules.toml`, `loader_rules.toml`, `loader_templates.toml`), `port` (source in, ported source out), `modpack` (formats, analyze, graph, plan, config, report, run; data in `pack_config_rules.toml`) |
-| `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8, `adapters.rs`, `loader.rs`, `port.rs` for Phase 9, `modpack.rs` for Phase 10; `cli/tests/pack_cli.rs` runs the real binary) |
+| `core/src/` | Domain and engine modules: project/filesystem/metadata/session/events/checkpoint/jobs/persistence, analyzer, knowledge, migration, descriptors, build scripts/resources/Mixins/bytecode, AI, build/scan, technology adapters, loader conversion, port and modpack engines |
+| `core/src/app/` | Shared `AppServices` facade, command helpers, session/job views, port/migrate/build/pack/AI job runners, settings, risk and checkpoint orchestration |
+| `ui/` | Tauri 2 + Svelte 5 + TypeScript desktop shell; `src/lib/api.ts` is the only frontend invoke boundary; screens, i18n, golden-backed unit/E2E tests; `src-tauri/` is a separate Cargo workspace with thin commands and OS keyring |
+| `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8, `adapters.rs`, `loader.rs`, `port.rs` for Phase 9, `modpack.rs` for Phase 10, `app.rs` for AppServices/golden views; `cli/tests/pack_cli.rs` runs the real binary) |
 | `cli/src/main.rs` | The `ummp analyze`, `migrate`, `remap-jar`, `rollback`, `ai-assist`, `ai-debug`, `scan`, `build`, `port`, `adapters`, and `pack` commands |
 | `providers/` | HTTP AI providers (Anthropic, OpenAI-compatible); the only crate that talks to model APIs |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |

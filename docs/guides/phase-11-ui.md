@@ -6,6 +6,7 @@ This guide lets an agent that has never seen this repository build Phase 11 alon
    GitHub commands, and the definition of done for every phase.
 3. Where this file and README disagree, this file wins for Phase 11.
 
+- Handoff after 11.B (status, open items, remaining plan): [phase-11b-handoff.md](phase-11b-handoff.md).
 - Earlier rough design: `docs/drafts/phase-11-ui.md` (history only).
 - State when this guide was written: Phases 1–10 merged (master after PR #8), 213 tests,
   next ADR number **0014**.
