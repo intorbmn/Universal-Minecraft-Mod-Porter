@@ -3,6 +3,7 @@
 use clap::{ArgGroup, Parser, Subcommand};
 use clap_complete::Shell;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Subcommand)]
 pub(crate) enum PackCmd {
