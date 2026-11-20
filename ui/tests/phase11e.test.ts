@@ -41,16 +41,14 @@ describe('AI approval', () => {
     expect(await screen.findByText('Review proposed edit: src/main/java/DemoWidget.java')).toBeInTheDocument();
     expect(screen.getByText('Check the method signature')).toBeInTheDocument();
     await fireEvent.keyDown(window, { key: 'a' });
-    expect(await screen.findByText('assisting')).toBeInTheDocument();
+    const { invoke } = await import('@tauri-apps/api/core');
+    expect(invoke).toHaveBeenCalledWith('decide', { approval: 'approval-1', approve: true });
   });
 });
 
 describe('Pack report pagination', () => {
   it('renders 50 of 300 rows at a time', async () => {
-    const golden = JSON.parse(readFileSync(
-      new URL('../../tests/fixtures/golden/app-views/pack-report-300.json', import.meta.url),
-      'utf8',
-    ));
+    const golden = JSON.parse(readFileSync('../tests/fixtures/golden/app-views/pack-report-300.json', 'utf8'));
     const items = golden.items;
     render(PackReport, {
       job: {
