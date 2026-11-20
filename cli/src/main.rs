@@ -89,7 +89,11 @@ fn run_pack_migrate(
         println!("Wrote: {}", w.display());
     }
     let code = out.exit_code();
-    Ok(if code == ExitCode::Partial.value() { ExitCode::Partial.value() } else { code })
+    Ok(if code == ExitCode::Partial.value() {
+        ExitCode::Partial.value()
+    } else {
+        code
+    })
 }
 
 /// Asks on the terminal for each proposed change.
@@ -117,7 +121,10 @@ impl ApprovalGate for PromptGate {
     }
 }
 
-fn provider(args: &AiArgs, config: &CliConfig) -> Result<Box<dyn AiProvider>, Box<dyn std::error::Error>> {
+fn provider(
+    args: &AiArgs,
+    config: &CliConfig,
+) -> Result<Box<dyn AiProvider>, Box<dyn std::error::Error>> {
     let provider = config.provider(args.provider.clone());
     Ok(match provider.as_str() {
         "anthropic" => Box::new(AnthropicProvider::from_env()?),
@@ -133,13 +140,11 @@ fn provider(args: &AiArgs, config: &CliConfig) -> Result<Box<dyn AiProvider>, Bo
             Box::new(OpenAiCompatibleProvider::new(&url))
         }
         other => {
-            return Err(
-                CliFailure::new(
-                    ExitCode::InvalidInput,
-                    format!("unknown provider '{other}'"),
-                )
-                .into(),
-            );
+            return Err(CliFailure::new(
+                ExitCode::InvalidInput,
+                format!("unknown provider '{other}'"),
+            )
+            .into());
         }
     })
 }
@@ -224,7 +229,11 @@ fn check_risk(
         RiskDecision::Refuse(why) => Err(CliFailure::new(ExitCode::Refused, why).into()),
         RiskDecision::Confirm => {
             if !std::io::stdin().is_terminal() {
-                return Err(CliFailure::new(ExitCode::InvalidInput, "Medium risk: pass --yes to build on this machine").into());
+                return Err(CliFailure::new(
+                    ExitCode::InvalidInput,
+                    "Medium risk: pass --yes to build on this machine",
+                )
+                .into());
             }
             print!("Medium risk. Build on this machine anyway? [y/N] ");
             std::io::stdout().flush()?;
@@ -240,7 +249,11 @@ fn check_risk(
 }
 
 /// Runs `ummp build`; `Ok(true)` when every stage that ran passed.
-fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<dyn std::error::Error>> {
+fn run_build(
+    path: &Path,
+    a: BuildArgs,
+    config: &CliConfig,
+) -> Result<bool, Box<dyn std::error::Error>> {
     let BuildArgs {
         local,
         repo,
@@ -254,7 +267,11 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
     } = a;
     let path = path.to_path_buf();
     if !path.is_dir() {
-        return Err(CliFailure::new(ExitCode::InvalidInput, "JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project").into());
+        return Err(CliFailure::new(
+            ExitCode::InvalidInput,
+            "JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project",
+        )
+        .into());
     }
     let scan = scan_path(&path)?;
     print!("{}", scan.to_text());
@@ -265,7 +282,10 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
             "build" => Ok(Stage::Build),
             "test" => Ok(Stage::Test),
             "server" => Ok(Stage::Server),
-            other => Err(CliFailure::new(ExitCode::InvalidInput, format!("unknown stage `{other}` (use build, test, server)"))),
+            other => Err(CliFailure::new(
+                ExitCode::InvalidInput,
+                format!("unknown stage `{other}` (use build, test, server)"),
+            )),
         })
         .collect::<Result<Vec<_>, _>>()?;
     let (mod_name, detected_java) = mod_identity(&path);
@@ -316,7 +336,10 @@ fn main() {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => {
-            let code = if matches!(error.kind(), clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion) {
+            let code = if matches!(
+                error.kind(),
+                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
+            ) {
                 ExitCode::Ok.value()
             } else {
                 ExitCode::InvalidInput.value()
@@ -453,7 +476,11 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
             let work = tempfile::tempdir()?;
             let p = import_with(&pack, work.path(), &ImportOptions::default())?;
             let (Some(mc), Some(loader)) = (p.mc.clone(), p.loader) else {
-                return Err(CliFailure::new(ExitCode::InvalidInput, "cannot tell the pack's Minecraft version or loader; use `pack migrate`").into());
+                return Err(CliFailure::new(
+                    ExitCode::InvalidInput,
+                    "cannot tell the pack's Minecraft version or loader; use `pack migrate`",
+                )
+                .into());
             };
             let kb = KnowledgeBase::open(Path::new(":memory:"))?;
             run_pack_migrate(
@@ -488,7 +515,9 @@ fn map_app_error(error: &ummp_core::app::AppError) -> CliFailure {
     CliFailure::new(code, error.to_string())
 }
 
-fn app_services(config: &CliConfig) -> Result<ummp_core::app::AppServices, Box<dyn std::error::Error>> {
+fn app_services(
+    config: &CliConfig,
+) -> Result<ummp_core::app::AppServices, Box<dyn std::error::Error>> {
     use ummp_core::app::{AppServices, Settings};
 
     let mut settings = Settings::new(config::data_dir());
@@ -496,7 +525,8 @@ fn app_services(config: &CliConfig) -> Result<ummp_core::app::AppServices, Box<d
     settings.output_root.clone_from(&config.output_root);
     settings.sandbox_repo.clone_from(&config.sandbox_repo);
     settings.ai_provider.clone_from(&config.ai_provider);
-    AppServices::open(settings).map_err(|error| Box::new(map_app_error(&error)) as Box<dyn std::error::Error>)
+    AppServices::open(settings)
+        .map_err(|error| Box::new(map_app_error(&error)) as Box<dyn std::error::Error>)
 }
 
 const fn command_name(command: &Commands) -> &'static str {
@@ -517,16 +547,25 @@ const fn command_name(command: &Commands) -> &'static str {
 }
 
 fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
-    let Cli { json: json_mode, config: config_path, command } = cli;
+    let Cli {
+        json: json_mode,
+        config: config_path,
+        command,
+    } = cli;
     let config = if matches!(&command, Commands::Completions { .. }) {
         CliConfig::default()
     } else {
         config_path
             .as_deref()
-            .map_or_else(CliConfig::load, |path| CliConfig::load_with_path(Some(path)))
-        .map_err(|error| {
-            CliFailure::new(ExitCode::InvalidInput, format!("invalid configuration: {error}"))
-        })?
+            .map_or_else(CliConfig::load, |path| {
+                CliConfig::load_with_path(Some(path))
+            })
+            .map_err(|error| {
+                CliFailure::new(
+                    ExitCode::InvalidInput,
+                    format!("invalid configuration: {error}"),
+                )
+            })?
     };
     let pm = DefaultProjectManager;
     let mut exit_code = ExitCode::Ok.value();
@@ -537,7 +576,8 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 return Err(CliFailure::new(
                     ExitCode::InvalidInput,
                     "--json cannot be combined with shell completion generation",
-                ).into());
+                )
+                .into());
             }
             let mut command = Cli::command();
             generate(shell, &mut command, "ummp", &mut std::io::stdout());
@@ -545,7 +585,11 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         Commands::Analyze { path } => {
             if json_mode {
                 let services = app_services(&config)?;
-                output::set_result(services.analyze(&path).map_err(|error| map_app_error(&error))?);
+                output::set_result(
+                    services
+                        .analyze(&path)
+                        .map_err(|error| map_app_error(&error))?,
+                );
             } else {
                 let project = pm.open(&path)?;
                 let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
@@ -634,7 +678,11 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 .filter(|m| !m.is_empty())
                 .collect();
             if stages.is_empty() {
-                return Err(CliFailure::new(ExitCode::InvalidInput, "no qualified class mappings for this request").into());
+                return Err(CliFailure::new(
+                    ExitCode::InvalidInput,
+                    "no qualified class mappings for this request",
+                )
+                .into());
             }
             let stats = remap_jar(&input, &output, &stages)?;
             println!(
@@ -755,7 +803,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         Commands::Scan { path } => {
             if json_mode {
                 let services = app_services(&config)?;
-                let report = services.scan(&path).map_err(|error| map_app_error(&error))?;
+                let report = services
+                    .scan(&path)
+                    .map_err(|error| map_app_error(&error))?;
                 if report.level == Some(ummp_core::app::views::RiskLevel::High) {
                     exit_code = ExitCode::Refused.value();
                 }
@@ -851,7 +901,12 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 None => {
                     store
                         .latest()
-                        .ok_or_else(|| CliFailure::new(ExitCode::InvalidInput, "no checkpoints found in the snapshot directory"))?
+                        .ok_or_else(|| {
+                            CliFailure::new(
+                                ExitCode::InvalidInput,
+                                "no checkpoints found in the snapshot directory",
+                            )
+                        })?
                         .id
                 }
             };
