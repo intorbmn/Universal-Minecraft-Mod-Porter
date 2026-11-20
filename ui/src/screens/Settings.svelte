@@ -16,6 +16,7 @@
     anthropic: null, openai: null,
   });
   let aiKeys = $state<Record<AiProvider, string>>({ anthropic: '', openai: '' });
+  let editingAi = $state<Record<AiProvider, boolean>>({ anthropic: false, openai: false });
   let aiBaseUrls = $state<Record<AiProvider, string>>({ anthropic: '', openai: '' });
   let error = $state<UiError | null>(null);
   let message = $state('');
@@ -67,6 +68,7 @@
     try {
       const saved = await api.aiKeySave(name, aiKeys[name], name === 'openai' ? aiBaseUrls.openai : null);
       aiKeys[name] = '';
+      editingAi[name] = false;
       aiStatus[name] = await api.aiKeyStatus(name);
       message = saved.warning ?? t('settings.secretSaved');
     } catch (e) {
@@ -79,6 +81,7 @@
     try {
       await api.aiKeyDelete(name);
       aiKeys[name] = '';
+      editingAi[name] = false;
       aiStatus[name] = await api.aiKeyStatus(name);
     } catch (e) {
       error = e as UiError;
@@ -143,8 +146,9 @@
   {#each ['anthropic', 'openai'] as name (name)}
     <section class="credential">
       <strong>{name === 'anthropic' ? 'Anthropic' : 'OpenAI'}</strong>
-      {#if aiStatus[name as AiProvider]?.saved}
+      {#if aiStatus[name as AiProvider]?.saved && !editingAi[name as AiProvider]}
         <code>{aiStatus[name as AiProvider]?.masked}</code>
+        <button onclick={() => (editingAi[name as AiProvider] = true)}>{t('ai.changeKey')}</button>
         <button onclick={() => deleteAiKey(name as AiProvider)}>{t('settings.deleteSecret')}</button>
       {:else}
         <input type="password" autocomplete="off" aria-label={name + ' API key'} bind:value={aiKeys[name as AiProvider]} placeholder={t('settings.secretPlaceholder')} />
