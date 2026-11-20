@@ -49,9 +49,10 @@ describe('shared AI credentials', () => {
 
     const input = await screen.findByLabelText('API key');
     await fireEvent.input(input, { target: { value: 'sk-ant-test-0000000000000000' } });
-    const start = screen.getByRole('button', { name: 'Start AI assist' });
-    await waitFor(() => expect(start).toBeEnabled());
-    await fireEvent.click(start);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Start AI assist' })).toBeEnabled(),
+    );
+    await fireEvent.click(screen.getByRole('button', { name: 'Start AI assist' }));
 
     await waitFor(() => expect(onStart).toHaveBeenCalledWith('job-1'));
     const saveIndex = invoke.mock.calls.findIndex(([command]) => command === 'ai_key_save');
