@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Phase 11.A: the CLI now shares one set of helpers with the desktop app
+  (`ummp_core::app::helpers` and `::snapshots`: knowledge-base opening, snapshot store,
+  mod identity, risk decision, `NoIndex`). The CLI's own copies are gone; behaviour, flags
+  and exit codes are unchanged (checked with a real `migrate --apply` + `rollback` round trip
+  and `cli/tests/pack_cli.rs`).
+
 ### Added
+- Phase 11.A (application services, ADR 0004): `ummp_core::app` facade for the desktop UI.
+  Sync services (analyze, scan, targets, plan, settings) and jobs on worker threads with
+  events, cancel and stale-job repair: port, in-place migrate (review flag required, rollback
+  on cancel), AI assist (per-file approval over events), pack and build (risk gate).
 - Phase 10 (ADR 0013): `ummp pack inspect|migrate|export` for modpacks. Reads and
   writes Modrinth `.mrpack`, CurseForge zip, Prism/MultiMC instances and plain folders;
   analyses every JAR in parallel; dependency graph (missing, duplicate, cycle, side);

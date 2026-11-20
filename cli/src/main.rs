@@ -7,13 +7,15 @@ use ummp_core::adapter::{AdapterRegistry, Handling};
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
+use ummp_core::app::helpers::{
+    detected_loader, mod_identity, open_kb, pack_format, risk_decision, side, NoIndex, RiskDecision,
+};
+use ummp_core::app::snapshots::{default_snapshots, load_store, save_store};
 use ummp_core::build::github::GithubBackend;
 use ummp_core::build::local::{default_workdir, LocalBackend};
 use ummp_core::build::report::{score, to_markdown};
 use ummp_core::build::{BuildBackend, BuildRequest, Stage};
-use ummp_core::build_script::required_java;
 use ummp_core::bytecode::{remap_jar, ClassMap};
-use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
@@ -21,7 +23,7 @@ use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
 use ummp_core::modpack::graph::PackGraph;
 use ummp_core::modpack::plan::Side;
 use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
-use ummp_core::modpack::{import_with, ImportOptions, PackFormat};
+use ummp_core::modpack::{import_with, ImportOptions};
 use ummp_core::port::{port, PortOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::scan::{scan_path, Severity};
@@ -88,18 +90,6 @@ enum PackCmd {
     },
 }
 
-fn pack_format(s: &str) -> Result<PackFormat, Box<dyn std::error::Error>> {
-    match s {
-        "mrpack" => Ok(PackFormat::Mrpack),
-        "curseforge" => Ok(PackFormat::CurseForge),
-        "prism" => Ok(PackFormat::Prism),
-        "folder" => Ok(PackFormat::Folder),
-        other => {
-            Err(format!("unknown pack format {other:?} (mrpack, curseforge, prism, folder)").into())
-        }
-    }
-}
-
 /// Runs the pipeline and prints the short summary; returns the exit code.
 fn run_pack_migrate(
     opts: &MigrateOptions,
@@ -131,26 +121,6 @@ fn run_pack_migrate(
         println!("Wrote: {}", w.display());
     }
     Ok(out.exit_code())
-}
-
-/// Index used offline: the planner never calls it, and if it did it would find nothing.
-struct NoIndex;
-impl ummp_core::modpack::plan::ModIndex for NoIndex {
-    fn versions(
-        &self,
-        _: &str,
-        _: &str,
-        _: &ummp_core::metadata::Loader,
-    ) -> Result<Vec<ummp_core::modpack::plan::RemoteVersion>, ummp_core::modpack::PackError> {
-        Ok(Vec::new())
-    }
-    fn by_hash(
-        &self,
-        _: &str,
-    ) -> Result<Option<ummp_core::modpack::plan::RemoteVersion>, ummp_core::modpack::PackError>
-    {
-        Ok(None)
-    }
 }
 
 #[derive(Parser)]
@@ -476,45 +446,6 @@ fn ai_config(args: &AiArgs) -> Result<AiConfig, Box<dyn std::error::Error>> {
     })
 }
 
-const STORE_FILE: &str = "checkpoints.json";
-
-fn default_snapshots(project_root: &Path) -> PathBuf {
-    let name = project_root
-        .file_name()
-        .map_or_else(|| "project".into(), |n| n.to_string_lossy().into_owned());
-    project_root.with_file_name(format!("{name}.ummp-snapshots"))
-}
-
-fn load_store(dir: &Path) -> Result<CheckpointStore, Box<dyn std::error::Error>> {
-    let file = dir.join(STORE_FILE);
-    if file.exists() {
-        Ok(serde_json::from_slice(&std::fs::read(file)?)?)
-    } else {
-        Ok(CheckpointStore::new())
-    }
-}
-
-fn save_store(dir: &Path, store: &CheckpointStore) -> Result<(), Box<dyn std::error::Error>> {
-    std::fs::create_dir_all(dir)?;
-    std::fs::write(dir.join(STORE_FILE), serde_json::to_vec_pretty(store)?)?;
-    Ok(())
-}
-
-fn open_kb(
-    kb: Option<PathBuf>,
-    mappings: Option<PathBuf>,
-) -> Result<KnowledgeBase, Box<dyn std::error::Error>> {
-    Ok(match (kb, mappings) {
-        (Some(db), _) => KnowledgeBase::open(&db)?,
-        (None, Some(file)) => {
-            let mem = KnowledgeBase::open(Path::new(":memory:"))?;
-            mem.import_mappings_from_file(&file)?;
-            mem
-        }
-        (None, None) => unreachable!("clap requires --kb or --mappings"),
-    })
-}
-
 /// Local builds run mod code on this machine: High risk needs `--i-accept-risk`, Medium
 /// needs `--yes` or a y/N answer. GitHub builds run on a disposable runner and only warn.
 fn check_risk(
@@ -523,19 +454,14 @@ fn check_risk(
     accept: bool,
     yes: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !local {
-        if risk.is_some() {
+    match risk_decision(risk, local, accept, yes) {
+        RiskDecision::Allow => Ok(()),
+        RiskDecision::AllowWithWarning => {
             println!("Warning: risk indicators found; building on a disposable GitHub runner.");
+            Ok(())
         }
-        return Ok(());
-    }
-    match risk {
-        Some(Severity::High) if !accept => {
-            Err("refusing to build a High-risk mod on this machine. \
-             Build on GitHub (drop --local), or review the findings and pass --i-accept-risk"
-                .into())
-        }
-        Some(Severity::Medium) if !yes && !accept => {
+        RiskDecision::Refuse(why) => Err(why.into()),
+        RiskDecision::Confirm => {
             if !std::io::stdin().is_terminal() {
                 return Err("Medium risk: pass --yes to build on this machine".into());
             }
@@ -549,54 +475,6 @@ fn check_risk(
                 Err("build cancelled".into())
             }
         }
-        _ => Ok(()),
-    }
-}
-
-/// A folder- and branch-safe mod name, and the Java version the mod needs, if known.
-fn mod_identity(path: &Path) -> (String, Option<u32>) {
-    let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
-    let first = AnalyzerEngine::default()
-        .analyze(path, &fs)
-        .ok()
-        .and_then(|r| r.mods.into_iter().next());
-    let raw = first
-        .as_ref()
-        .map(|m| m.metadata.mod_id.clone())
-        .filter(|id| !id.is_empty())
-        .or_else(|| path.file_name().map(|n| n.to_string_lossy().into_owned()))
-        .unwrap_or_else(|| "mod".into());
-    let name: String = raw
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .take(40)
-        .collect();
-    let java = first.and_then(|m| {
-        m.detected_java
-            .map(|j| j.major)
-            .or_else(|| m.metadata.java.map(|j| j.major))
-            .or_else(|| required_java(&m.metadata.minecraft.to_string()))
-    });
-    (if name.is_empty() { "mod".into() } else { name }, java)
-}
-
-/// The loader named in the project's descriptor, lowercase (`fabric`, `neoforge`, ...).
-fn detected_loader(path: &Path) -> Option<String> {
-    let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
-    let report = AnalyzerEngine::default().analyze(path, &fs).ok()?;
-    let loader = &report.mods.first()?.metadata.loader;
-    match loader {
-        ummp_core::metadata::Loader::Forge => Some("forge".into()),
-        ummp_core::metadata::Loader::Fabric => Some("fabric".into()),
-        ummp_core::metadata::Loader::NeoForge => Some("neoforge".into()),
-        ummp_core::metadata::Loader::Quilt => Some("quilt".into()),
-        _ => None,
     }
 }
 
@@ -676,15 +554,6 @@ fn main() {
     if let Err(e) = run(Cli::parse()) {
         eprintln!("error: {e}");
         std::process::exit(1);
-    }
-}
-
-fn side(s: &str) -> Result<Side, Box<dyn std::error::Error>> {
-    match s {
-        "client" => Ok(Side::Client),
-        "server" => Ok(Side::Server),
-        "both" => Ok(Side::Both),
-        other => Err(format!("unknown side {other:?} (client, server, both)").into()),
     }
 }
 

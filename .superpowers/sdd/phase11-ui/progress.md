@@ -27,3 +27,8 @@ Task A7 (risk gate for pack and local build): complete. `core/src/app/runs.rs`: 
 - Ruling: cancelling a running build is honoured between steps only; an already running Gradle/GitHub build is not interrupted (backends have no cancel hook). Goes to KNOWN_LIMITATIONS in 11.G.
 - Mutation check (★ high_risk_input_refuses_pack_and_local_build_without_ack): (1) gate allows High local -> RED; (2) pack allow_risk forced true -> RED; (3) start_build skips the gate -> RED (first attempt did not apply because cargo fmt had reflowed the code; redone against the real text). Restored -> 28/28, stable over 3 runs. The M3 mutant started a real local build and left two scratch folders under ~/ummp-builds in the sandbox; removed them.
 - Four commands pass.
+
+Task A8 (CLI onto services): complete. `cli/src/main.rs` lost its copies of pack_format, NoIndex, default_snapshots/load_store/save_store, open_kb, mod_identity, detected_loader, side (1132 -> 1001 lines) and imports them from `ummp_core::app::{helpers,snapshots}`; `check_risk` is a thin wrapper over `risk_decision` (prompt stays in the CLI).
+- Ruling: CLI `open_kb` no longer panics on the impossible (None, None) case; core returns an empty in-memory KB (clap still requires --kb or --mappings for `migrate`). Error text for a corrupt checkpoint store is now AppError::Input's wording.
+- Evidence: four commands pass; cargo test --all green; manual real-binary round trip `migrate --apply` (tree changed, checkpoints.json written) -> `rollback` (tree identical to fixture); `cli/tests/pack_cli.rs` 5/5 unchanged.
+- 11.A COMPLETE (A1-A8). Next: 11.B (Tauri 2 scaffold). Before it: read Tauri 2 docs, load frontend-design + ui-ux-pro-max skills.
