@@ -304,7 +304,7 @@ impl BuildBackend for GithubBackend {
             ],
             &dir,
         )?;
-        tool(
+        tool_with_token(
             &self.git,
             &[
                 "-c",
@@ -318,6 +318,7 @@ impl BuildBackend for GithubBackend {
                 &refspec,
             ],
             &dir,
+            self.token.as_ref(),
         )?;
 
         let stage_count = u32::try_from(req.stages.len()).unwrap_or(u32::MAX);
@@ -339,6 +340,7 @@ impl BuildBackend for GithubBackend {
                 &art_s,
             ],
             &dir,
+            self.token.as_ref(),
         );
         let json = match downloaded {
             Ok(_) => std::fs::read_to_string(art.join("stages.json")).ok(),
