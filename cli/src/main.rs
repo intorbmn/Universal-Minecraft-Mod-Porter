@@ -5,14 +5,16 @@ mod config;
 mod exit;
 mod output;
 
-use args::{AiArgs, BuildArgs, Cli, Commands, PackCmd};
+use args::{AiArgs, AiKeyCmd, BuildArgs, Cli, Commands, PackCmd};
 use config::CliConfig;
 use exit::{CliFailure, ExitCode};
 use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
 use ummp_core::adapter::{AdapterRegistry, Handling};
+use ummp_core::app::credentials::{default_data_dir, resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore};
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
@@ -125,20 +127,10 @@ fn provider(
     args: &AiArgs,
     config: &CliConfig,
 ) -> Result<Box<dyn AiProvider>, Box<dyn std::error::Error>> {
-    let provider = config.provider(args.provider.clone());
-    Ok(match provider.as_str() {
-        "anthropic" => Box::new(AnthropicProvider::from_env()?),
-        "openai" => {
-            let url = config
-                .openai_base_url(args.base_url.clone())
-                .ok_or_else(|| {
-                    CliFailure::new(
-                        ExitCode::InvalidInput,
-                        "OpenAI needs --base-url or openai_base_url in ummp.toml",
-                    )
-                })?;
-            Box::new(OpenAiCompatibleProvider::new(&url))
-        }
+    let name = config.provider(args.provider.clone());
+    let kind = match name.as_str() {
+        "anthropic" => AiProviderKind::Anthropic,
+        "openai" => AiProviderKind::Openai,
         other => {
             return Err(CliFailure::new(
                 ExitCode::InvalidInput,
@@ -146,7 +138,29 @@ fn provider(
             )
             .into());
         }
-    })
+    };
+    let data_dir = default_data_dir()?;
+    let key = resolve_ai_key(&data_dir, kind)?.ok_or_else(|| {
+        CliFailure::new(
+            ExitCode::Refused,
+            format!("No {name} API key is saved. Run `ummp ai-key set --provider {name}` or enter it in the desktop AI screen."),
+        )
+    })?;
+    if kind == AiProviderKind::Anthropic {
+        return Ok(Box::new(AnthropicProvider::with_api_key(
+            key.expose().to_owned(),
+            "https://api.anthropic.com",
+        )));
+    }
+    let store = FileKeyStore::in_dir(&data_dir);
+    let url = config
+        .openai_base_url(args.base_url.clone())
+        .or(store.openai_base_url()?)
+        .unwrap_or_else(|| "https://api.openai.com/v1".into());
+    Ok(Box::new(OpenAiCompatibleProvider::with_api_key(
+        url,
+        key.expose().to_owned(),
+    )))
 }
 
 fn open_configured_kb(
@@ -506,6 +520,136 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
     }
 }
 
+fn parse_ai_provider(value: &str) -> Result<AiProviderKind, CliFailure> {
+    match value {
+        "anthropic" => Ok(AiProviderKind::Anthropic),
+        "openai" => Ok(AiProviderKind::Openai),
+        _ => Err(CliFailure::new(ExitCode::InvalidInput, "provider must be anthropic or openai")),
+    }
+}
+
+fn read_api_key() -> Result<String, Box<dyn std::error::Error>> {
+    if !std::io::stdin().is_terminal() {
+        let mut value = String::new();
+        std::io::stdin().lock().read_line(&mut value)?;
+        return Ok(value.trim().to_owned());
+    }
+
+    eprint!("API key (input hidden): ");
+    std::io::stderr().flush()?;
+    #[cfg(unix)]
+    {
+        let status = Command::new("stty").arg("-echo").status()?;
+        if !status.success() {
+            return Err("could not disable terminal echo".into());
+        }
+        let mut value = String::new();
+        let read = std::io::stdin().lock().read_line(&mut value);
+        let restore = Command::new("stty").arg("echo").status();
+        eprintln!();
+        read?;
+        if !restore?.success() {
+            return Err("could not restore terminal echo".into());
+        }
+        Ok(value.trim().to_owned())
+    }
+    #[cfg(windows)]
+    {
+        let script = "$s=Read-Host 'API key' -AsSecureString; $p=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try {[Runtime.InteropServices.Marshal]::PtrToStringBSTR($p)} finally {[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($p)}";
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-Command", script])
+            .output()?;
+        if !output.status.success() {
+            return Err("could not read the API key securely".into());
+        }
+        Ok(String::from_utf8(output.stdout)?.trim().to_owned())
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        Err("hidden terminal input is not supported on this platform; pipe the key through stdin".into())
+    }
+}
+
+fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = default_data_dir()?;
+    let store = FileKeyStore::in_dir(&data_dir);
+    match cmd {
+        AiKeyCmd::Set { provider, base_url } => {
+            let kind = parse_ai_provider(&provider)?;
+            let key = read_api_key()?;
+            let warning = store.set(kind, &ummp_core::app::Secret::new(key))?;
+            if kind == AiProviderKind::Openai {
+                store.set_openai_base_url(base_url.as_deref())?;
+            }
+            let result = serde_json::json!({
+                "provider": provider,
+                "saved": true,
+                "masked": store.masked(kind)?,
+                "warning": warning,
+            });
+            if json_mode {
+                output::set_result(result);
+            } else {
+                println!("Saved {} API key: {}", provider, result["masked"].as_str().unwrap_or("saved"));
+                if let Some(warning) = warning {
+                    eprintln!("Warning: {warning}");
+                }
+            }
+        }
+        AiKeyCmd::Status { provider } => {
+            let providers = provider.map_or_else(
+                || vec![("anthropic", AiProviderKind::Anthropic), ("openai", AiProviderKind::Openai)],
+                |name| match parse_ai_provider(&name) {
+                    Ok(kind) => vec![(if kind == AiProviderKind::Anthropic { "anthropic" } else { "openai" }, kind)],
+                    Err(error) => vec![("", { let _ = error; AiProviderKind::Anthropic })],
+                },
+            );
+            if providers.iter().any(|(name, _)| name.is_empty()) {
+                return Err(CliFailure::new(ExitCode::InvalidInput, "provider must be anthropic or openai").into());
+            }
+            let entries = providers.into_iter().map(|(name, kind)| {
+                serde_json::json!({
+                    "provider": name,
+                    "saved": store.get(kind)?.is_some(),
+                    "masked": store.masked(kind)?,
+                })
+            }).collect::<Result<Vec<_>, ummp_core::app::AppError>>()?;
+            let result = serde_json::json!({
+                "path": data_dir.join("credentials.json"),
+                "providers": entries,
+            });
+            if json_mode {
+                output::set_result(result);
+            } else {
+                println!("Credentials: {}", result["path"].as_str().unwrap_or_default());
+                for entry in result["providers"].as_array().into_iter().flatten() {
+                    println!("{}: {}", entry["provider"].as_str().unwrap_or_default(),
+                        entry["masked"].as_str().unwrap_or("not saved"));
+                }
+            }
+        }
+        AiKeyCmd::Delete { provider } => {
+            let providers = provider.map_or_else(
+                || vec![AiProviderKind::Anthropic, AiProviderKind::Openai],
+                |name| vec![parse_ai_provider(&name).unwrap_or(AiProviderKind::Anthropic)],
+            );
+            for kind in providers {
+                store.delete(kind)?;
+                if kind == AiProviderKind::Openai {
+                    store.set_openai_base_url(None)?;
+                }
+            }
+            let result = serde_json::json!({ "deleted": true });
+            if json_mode {
+                output::set_result(result);
+            } else {
+                println!("Deleted selected AI credential(s).");
+            }
+        }
+    }
+    Ok(())
+}
+
 fn map_app_error(error: &ummp_core::app::AppError) -> CliFailure {
     let code = match &error {
         ummp_core::app::AppError::Input(_) => ExitCode::InvalidInput,
@@ -531,6 +675,7 @@ fn app_services(
 
 const fn command_name(command: &Commands) -> &'static str {
     match command {
+        Commands::AiKey { .. } => "ai-key",
         Commands::Completions { .. } => "completions",
         Commands::Analyze { .. } => "analyze",
         Commands::Migrate { .. } => "migrate",
@@ -552,7 +697,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         config: config_path,
         command,
     } = cli;
-    let config = if matches!(&command, Commands::Completions { .. }) {
+    let config = if matches!(&command, Commands::Completions { .. } | Commands::AiKey { .. }) {
         CliConfig::default()
     } else {
         config_path
@@ -571,6 +716,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     let mut exit_code = ExitCode::Ok.value();
 
     match command {
+        Commands::AiKey { cmd } => run_ai_key(cmd, json_mode)?,
         Commands::Completions { shell } => {
             if json_mode {
                 return Err(CliFailure::new(
