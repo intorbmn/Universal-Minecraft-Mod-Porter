@@ -71,11 +71,13 @@ async fn plan(svc: Svc<'_>, request: PlanRequest) -> Result<PlanView, UiError> {
     blocking(&svc, move |s| commands::plan(s, &request)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn start_port(svc: Svc<'_>, request: PortRequest) -> Result<Uuid, UiError> {
     commands::start_port(&svc, request)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn start_migrate_in_place(
     svc: Svc<'_>,
@@ -90,6 +92,7 @@ async fn job(svc: Svc<'_>, id: Uuid) -> Result<JobView, UiError> {
     blocking(&svc, move |s| commands::job(s, id)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn cancel(svc: Svc<'_>, id: Uuid) -> Result<(), UiError> {
     commands::cancel(&svc, id)
