@@ -101,16 +101,12 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
 
 
 test('modpack report paginates 300 rows and records first-page render time', async ({ page }) => {
-  const items = Array.from({ length: 300 }, (_, i) => ({
-    path: `mods/mod-${i}.jar`,
-    mod_id: `mod-${i}`,
-    action: { action: 'keep' },
-    reason: 'already compatible',
-  }));
+  const packGolden = golden('pack-report-300');
+  const items = packGolden.items;
   const job = {
     id: 'job-pack', session: 'session-pack', step: 'done', state: 'Succeeded',
     progress: { done: 3, total: 3 }, log: [], error: null,
-    result: { output: '/tmp/pack-out', written: [], manual: 0, items, exit_code: 0 },
+    result: { output: packGolden.output, written: [], manual: 0, items, exit_code: 0 },
   };
   await page.addInitScript(({ completedJob }) => {
     (window as any).__testOpenOutput = false;
