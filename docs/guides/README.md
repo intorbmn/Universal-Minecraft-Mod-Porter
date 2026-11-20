@@ -51,14 +51,56 @@ which java javac gradle gh      # Java 21, Gradle 8.x, GitHub CLI are used by te
 - Tests that need `javac`/`gradle` skip themselves with a message when the tool is missing;
   CI has Java. Do not mark a phase COMPLETED on skipped tests: check the output.
 
+## 2a. Skill check (every phase, before design)
+
+The user installs plugins on their account. A new agent may run in a session that lacks
+some of them. At the start of every phase:
+1. Compare the session's available skills (the system message list and the Skill tool
+   list) with the table below. Use full `plugin:skill` names, and do not count look-alikes.
+2. If a **required** skill is missing, **stop and ask the user to install it** before
+   designing. Use the message template in `phase-11-ui.md` §0.2: it lists each plugin,
+   its skill, and what it is used for. Offer two options: install, or continue by hand.
+3. A skill installed during a session may only appear in a new session. Ask the user to
+   restart or reload plugins, then check again.
+4. Record the skills used, and any applied by hand, in the phase file.
+
+Plugins and the skills each phase needs (R = required, r = recommended):
+
+| Plugin | Skills | 10 | 11 | 12 | 13 | 14 |
+|---|---|---|---|---|---|---|
+| superpowers | brainstorming, writing-plans, executing-plans, test-driven-development, systematic-debugging, verification-before-completion | R | R | R | R | R |
+| andrej-karpathy-skills | karpathy-guidelines | R | R | R | R | R |
+| rust-cli-skills | rust-errors, rust-idiomatic, rust-testing | R | R | R | R | R |
+| rust-cli-skills | rust-concurrency | R | R | R | r | – |
+| rust-cli-skills | rust-performance | R | – | – | R | – |
+| rust-cli-skills | rust-filesystem | R | r | r | R | – |
+| rust-cli-skills | rust-design | – | R | R | – | r |
+| rust-cli-skills | rust-cli-interface | – | – | R | – | – |
+| rust-cli-skills | rust-memory, rust-distribution | – | – | – | R | – |
+| ecc | architecture-decision-records, rust-review | R | R | R | R | R |
+| ecc | rust-build | r | r | r | r | r |
+| ecc | mcp-server-patterns, api-design | – | – | R | – | r |
+| frontend-design | frontend-design | – | R | – | – | – |
+| ui-ux-pro-max | ui-ux-pro-max | – | R | – | – | – |
+| example-skills | webapp-testing | – | R | – | – | – |
+| example-skills | mcp-builder | – | – | R | – | – |
+| example-skills | doc-coauthoring | – | – | – | r | R |
+| claude-security | claude-security (full scan agent) | – | – | R | R | – |
+| pr-review-toolkit | review-pr | r | r | r | r | R |
+| commit-commands | commit-push-pr | r | r | r | r | r |
+
+Phase-specific details, such as what each skill is used for and which tools are optional,
+are in each phase guide. `phase-11-ui.md` §0.1 is the most complete example.
+
 ## 3. The workflow for one phase (follow it exactly)
 
 1. **Start**
    - `git checkout -b phase-NN-<topic>` from an up-to-date `master`.
    - Read `docs/PROJECT_STATUS.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/BACKLOG.md`, the
      phase guide, and the ADRs it names.
-   - Load the skills for the phase (CLAUDE.md table). If a skill is unavailable, say so in
-     one line and apply its practice by hand. Write in the phase file which ones you used.
+   - Run the skill check (§2a). Missing required skills: ask the user to install them,
+     and wait for the answer. Then load the skills for the phase as each step needs them,
+     and write in the phase file which ones you used.
 2. **Design** (`superpowers:brainstorming`)
    - Ask the guide's questions. Lay out 2–3 approaches with your pick.
    - Write `docs/superpowers/specs/YYYY-MM-DD-phaseNN-<topic>-design.md`, using the guide as

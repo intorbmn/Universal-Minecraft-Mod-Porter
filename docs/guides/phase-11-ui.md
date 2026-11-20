@@ -38,18 +38,74 @@ This guide lets an agent that has never seen this repository build Phase 11 alon
    - `core/src/ai/mod.rs`: `ApprovalGate`
    - `core/src/jobs.rs`, `core/src/persistence.rs`, `core/src/events.rs`,
      `core/src/session.rs`, `core/src/checkpoint.rs`
-4. Load the skills from the CLAUDE.md table. If one is missing, say so in one line and
-   apply its practice by hand. Record in the phase file which ones you used.
-   - **Design:** `superpowers:brainstorming`, `superpowers:writing-plans`,
-     `andrej-karpathy-skills:karpathy-guidelines`, `frontend-design:frontend-design`,
-     `ui-ux-pro-max:ui-ux-pro-max`.
-   - **Build:** `superpowers:executing-plans`, `superpowers:test-driven-development`,
-     `rust-cli-skills:rust-errors`, `rust-idiomatic`, `rust-testing`, `rust-design`,
-     `rust-concurrency`, `example-skills:webapp-testing` (Playwright).
-   - **Finish:** `superpowers:verification-before-completion`, `ecc:rust-review`,
-     `pr-review-toolkit:review-pr`, `ecc:architecture-decision-records`.
+4. **Skill check, before any design work.** Follow §0.1. If a **required** skill is
+   missing, stop and ask the user to install it, using the §0.2 message. Wait for the
+   answer. Load every available skill with the Skill tool when its step comes. Record
+   which ones you used in the phase file.
 5. Ask the user the §3 questions (one message, with defaults). Then write the design doc
    (§10, step D1).
+
+### 0.1 Skills this phase needs
+
+How to check:
+- The session lists the available skills, in the system message and in the Skill tool's
+  list. Compare it with the table below, by the full `plugin:skill` name.
+- Do not guess from memory, and do not count a skill as present because a similar one
+  exists. For example, `ecc:tdd-workflow` does **not** replace
+  `superpowers:test-driven-development`; CLAUDE.md names the one to use.
+
+| Skill (`plugin:skill`) | Plugin to install | Used for | Need |
+|---|---|---|---|
+| `superpowers:brainstorming` | superpowers | design talk + design doc (D1, D2) | **required** |
+| `superpowers:writing-plans` | superpowers | the implementation plan (P1) | **required** |
+| `superpowers:executing-plans` | superpowers | Native execution with a ledger (B1–B6) | **required** |
+| `superpowers:test-driven-development` | superpowers | every task, RED → GREEN | **required** |
+| `superpowers:systematic-debugging` | superpowers | any failing test or build | **required** |
+| `superpowers:verification-before-completion` | superpowers | before claiming done, before the PR | **required** |
+| `andrej-karpathy-skills:karpathy-guidelines` | andrej-karpathy-skills | keeping the design small (master prompt §12) | **required** |
+| `frontend-design:frontend-design` | frontend-design | the 3 visual directions, screen design | **required** |
+| `ui-ux-pro-max:ui-ux-pro-max` | ui-ux-pro-max | styles, palettes, UX and accessibility rules, Svelte guidance | **required** |
+| `rust-cli-skills:rust-errors` | rust-cli-skills | `AppError`, mapping to `UiError` | **required** |
+| `rust-cli-skills:rust-idiomatic` | rust-cli-skills | facade code style | **required** |
+| `rust-cli-skills:rust-testing` | rust-cli-skills | `core/tests/app.rs`, the desktop crate tests | **required** |
+| `rust-cli-skills:rust-design` | rust-cli-skills | the `AppServices` API, traits for secrets and gates | **required** |
+| `rust-cli-skills:rust-concurrency` | rust-cli-skills | worker threads, cancel tokens, approval channel | **required** |
+| `example-skills:webapp-testing` | example-skills | Playwright E2E for the web view | **required** |
+| `ecc:architecture-decision-records` | ecc | ADR 0014 | **required** |
+| `ecc:rust-review` | ecc | the Rust review before the PR | **required** |
+| `pr-review-toolkit:review-pr` | pr-review-toolkit | the whole-PR review before the report | recommended |
+| `commit-commands:commit-push-pr` | commit-commands | commit/push flow (the PR itself is opened with REST, README §5) | recommended |
+| `ecc:rust-build` | ecc | compiler and borrow-checker errors | recommended |
+| `rust-cli-skills:rust-filesystem` | rust-cli-skills | moving the snapshot helpers, settings file writes | recommended |
+| Playwright MCP tools (`browser_*`) | Playwright (Microsoft) MCP plugin | looking at the dev build by hand while designing | optional |
+
+Rules:
+- **Missing required skill:** stop and ask (§0.2). Do not start D1 until the user answers.
+- **The user says "không cài, cứ làm"** (do not install, just continue): continue, apply
+  that skill's practice by hand, and write in the phase file "skill X not available;
+  practice applied by hand: …".
+- **Missing recommended or optional skill:** do not stop. Mention it once in the first
+  message and do the work by hand.
+- **After the user installs something:** a running session may not see new skills. Ask
+  the user to start a new session (or reload plugins) if the skill still does not appear.
+  Then re-check.
+
+### 0.2 Message to send when skills are missing (Vietnamese; fill in the lists)
+```
+Trước khi bắt đầu Phase 11, mình kiểm tra skill thì thấy thiếu:
+
+Bắt buộc (cần cài trước khi làm):
+- <plugin> — skill <plugin:skill>: dùng để <việc>
+- ...
+
+Nên có (không có vẫn làm được, mình sẽ làm tay theo cùng quy trình):
+- <plugin> — skill <plugin:skill>: dùng để <việc>
+
+Cách cài: bật plugin trên trang plugin của claude.ai, hoặc trong Claude Code gõ /plugin rồi
+cài theo tên plugin ở trên. Cài xong bạn mở phiên mới (hoặc reload plugin) để mình thấy skill.
+
+Bạn muốn: (1) cài rồi báo mình, hay (2) không cài, mình làm tay và ghi chú vào phase file?
+```
 
 ---
 
