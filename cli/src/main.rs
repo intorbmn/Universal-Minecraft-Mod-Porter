@@ -160,7 +160,7 @@ fn provider(
         .or(store.openai_base_url()?)
         .unwrap_or_else(|| "https://api.openai.com/v1".into());
     Ok(Box::new(OpenAiCompatibleProvider::with_api_key(
-        url,
+        &url,
         key.expose().to_owned(),
     )))
 }
@@ -618,13 +618,18 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
                     vec![(if kind == AiProviderKind::Anthropic { "anthropic" } else { "openai" }, kind)]
                 }
             };
-            let entries = providers.into_iter().map(|(name, kind)| {
-                serde_json::json!({
-                    "provider": name,
-                    "saved": store.get(kind)?.is_some(),
-                    "masked": store.masked(kind)?,
+            let entries = providers
+                .into_iter()
+                .map(|(name, kind)| {
+                    let saved = store.get(kind)?.is_some();
+                    let masked = store.masked(kind)?;
+                    Ok(serde_json::json!({
+                        "provider": name,
+                        "saved": saved,
+                        "masked": masked,
+                    }))
                 })
-            }).collect::<Result<Vec<_>, ummp_core::app::AppError>>()?;
+                .collect::<Result<Vec<_>, ummp_core::app::AppError>>()?;
             let result = serde_json::json!({
                 "path": data_dir.join("credentials.json"),
                 "providers": entries,
