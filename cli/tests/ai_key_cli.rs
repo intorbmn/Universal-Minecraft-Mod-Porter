@@ -3,7 +3,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-fn binary() -> &'static str {
+const fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_ummp")
 }
 
