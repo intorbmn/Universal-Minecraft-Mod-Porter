@@ -903,6 +903,18 @@ fn fabric_jar(id: &str) -> Vec<u8> {
 }
 
 /// A jar with a webhook URL in a resource: the scanner rates it High.
+#[test]
+fn analyze_standalone_jar_returns_descriptor_metadata_without_source_files() {
+    let d = tempdir().unwrap();
+    let jar = d.path().join("demo.jar");
+    std::fs::write(&jar, fabric_jar("demo")).unwrap();
+    let view = services(d.path()).analyze(&jar).unwrap();
+    assert_eq!(view.kind, "jar");
+    assert_eq!(view.mods.len(), 1);
+    assert_eq!(view.mods[0].id, "demo");
+    assert_eq!(view.mods[0].loader, "fabric");
+}
+
 fn evil_jar() -> Vec<u8> {
     zip_bytes(&[
         (
