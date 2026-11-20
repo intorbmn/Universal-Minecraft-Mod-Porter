@@ -414,7 +414,7 @@ fn open_configured_kb(
     config: &CliConfig,
 ) -> Result<KnowledgeBase, Box<dyn std::error::Error>> {
     if kb.is_none() && mappings.is_none() {
-        Ok(open_kb(config.kb.clone(), None)?)
+        Ok(open_kb(config.kb_path(None), None)?)
     } else {
         Ok(open_kb(kb, mappings)?)
     }
@@ -721,7 +721,11 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     let config = if matches!(&command, Commands::Completions { .. }) {
         CliConfig::default()
     } else {
-        CliConfig::load_with_path(config_path.as_deref()).map_err(|error| {
+        match config_path.as_deref() {
+            Some(path) => CliConfig::load_with_path(Some(path)),
+            None => CliConfig::load(),
+        }
+        .map_err(|error| {
             CliFailure::new(ExitCode::InvalidInput, format!("invalid configuration: {error}"))
         })?
     };
