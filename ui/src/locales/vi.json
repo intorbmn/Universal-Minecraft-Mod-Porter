@@ -165,5 +165,6 @@
   "plan.skipped": "Mapping bị bỏ qua",
   "handling.auto": "Tự động",
   "handling.assisted": "Có hỗ trợ",
-  "handling.manual": "Thủ công"
+  "handling.manual": "Thủ công",
+  "home.pickFile": "Chọn JAR / ZIP source"
 }
