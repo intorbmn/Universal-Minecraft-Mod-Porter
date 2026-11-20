@@ -720,7 +720,10 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
             let report = AnalyzerEngine::default().analyze(&project.root, &fs)?;
             if json {
-                println!("{}", report.to_json()?);
+                let result: serde_json::Value = serde_json::from_str(&report.to_json()?)?;
+                println!("{}", serde_json::to_string(&serde_json::json!({
+                    "schema": 1, "command": "analyze", "result": result
+                }))?);
             } else {
                 print!("{}", report.to_text());
             }
@@ -900,7 +903,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             let mut store = load_store(&snap_dir)?;
             let engine = MigrationEngine::default();
             let cfg = ai_config(&ai)?;
-            let provider = provider(&ai)?;
+            let provider = provider(&ai, &config)?;
             let mut gate = gate(&ai);
             let mut orch = Orchestrator::new(
                 provider.as_ref(),
@@ -927,7 +930,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         Commands::Scan { path, json } => {
             let report = scan_path(&path)?;
             if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
+                println!("{}", serde_json::to_string(&serde_json::json!({
+                    "schema": 1, "command": "scan", "result": report
+                }))?);
             } else {
                 print!("{}", report.to_text());
             }
