@@ -1,4 +1,10 @@
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
+mod config;
+mod exit;
+
+use config::CliConfig;
+use exit::ExitCode;
 use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -132,13 +138,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Generate shell completions.
+    Completions { shell: Shell },
     /// Detect loader, Minecraft/Java versions, dependencies and build system.
     Analyze {
         /// Project root path (source tree or a folder of JARs).
         path: PathBuf,
-        /// Print the machine-readable JSON report instead of text.
-        #[arg(long)]
-        json: bool,
     },
     /// Plan and run a source migration. Dry run unless `--apply` is given.
     #[command(group(ArgGroup::new("knowledge").required(true).args(["kb", "mappings"])))]
@@ -240,8 +245,6 @@ enum Commands {
     Scan {
         /// Project folder or JAR file.
         path: PathBuf,
-        #[arg(long)]
-        json: bool,
     },
     /// Build, test and start a dedicated server; on GitHub Actions unless `--local`.
     Build {
@@ -341,8 +344,8 @@ struct BuildArgs {
 #[derive(clap::Args)]
 struct AiArgs {
     /// `anthropic` (ANTHROPIC_API_KEY) or `openai` (OpenAI-compatible, e.g. Ollama).
-    #[arg(long, default_value = "anthropic")]
-    provider: String,
+    #[arg(long)]
+    provider: Option<String>,
     /// Base URL for `--provider openai`, e.g. http://localhost:11434/v1.
     #[arg(long)]
     base_url: Option<String>,
@@ -383,8 +386,9 @@ impl ApprovalGate for PromptGate {
     }
 }
 
-fn provider(args: &AiArgs) -> Result<Box<dyn AiProvider>, Box<dyn std::error::Error>> {
-    Ok(match args.provider.as_str() {
+fn provider(args: &AiArgs, config: &CliConfig) -> Result<Box<dyn AiProvider>, Box<dyn std::error::Error>> {
+    let provider = config.provider(args.provider.clone());
+    Ok(match provider.as_str() {
         "anthropic" => Box::new(AnthropicProvider::from_env()?),
         "openai" => {
             let url = args
@@ -479,7 +483,7 @@ fn check_risk(
 }
 
 /// Runs `ummp build`; `Ok(true)` when every stage that ran passed.
-fn run_build(path: &Path, a: BuildArgs) -> Result<bool, Box<dyn std::error::Error>> {
+fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<dyn std::error::Error>> {
     let BuildArgs {
         local,
         repo,
@@ -526,8 +530,8 @@ fn run_build(path: &Path, a: BuildArgs) -> Result<bool, Box<dyn std::error::Erro
         }
         .run(&req)?
     } else {
-        let repo = repo
-            .or_else(|| std::env::var("UMMP_BUILD_REPO").ok())
+        let repo = config
+            .sandbox_repo(repo)
             .unwrap_or_else(|| "intorbmn/ummp-build-sandbox".into());
         println!("Building on GitHub Actions in {repo} (this takes a few minutes)...");
         GithubBackend {
@@ -552,13 +556,29 @@ fn run_build(path: &Path, a: BuildArgs) -> Result<bool, Box<dyn std::error::Erro
 
 fn main() {
     tracing_subscriber::fmt::init();
-    if let Err(e) = run(Cli::parse()) {
-        eprintln!("error: {e}");
-        std::process::exit(1);
-    }
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => {
+            let code = if matches!(error.kind(), clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion) {
+                ExitCode::Ok.value()
+            } else {
+                ExitCode::InvalidInput.value()
+            };
+            let _ = error.print();
+            std::process::exit(code);
+        }
+    };
+    let code = match run(cli) {
+        Ok(code) => code,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::Error.value()
+        }
+    };
+    std::process::exit(code);
 }
 
-fn run_pack(cmd: PackCmd) -> Result<i32, Box<dyn std::error::Error>> {
+fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error::Error>> {
     match cmd {
         PackCmd::Inspect {
             pack,
@@ -634,7 +654,7 @@ fn run_pack(cmd: PackCmd) -> Result<i32, Box<dyn std::error::Error>> {
                     online,
                     sources,
                     side: side(&s)?,
-                    output,
+                    output: config.output_dir(output),
                     allow_risk,
                     loader_version,
                     formats,
@@ -667,7 +687,7 @@ fn run_pack(cmd: PackCmd) -> Result<i32, Box<dyn std::error::Error>> {
                     online: false,
                     sources: None,
                     side: Side::Both,
-                    output,
+                    output: config.output_dir(output),
                     allow_risk: false,
                     loader_version: None,
                     formats: vec![pack_format(&to_format)?],
@@ -680,11 +700,17 @@ fn run_pack(cmd: PackCmd) -> Result<i32, Box<dyn std::error::Error>> {
     }
 }
 
-fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
+    let config = CliConfig::load()?;
     let pm = DefaultProjectManager;
+    let mut exit_code = ExitCode::Ok.value();
 
     match cli.command {
-        Commands::Analyze { path, json } => {
+        Commands::Completions { shell } => {
+            let mut command = Cli::command();
+            generate(shell, &mut command, "ummp", &mut std::io::stdout());
+        }
+        Commands::Analyze { path } => {
             let project = pm.open(&path)?;
             let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
             let report = AnalyzerEngine::default().analyze(&project.root, &fs)?;
@@ -826,7 +852,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
             let analysis = AnalyzerEngine::default().analyze(&project.root, &fs)?;
             let cfg = ai_config(&ai)?;
-            let provider = provider(&ai)?;
+            let provider = provider(&ai, &config)?;
             let mut gate = gate(&ai);
             let mut orch = Orchestrator::new(
                 provider.as_ref(),
@@ -893,7 +919,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             print_ai_report(&report, &cfg);
         }
 
-        Commands::Scan { path, json } => {
+        Commands::Scan { path } => {
             let report = scan_path(&path)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
@@ -901,13 +927,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 print!("{}", report.to_text());
             }
             if report.risk() == Some(Severity::High) {
-                std::process::exit(2);
+                exit_code = ExitCode::Refused.value();
             }
         }
 
         Commands::Build { path, opts } => {
-            if !run_build(&path, opts)? {
-                std::process::exit(1);
+            if !run_build(&path, opts, &config)? {
+                exit_code = ExitCode::BuildFailed.value();
             }
         }
 
@@ -924,6 +950,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             build,
             build_opts,
         } => {
+            let output = config.output_dir(output);
             let kb = if kb.is_none() && mappings.is_none() {
                 println!("No knowledge base given: structural migration only (descriptors, build files, loader conversion).");
                 KnowledgeBase::open(Path::new(":memory:"))?
@@ -957,16 +984,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 count(Handling::Manual)
             );
             println!("Report: {}", result.output.join("UMMP_REPORT.md").display());
-            if build && !run_build(&result.output, build_opts)? {
-                std::process::exit(1);
+            if build && !run_build(&result.output, build_opts, &config)? {
+                exit_code = ExitCode::BuildFailed.value();
             }
         }
 
         Commands::Pack { cmd } => {
-            let code = run_pack(cmd)?;
-            if code != 0 {
-                std::process::exit(code);
-            }
+            exit_code = run_pack(cmd, &config)?;
         }
 
         Commands::Adapters => {
@@ -998,5 +1022,5 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    Ok(())
+    Ok(exit_code)
 }
