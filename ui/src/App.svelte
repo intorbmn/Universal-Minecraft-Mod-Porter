@@ -62,7 +62,7 @@
             to: next.to,
             from: next.from,
             loader: next.loader,
-            zip: false,
+            zip: next.input.toLowerCase().endsWith('.zip'),
             min_confidence: next.min_confidence,
           })
         : await api.startMigrateInPlace(next, reviewed);
