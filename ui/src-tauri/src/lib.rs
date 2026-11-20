@@ -124,11 +124,7 @@ fn decide(svc: Svc<'_>, approval: Uuid, approve: bool) -> Result<(), UiError> {
 }
 
 #[tauri::command]
-async fn rollback(
-    svc: Svc<'_>,
-    project: PathBuf,
-    checkpoint: Option<Uuid>,
-) -> Result<(), UiError> {
+async fn rollback(svc: Svc<'_>, project: PathBuf, checkpoint: Option<Uuid>) -> Result<(), UiError> {
     blocking(&svc, move |s| commands::rollback(s, &project, checkpoint)).await
 }
 
