@@ -23,6 +23,7 @@ Phases 0-10 complete; Phase 11 (desktop UI) is implemented on `phase-11-ui`; aut
 | [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) | Testing strategy |
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
+| [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [phase-11-ui.md](docs/phase/phase-11-ui.md) | Phase 11 implementation and verification record |
 | [ui/README.md](ui/README.md) | Desktop app setup and developer workflow |
 | [guides/](docs/guides/README.md) | Step-by-step guides for the remaining phases (10–14) |
@@ -96,9 +97,10 @@ ummp pack migrate path/to/pack.mrpack --to 1.21.1 --loader neoforge [--online] [
 ummp pack export path/to/instance --to-format mrpack
 # exit codes: 0 done, 2 refused (High-risk JAR; review it, then --allow-risk), 3 done, mods left to you
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
+ummp completions bash # also: zsh, fish, powershell
 # local model: --provider openai --base-url http://localhost:11434/v1 ; settings: --ai-config ai.json
 ```
-`--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
+`ummp.toml` can set `output_dir`, `sandbox_repo` and `provider`; CLI flags override `UMMP_*` environment values and config. See [docs/CLI.md](docs/CLI.md).\n\n`--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
 (the knowledge-base export format); `--kb` takes a knowledge-base SQLite file instead.
 Checkpoints go to `<project>.ummp-snapshots/` next to the project unless `--snapshots` is set.
 
