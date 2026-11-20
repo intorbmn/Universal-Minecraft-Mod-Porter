@@ -167,7 +167,9 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
     const callbacks = new Map<number, (event: unknown) => void>();
     let nextCallback = 1;
     let finished = false;
+    let aiStarts = 0;
     const decisions: boolean[] = [];
+    (window as any).__testAiStarts = () => aiStarts;
     (window as any).__testDecisions = decisions;
     (window as any).__testEmit = (event: unknown) => {
       for (const callback of callbacks.values()) callback({ payload: event });
@@ -197,7 +199,7 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
           source_loader: 'fabric', target_loader: 'neoforge',
           files: [], moves: [], deletes: [], technologies: [], skipped: [], warnings: [], files_scanned: 2,
         };
-        if (cmd === 'start_ai_assist') return 'job-ai';
+        if (cmd === 'start_ai_assist') { aiStarts += 1; return 'job-ai'; }
         if (cmd === 'job') return finished ? {
           id: 'job-ai', session: 'session-ai', step: 'done', state: 'Succeeded',
           progress: { done: 4, total: 4 }, log: [], error: null,
@@ -232,6 +234,7 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
   await page.getByRole('button', { name: 'Preview changes' }).click();
   await page.getByRole('button', { name: 'AI assist' }).click();
   await page.getByRole('button', { name: 'Start AI assist' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__testAiStarts)).toBe(1);
   await expect(page.getByRole('heading', { name: 'Migration progress' })).toBeVisible();
   await page.waitForFunction(() => (window as any).__testCallbackCount() > 0);
 
