@@ -45,7 +45,7 @@
   "report.rollback": "Hoàn tác thay đổi tại chỗ",
   "report.rolledBack": "Đã hoàn tác",
   "build.title": "Build",
-  "build.comingSoon": "Cấu hình build sẽ được bổ sung ở milestone tiếp theo."
+  "build.comingSoon": "Cấu hình build sẽ được bổ sung ở milestone tiếp theo.",
   "home.title": "Bắt đầu chuyển đổi",
   "home.pick": "Chọn mod (.jar hoặc thư mục)",
   "home.pickFolder": "Chọn thư mục",
@@ -149,5 +149,6 @@
   "pack.reason": "Lý do",
   "pack.path": "Đường dẫn nguồn",
   "pack.previous": "Trước",
-  "pack.next": "Tiếp"
+  "pack.next": "Tiếp",
+  "analysis.jarOnly": "Có thể quét JAR độc lập, nhưng để port hoặc build cần thư mục source hoặc tệp ZIP chứa source."
 }
