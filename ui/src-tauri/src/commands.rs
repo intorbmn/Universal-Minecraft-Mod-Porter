@@ -9,7 +9,7 @@ use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
-use ummp_core::app::credentials::{resolve_ai_key_from_store, AiKeyStore, AiProviderKind, CREDENTIALS_FILE};
+use ummp_core::app::credentials::{resolve_ai_key_from_store, AiKeyStore, AiProviderKind};
 use ummp_core::app::{
     AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Secret, Settings,
 };
@@ -200,7 +200,6 @@ pub fn start_pack(svc: &AppServices, request: PackRequest) -> Result<Uuid, UiErr
 pub struct AiKeyStatus {
     pub saved: bool,
     pub masked: Option<String>,
-    pub path: String,
     pub base_url: Option<String>,
 }
 
@@ -224,13 +223,11 @@ fn ai_provider(value: &str) -> Result<AiProviderKind, UiError> {
 pub fn ai_key_status(
     store: &dyn AiKeyStore,
     provider: &str,
-    data_dir: &Path,
 ) -> Result<AiKeyStatus, UiError> {
     let masked = store.masked(ai_provider(provider)?).map_err(UiError::from)?;
     Ok(AiKeyStatus {
         saved: masked.is_some(),
         masked,
-        path: data_dir.join(CREDENTIALS_FILE).to_string_lossy().into_owned(),
         base_url: store.openai_base_url().map_err(UiError::from)?,
     })
 }
