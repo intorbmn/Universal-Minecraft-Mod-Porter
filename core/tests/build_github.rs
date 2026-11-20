@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use ummp_core::build::github::{workflow_yaml, GithubBackend};
 use ummp_core::build::logs::ErrorKind;
+use ummp_core::app::Secret;
 use ummp_core::build::{BuildBackend, BuildRequest, Stage, StageStatus};
 
 const ALL: [Stage; 3] = [Stage::Build, Stage::Test, Stage::Server];
@@ -29,6 +30,7 @@ fn fakes(dir: &Path, artifact: &Path, auth_ok: bool) -> (PathBuf, PathBuf) {
         &gh,
         &format!(
             "echo \"gh $*\" >> '{calls}'\n\
+             echo \"GH_TOKEN=${GH_TOKEN:-}\" >> '{calls}'\n\
              case \"$1 $2\" in\n\
              'auth status') exit 1 ;;\n\
              'api repos/demo-owner/ummp-build-sandbox/actions/runs/42/jobs') echo '{{\"jobs\":[{{\"id\":7}}]}}' ;;\n\
@@ -55,6 +57,7 @@ fn backend(dir: &Path, gh: PathBuf, git: PathBuf) -> GithubBackend {
         git,
         poll: Duration::from_millis(10),
         workdir: dir.join("work"),
+        token: None,
     }
 }
 
@@ -110,6 +113,29 @@ fn fake_gh_round_trip() {
     assert!(calls.contains("gh run download 42"), "{calls}");
     let wf = std::fs::read_to_string(o.workdir.join(".github/workflows/ummp-build.yml")).unwrap();
     assert!(wf.contains("java-version: '21'"));
+}
+
+#[test]
+fn optional_token_is_passed_in_environment_and_redacted_from_debug() {
+    let d = tempfile::tempdir().unwrap();
+    let art = d.path().join("art");
+    std::fs::create_dir_all(&art).unwrap();
+    std::fs::write(
+        art.join("stages.json"),
+        r#"[{"stage":"build","status":"passed"},{"stage":"test","status":"passed"},{"stage":"server","status":"passed"}]"#,
+    )
+    .unwrap();
+    let (gh, git) = fakes(d.path(), &art, true);
+    let mut b = backend(d.path(), gh, git);
+    b.token = Some(Secret::new("test-github-token"));
+    assert!(!format!("{b:?}").contains("test-github-token"));
+    b.run(&request()).unwrap();
+    let calls = std::fs::read_to_string(d.path().join("calls")).unwrap();
+    assert!(calls.contains("GH_TOKEN=test-github-token"), "{calls}");
+    assert!(
+        calls.lines().filter(|line| line.starts_with("gh ")).all(|line| !line.contains("test-github-token")),
+        "the token must never appear in command arguments: {calls}"
+    );
 }
 
 #[test]
