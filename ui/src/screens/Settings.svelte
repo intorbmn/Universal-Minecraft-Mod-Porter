@@ -114,9 +114,12 @@
   </section>
 
   <h2>{t('settings.credentials')}</h2>
+  <p class="muted">{t('settings.secretHelp')}</p>
   {#each secretNames as name (name)}
     <section class="credential">
-      <div><strong>{name}</strong><span class="muted">{saved[name] ? t('settings.stored') : t('settings.notStored')}</span></div>
+      <div><strong>{name}</strong><span class="muted">{saved[name] ? t('settings.stored') : t('settings.notStored')}</span>
+        {#if name === 'github_token'}<small class="muted">{t('settings.githubTokenHelp')}</small>{/if}
+      </div>
       <input type="password" autocomplete="off" aria-label={`${name} value`} bind:value={values[name]} placeholder={t('settings.secretPlaceholder')} />
       <button onclick={() => saveSecret(name)} disabled={!values[name].trim()}>{t('settings.storeSecret')}</button>
       <button onclick={() => removeSecret(name)} disabled={!saved[name]}>{t('settings.deleteSecret')}</button>
