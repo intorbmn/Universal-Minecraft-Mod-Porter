@@ -771,7 +771,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
 }
 
 fn map_app_error(error: ummp_core::app::AppError) -> CliFailure {
-    let code = match error {
+    let code = match &error {
         ummp_core::app::AppError::Input(_) => ExitCode::InvalidInput,
         ummp_core::app::AppError::Refused(_) => ExitCode::Refused,
         _ => ExitCode::Error,
