@@ -177,7 +177,7 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
         return id;
       },
       unregisterCallback: (id: number) => callbacks.delete(id),
-      invoke: async (cmd: string) => {
+      invoke: async (cmd: string, args: any) => {
         if (cmd === 'sessions') return [];
         if (cmd === 'analyze') return {
           kind: 'folder',
