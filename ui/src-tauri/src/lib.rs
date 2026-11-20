@@ -8,9 +8,12 @@ use std::sync::Arc;
 
 use commands::UiError;
 use tauri::{AppHandle, Emitter, Manager, State};
-use ummp_core::app::views::{AnalysisView, RiskView, SessionView, TargetsView};
-use ummp_core::app::{AppServices, Settings};
+use ummp_core::app::views::{
+    AnalysisView, JobView, PlanView, RiskView, SessionView, TargetsView,
+};
+use ummp_core::app::{AppServices, PlanRequest, PortRequest, Settings};
 use ummp_core::events::{Event, EventHandler};
+use uuid::Uuid;
 
 /// Name of the window event that carries every job event.
 pub const WINDOW_EVENT: &str = "ummp://event";
@@ -56,11 +59,49 @@ async fn sessions(svc: Svc<'_>, limit: usize) -> Result<Vec<SessionView>, UiErro
     blocking(&svc, move |s| commands::sessions(s, limit)).await
 }
 
-// Tauri hands `State` over by value; a reference parameter is not accepted.
+// Tauri hands State over by value; a reference parameter is not accepted.
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn targets(svc: Svc<'_>) -> TargetsView {
     commands::targets(&svc)
+}
+
+#[tauri::command]
+async fn plan(svc: Svc<'_>, request: PlanRequest) -> Result<PlanView, UiError> {
+    blocking(&svc, move |s| commands::plan(s, &request)).await
+}
+
+#[tauri::command]
+fn start_port(svc: Svc<'_>, request: PortRequest) -> Result<Uuid, UiError> {
+    commands::start_port(&svc, request)
+}
+
+#[tauri::command]
+fn start_migrate_in_place(
+    svc: Svc<'_>,
+    request: PlanRequest,
+    reviewed: bool,
+) -> Result<Uuid, UiError> {
+    commands::start_migrate_in_place(&svc, request, reviewed)
+}
+
+#[tauri::command]
+async fn job(svc: Svc<'_>, id: Uuid) -> Result<JobView, UiError> {
+    blocking(&svc, move |s| commands::job(s, id)).await
+}
+
+#[tauri::command]
+fn cancel(svc: Svc<'_>, id: Uuid) -> Result<(), UiError> {
+    commands::cancel(&svc, id)
+}
+
+#[tauri::command]
+async fn rollback(
+    svc: Svc<'_>,
+    project: PathBuf,
+    checkpoint: Option<Uuid>,
+) -> Result<(), UiError> {
+    blocking(&svc, move |s| commands::rollback(s, &project, checkpoint)).await
 }
 
 /// Starts the desktop app.
@@ -78,7 +119,18 @@ pub fn run() {
             app.manage(svc);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![analyze, scan, sessions, targets])
+        .invoke_handler(tauri::generate_handler![
+            analyze,
+            scan,
+            sessions,
+            targets,
+            plan,
+            start_port,
+            start_migrate_in_place,
+            job,
+            cancel,
+            rollback
+        ])
         .run(tauri::generate_context!())
         .expect("error while running the UMMP desktop app");
 }
