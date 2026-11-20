@@ -12,3 +12,7 @@ Task A4 (jobs + events): complete. `core/src/app/jobs.rs` (CancelToken, JobCtx s
 - Ruling: failure text is stored in Job.output as {"error": msg}; JobView.error is derived from it.
 - Mutation check (★ port_job_emits_events_in_order): (1) job.started published under another name -> RED (left "job.skipped", right "job.started"); (2) success finished as Failed -> RED at the state assertion. Restored -> 22/22 green, stable over 6 runs.
 - Four commands pass; cargo test --all green (app: 22 tests).
+
+Task A5 (in-place migrate, rollback, cancel): complete. `start_migrate_in_place(req, reviewed)` (Refused before any write when !reviewed; folder only), `rollback(project, Option<Uuid>)`, cancel restores the checkpoint at the post-apply "verify" step. `plan()` now shares `resolve_plan` with the job.
+- Ruling: cancel is checked at step boundaries only (engine apply is atomic and already rolls itself back on failure); cancelling after apply restores the checkpoint and ends Cancelled.
+- Mutation check: (1) ignore `reviewed` -> in_place_migrate_requires_reviewed_flag RED; (2) skip restore after cancel -> cancel_in_place_migrate_rolls_back_and_reports_cancelled RED. Restored -> 25/25, stable over 5 runs. Four commands pass.

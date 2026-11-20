@@ -587,3 +587,124 @@ fn app_event_payloads_match_golden_json() {
     let back: JobFinished = serde_json::from_value(golden("job.finished.failed")).unwrap();
     assert_eq!(back, failed);
 }
+
+// ---- 11.A5: in-place migrate, rollback, cancel ----
+
+fn project_copy(dir: &Path) -> PathBuf {
+    let project = dir.join("proj");
+    copy_tree(&fixture("loader/fabric-src"), &project);
+    project
+}
+
+/// ★ mutation: let `start_migrate_in_place` ignore `reviewed` (or write before the check)
+/// and this goes red: the folder would change or no `Refused` comes back.
+#[test]
+fn in_place_migrate_requires_reviewed_flag() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let project = project_copy(d.path());
+    let before = read_tree(&project);
+
+    let refused = svc.start_migrate_in_place(plan_req(project.clone()), false);
+    assert!(matches!(refused, Err(AppError::Refused(_))), "{refused:?}");
+    assert_eq!(
+        read_tree(&project),
+        before,
+        "a refused run must write nothing"
+    );
+    assert!(
+        !default_snapshots(&project).exists(),
+        "a refused run must not even take a checkpoint"
+    );
+
+    let rx = collect(&svc);
+    let job = svc
+        .start_migrate_in_place(plan_req(project.clone()), true)
+        .unwrap();
+    let events = until_finished(&rx, job);
+    assert_eq!(
+        events.last().unwrap().payload["state"],
+        "Succeeded",
+        "{:?}",
+        events.last().unwrap().payload
+    );
+    assert_ne!(
+        read_tree(&project),
+        before,
+        "a reviewed run must change the folder"
+    );
+}
+
+#[test]
+fn rollback_restores_tree_after_in_place_migrate() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let project = project_copy(d.path());
+    let before = read_tree(&project);
+    let rx = collect(&svc);
+    let job = svc
+        .start_migrate_in_place(plan_req(project.clone()), true)
+        .unwrap();
+    until_finished(&rx, job);
+    assert_ne!(read_tree(&project), before);
+
+    svc.rollback(&project, None).unwrap();
+    assert_eq!(
+        read_tree(&project),
+        before,
+        "rollback must restore every file"
+    );
+
+    let none = svc.rollback(&d.path().join("empty"), None);
+    assert!(matches!(
+        none,
+        Err(AppError::Input(_) | AppError::NotFound(_))
+    ));
+}
+
+/// ★ mutation: skip the restore (or the cancel check) after the apply step and this goes red:
+/// the tree stays migrated, or the job ends Succeeded instead of Cancelled.
+#[test]
+fn cancel_in_place_migrate_rolls_back_and_reports_cancelled() {
+    use std::sync::mpsc;
+    use std::sync::Mutex;
+
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let project = project_copy(d.path());
+    let before = read_tree(&project);
+
+    // The hook parks the job at the step after the apply, so the test can cancel at a
+    // moment when the folder is already migrated. No sleeps.
+    let (reached_tx, reached_rx) = mpsc::channel::<()>();
+    let (go_tx, go_rx) = mpsc::channel::<()>();
+    let reached_tx = Mutex::new(reached_tx);
+    let go_rx = Mutex::new(go_rx);
+    svc.set_step_hook(Arc::new(move |_job, step| {
+        if step == "verify" {
+            reached_tx.lock().unwrap().send(()).unwrap();
+            go_rx.lock().unwrap().recv().unwrap();
+        }
+    }));
+    let rx = collect(&svc);
+    let job = svc
+        .start_migrate_in_place(plan_req(project.clone()), true)
+        .unwrap();
+
+    reached_rx
+        .recv_timeout(std::time::Duration::from_mins(1))
+        .expect("job never reached the verify step");
+    assert_ne!(read_tree(&project), before, "apply must have run by now");
+    svc.cancel(job).unwrap();
+    go_tx.send(()).unwrap();
+
+    let events = until_finished(&rx, job);
+    let last = events.last().unwrap();
+    assert_eq!(last.payload["state"], "Cancelled", "{:?}", last.payload);
+    assert_eq!(
+        read_tree(&project),
+        before,
+        "cancel must restore the folder"
+    );
+    assert_eq!(svc.job(job).unwrap().state, JobState::Cancelled);
+}

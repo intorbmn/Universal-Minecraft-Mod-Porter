@@ -10,14 +10,17 @@ use crate::adapter::{loader, Handling};
 use crate::analyzer::AnalyzerEngine;
 use crate::checkpoint::CheckpointError;
 use crate::filesystem::{FileSystem, LocalFileSystem};
-use crate::migration::{MigrationEngine, MigrationError, MigrationPlanner, MigrationRequest};
+use crate::migration::{
+    MigrationEngine, MigrationError, MigrationPlan, MigrationPlanner, MigrationRequest, RunOptions,
+};
 use crate::modpack::PackError;
 use crate::persistence::{DbError, JobDb};
 use crate::port::{default_port_root, port, stage_source, PortError, PortOptions};
-use crate::project::{DefaultProjectManager, ProjectManager};
+use crate::project::{DefaultProjectManager, Project, ProjectManager};
 use crate::scan::{scan_path, Severity};
 use helpers::{check_input, loader_label, open_kb, InputKind};
 use serde::{Deserialize, Serialize};
+use snapshots::{default_snapshots, load_store, save_store};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -303,40 +306,12 @@ impl AppServices {
         let staging = tempfile::tempdir()?;
         let root = stage_source(&req.input, staging.path())?;
         let project = DefaultProjectManager.open(&root).map_err(input_err)?;
-        let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
-        let report = AnalyzerEngine::default()
-            .analyze(&project.root, &fs)
-            .map_err(input_err)?;
-        let first = report.mods.first();
-        let source_loader = first.and_then(|m| loader_label(&m.metadata.loader).map(str::to_owned));
-        let from = match (&req.from, first) {
-            (Some(f), _) => f.clone(),
-            (None, Some(m)) => m.metadata.minecraft.to_string(),
-            (None, None) => {
-                return Err(AppError::Input(
-                    "cannot detect the Minecraft version: choose the source version".into(),
-                ))
-            }
-        };
-        let target_loader = match (&req.loader, &source_loader) {
-            (Some(l), _) => l.to_ascii_lowercase(),
-            (None, Some(l)) => l.clone(),
-            (None, None) => {
-                return Err(AppError::Input(
-                    "cannot detect the loader: choose a target loader".into(),
-                ))
-            }
-        };
-        let settings = self.settings();
-        let kb = open_kb(settings.kb_path, None)?;
-        let request = MigrationRequest {
-            source_minecraft: from.clone(),
-            target_minecraft: req.to.clone(),
-            target_loader: target_loader.clone(),
-            min_confidence: req.min_confidence,
-            source_loader: source_loader.clone(),
-        };
-        let plan = MigrationPlanner::plan(&kb, &request)?;
+        let Resolved {
+            plan,
+            from,
+            source_loader,
+            target_loader,
+        } = resolve_plan(self.settings().kb_path, &project, req)?;
         let set = MigrationEngine::default().compute_edits(&plan, &project)?;
         let attention: Vec<String> = set
             .technologies
@@ -411,6 +386,61 @@ fn write_settings(s: &Settings) -> Result<(), AppError> {
 }
 
 /// Wraps an engine error that has no variant of its own as a message for the person.
+/// A migration plan plus the versions and loaders it was resolved from.
+struct Resolved {
+    plan: MigrationPlan,
+    from: String,
+    source_loader: Option<String>,
+    target_loader: String,
+}
+
+/// Detects what the request leaves open (source version, loaders) and plans the migration.
+fn resolve_plan(
+    kb_path: Option<PathBuf>,
+    project: &Project,
+    req: &PlanRequest,
+) -> Result<Resolved, AppError> {
+    let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
+    let report = AnalyzerEngine::default()
+        .analyze(&project.root, &fs)
+        .map_err(input_err)?;
+    let first = report.mods.first();
+    let source_loader = first.and_then(|m| loader_label(&m.metadata.loader).map(str::to_owned));
+    let from = match (&req.from, first) {
+        (Some(f), _) => f.clone(),
+        (None, Some(m)) => m.metadata.minecraft.to_string(),
+        (None, None) => {
+            return Err(AppError::Input(
+                "cannot detect the Minecraft version: choose the source version".into(),
+            ))
+        }
+    };
+    let target_loader = match (&req.loader, &source_loader) {
+        (Some(l), _) => l.to_ascii_lowercase(),
+        (None, Some(l)) => l.clone(),
+        (None, None) => {
+            return Err(AppError::Input(
+                "cannot detect the loader: choose a target loader".into(),
+            ))
+        }
+    };
+    let kb = open_kb(kb_path, None)?;
+    let request = MigrationRequest {
+        source_minecraft: from.clone(),
+        target_minecraft: req.to.clone(),
+        target_loader: target_loader.clone(),
+        min_confidence: req.min_confidence,
+        source_loader: source_loader.clone(),
+    };
+    let plan = MigrationPlanner::plan(&kb, &request)?;
+    Ok(Resolved {
+        plan,
+        from,
+        source_loader,
+        target_loader,
+    })
+}
+
 /// Canonical form of `p`, or of its nearest existing ancestor with the rest appended.
 fn resolve_loose(p: &Path) -> PathBuf {
     let mut rest = Vec::new();
@@ -525,5 +555,85 @@ impl AppServices {
                 "report": ReportView::from(&result.report),
             }))
         })
+    }
+}
+
+impl AppServices {
+    /// Starts an in-place migration of a project folder as a job. The folder is only touched
+    /// after the person reviewed the plan (`reviewed`) and a checkpoint was taken; cancelling
+    /// at any step restores the checkpoint.
+    ///
+    /// # Errors
+    /// Returns [`AppError::Refused`] when the plan was not reviewed and [`AppError::Input`]
+    /// when the input is missing or not a folder. Nothing is written in either case.
+    pub fn start_migrate_in_place(
+        &self,
+        req: PlanRequest,
+        reviewed: bool,
+    ) -> Result<Uuid, AppError> {
+        if !reviewed {
+            return Err(AppError::Refused(
+                "review the plan before changing the folder in place".into(),
+            ));
+        }
+        if check_input(&req.input, false)? != InputKind::Folder {
+            return Err(AppError::Input(
+                "in-place migration needs a mod folder, not a .zip file".into(),
+            ));
+        }
+        let kb_path = self.settings().kb_path;
+        self.start_job("migrate", move |ctx| {
+            ctx.step("validate", 1, 5)?;
+            let project = DefaultProjectManager.open(&req.input).map_err(input_err)?;
+            ctx.step("planning", 2, 5)?;
+            let resolved = resolve_plan(kb_path, &project, &req)?;
+            ctx.step("applying", 3, 5)?;
+            let snap_dir = default_snapshots(&project.root);
+            let mut store = load_store(&snap_dir)?;
+            let report = MigrationEngine::default().run(
+                &resolved.plan,
+                &project,
+                &mut store,
+                &RunOptions {
+                    dry_run: false,
+                    snapshot_root: &snap_dir,
+                    session_id: ctx.id(),
+                },
+            )?;
+            save_store(&snap_dir, &store)?;
+            if let Err(cancelled) = ctx.step("verify", 4, 5) {
+                if let Some(id) = report.checkpoint_id {
+                    store.restore(id, &project.root)?;
+                    ctx.log("cancelled: the folder was restored from the checkpoint");
+                }
+                return Err(cancelled);
+            }
+            ctx.progress("done", 5, 5);
+            Ok(serde_json::json!({
+                "checkpoint": report.checkpoint_id,
+                "report": ReportView::from(&report),
+            }))
+        })
+    }
+
+    /// Restores `project` from a checkpoint (the latest when `checkpoint` is `None`).
+    ///
+    /// # Errors
+    /// Returns [`AppError::Input`] when the project cannot be opened or has no checkpoint,
+    /// and [`AppError::Checkpoint`] when the restore itself fails.
+    pub fn rollback(&self, project: &Path, checkpoint: Option<Uuid>) -> Result<(), AppError> {
+        let project = DefaultProjectManager.open(project).map_err(input_err)?;
+        let store = load_store(&default_snapshots(&project.root))?;
+        let id = match checkpoint {
+            Some(id) => id,
+            None => {
+                store
+                    .latest()
+                    .ok_or_else(|| AppError::Input("no checkpoints found for this project".into()))?
+                    .id
+            }
+        };
+        store.restore(id, &project.root)?;
+        Ok(())
     }
 }
