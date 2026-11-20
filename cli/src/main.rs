@@ -4,7 +4,7 @@ mod config;
 mod exit;
 
 use config::CliConfig;
-use exit::ExitCode;
+use exit::{CliFailure, ExitCode};
 use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -399,10 +399,10 @@ fn provider(args: &AiArgs, config: &CliConfig) -> Result<Box<dyn AiProvider>, Bo
             let url = args
                 .base_url
                 .as_deref()
-                .ok_or("--provider openai needs --base-url")?;
+                .ok_or_else(|| CliFailure::new(ExitCode::InvalidInput, "--provider openai needs --base-url"))?;
             Box::new(OpenAiCompatibleProvider::new(url))
         }
-        other => return Err(format!("unknown provider '{other}'").into()),
+        other => return Err(CliFailure::new(ExitCode::InvalidInput, format!("unknown provider '{other}'")).into()),
     })
 }
 
@@ -469,10 +469,10 @@ fn check_risk(
             println!("Warning: risk indicators found; building on a disposable GitHub runner.");
             Ok(())
         }
-        RiskDecision::Refuse(why) => Err(why.into()),
+        RiskDecision::Refuse(why) => Err(CliFailure::new(ExitCode::Refused, why).into()),
         RiskDecision::Confirm => {
             if !std::io::stdin().is_terminal() {
-                return Err("Medium risk: pass --yes to build on this machine".into());
+                return Err(CliFailure::new(ExitCode::InvalidInput, "Medium risk: pass --yes to build on this machine").into());
             }
             print!("Medium risk. Build on this machine anyway? [y/N] ");
             std::io::stdout().flush()?;
@@ -481,7 +481,7 @@ fn check_risk(
             if line.trim().eq_ignore_ascii_case("y") {
                 Ok(())
             } else {
-                Err("build cancelled".into())
+                Err(CliFailure::new(ExitCode::Refused, "build cancelled").into())
             }
         }
     }
@@ -502,10 +502,7 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
     } = a;
     let path = path.to_path_buf();
     if !path.is_dir() {
-        return Err(
-            "JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project"
-                .into(),
-        );
+        return Err(CliFailure::new(ExitCode::InvalidInput, "JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project").into());
     }
     let scan = scan_path(&path)?;
     print!("{}", scan.to_text());
@@ -516,7 +513,7 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
             "build" => Ok(Stage::Build),
             "test" => Ok(Stage::Test),
             "server" => Ok(Stage::Server),
-            other => Err(format!("unknown stage `{other}` (use build, test, server)")),
+            other => Err(CliFailure::new(ExitCode::InvalidInput, format!("unknown stage `{other}` (use build, test, server)"))),
         })
         .collect::<Result<Vec<_>, _>>()?;
     let (mod_name, detected_java) = mod_identity(&path);
@@ -533,7 +530,8 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
             workdir,
             gradle: None,
         }
-        .run(&req)?
+        .run(&req)
+        .map_err(|error| CliFailure::new(ExitCode::BuildFailed, error.to_string()))?
     } else {
         let repo = config
             .sandbox_repo(repo)
@@ -547,7 +545,8 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
             workdir,
             token: None,
         }
-        .run(&req)?
+        .run(&req)
+        .map_err(|error| CliFailure::new(ExitCode::BuildFailed, error.to_string()))?
     };
     let md = to_markdown(&outcome, &scan);
     std::fs::write(outcome.workdir.join("ummp-report.md"), &md)?;
@@ -577,7 +576,7 @@ fn main() {
         Ok(code) => code,
         Err(error) => {
             eprintln!("error: {error}");
-            ExitCode::Error.value()
+            error.downcast_ref::<CliFailure>().map_or(ExitCode::Error.value(), |e| e.code.value())
         }
     };
     std::process::exit(code);
@@ -677,9 +676,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
             let work = tempfile::tempdir()?;
             let p = import_with(&pack, work.path(), &ImportOptions::default())?;
             let (Some(mc), Some(loader)) = (p.mc.clone(), p.loader) else {
-                return Err(
-                    "cannot tell the pack's Minecraft version or loader; use `pack migrate`".into(),
-                );
+                return Err(CliFailure::new(ExitCode::InvalidInput, "cannot tell the pack's Minecraft version or loader; use `pack migrate`").into());
             };
             let kb = KnowledgeBase::open(Path::new(":memory:"))?;
             run_pack_migrate(
@@ -809,7 +806,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 .filter(|m| !m.is_empty())
                 .collect();
             if stages.is_empty() {
-                return Err("no qualified class mappings for this request".into());
+                return Err(CliFailure::new(ExitCode::InvalidInput, "no qualified class mappings for this request").into());
             }
             let stats = remap_jar(&input, &output, &stages)?;
             println!(
@@ -1023,7 +1020,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 None => {
                     store
                         .latest()
-                        .ok_or("no checkpoints found in the snapshot directory")?
+                        .ok_or_else(|| CliFailure::new(ExitCode::InvalidInput, "no checkpoints found in the snapshot directory"))?
                         .id
                 }
             };
