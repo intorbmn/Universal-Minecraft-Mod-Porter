@@ -1,47 +1,98 @@
-# Svelte + TS + Vite
+# UMMP desktop app
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+This folder contains the Tauri 2 desktop shell. The UI is a Svelte 5 + TypeScript + Vite
+application; all domain logic remains in `ummp_core::app::AppServices`.
 
-## Recommended IDE Setup
+## Prerequisites
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+- Windows 10/11 x64 (the supported packaging target for this phase).
+- Node.js 22 and npm.
+- Rust stable with the components from the repository toolchain file.
+- Microsoft C++ Build Tools (MSVC) and the WebView2 runtime.
+- For Linux development/CI: GTK/WebKit development packages and `libdbus-1-dev`
+  (the latter is required by the Secret Service keyring backend).
 
-## Need an official Svelte framework?
+## Run in development
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
-
-## Technical considerations
-
-**Why use this over SvelteKit?**
-
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
-
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
-
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
-
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
-
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
-
-**Why include `.vscode/extensions.json`?**
-
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
-
-**Why enable `allowJs` in the TS template?**
-
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+```powershell
+cd ui
+npm ci
+npm run tauri dev
 ```
+
+For a frontend-only preview:
+
+```powershell
+npm run dev
+```
+
+The frontend-only preview needs a mocked Tauri bridge for commands; it is not a substitute
+for the native desktop app.
+
+## Build installers
+
+```powershell
+cd ui
+npm ci
+npm run tauri build
+```
+
+The MSI and NSIS packages are written to:
+
+- `ui/src-tauri/target/release/bundle/msi/`
+- `ui/src-tauri/target/release/bundle/nsis/`
+
+The manually dispatched Windows workflow is
+[desktop-release.yml](../.github/workflows/desktop-release.yml). These installers are
+currently unsigned. Verify the SHA-256 and install only on a test machine until code signing
+and the manual Windows smoke test are complete.
+
+## Test
+
+```powershell
+cd ui
+npm run check
+npm run test
+npm run e2e
+npm audit --omit=dev
+```
+
+The desktop Rust crate is a separate Cargo workspace:
+
+```powershell
+cd ui/src-tauri
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo build
+```
+
+The root workspace remains independent:
+
+```powershell
+cd ..
+cargo fmt --check
+cargo clippy --all --all-targets -- -D warnings
+cargo test --all
+```
+
+## Architecture rules
+
+- `src/lib/api.ts` is the only frontend module allowed to call Tauri `invoke`.
+- Long-running work is started by an application command and observed through the
+  `ummp://event` job stream; screens never call core engines directly.
+- Blocking filesystem/scan work is moved to Tauri's blocking pool.
+- API keys and GitHub tokens are stored in the operating-system keyring. The UI can only
+  set, delete, and query whether a credential exists; there is no command that returns it.
+- The GitHub token is injected as `GH_TOKEN` into GitHub CLI/git child processes only.
+- AI proposals remain read-only until the user explicitly approves each file. A/R are the
+  keyboard shortcuts for approve/reject.
+- In-place migration requires the review checkbox; porting to a new output folder is the
+  default and leaves the source untouched.
+- Build risk gates are enforced by the core service, not just by disabled UI buttons.
+- Modpack reports paginate at 50 rows to keep large reports responsive.
+- Both English and Vietnamese strings live in `src/locales/`; missing Vietnamese keys fall
+  back to English.
+
+See [Phase 11 implementation notes](../docs/phase/phase-11-ui.md) for the current verification
+state and known gaps.
