@@ -1,6 +1,6 @@
 # Phase 11 handoff (after 11.B) — for the next AI
 
-Repo `intorbmn/universal-minecraft-mod-porter`, branch `phase-11-ui` (pushed). No PR yet. Do NOT merge. Do NOT start Phase 12.
+Repo `intorbmn/universal-minecraft-mod-porter`, branch `phase-11-ui` (pushed). Draft PR #11 is open. Do NOT merge. Do NOT start Phase 12.
 Reply to the user in Vietnamese; code, docs, commits in English; final report very short.
 
 ## Read first (in this order)
