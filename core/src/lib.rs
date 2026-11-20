@@ -19,6 +19,7 @@ pub mod knowledge;
 pub mod metadata;
 pub mod migration;
 pub mod mixin;
+pub mod modpack;
 pub mod persistence;
 pub mod port;
 pub mod project;

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 10 (ADR 0013): `ummp pack inspect|migrate|export` for modpacks. Reads and
+  writes Modrinth `.mrpack`, CurseForge zip, Prism/MultiMC instances and plain folders;
+  analyses every JAR in parallel; dependency graph (missing, duplicate, cycle, side);
+  per-mod plan (keep, update, port, replace, remove, manual) with a reason for each;
+  optional read-only Modrinth lookups with `--online` (cached as JSON); config key renames
+  applied through `MigrationEngine` with a checkpoint; `UMMP_PACK_REPORT.md`. Exit codes:
+  0 done, 2 refused for a High-risk JAR, 3 done with mods left to you. Archive reads are
+  bounded and path-checked.
 - `docs/guides/`: detailed step-by-step guides for Phases 10–14 (workflow, environment
   quirks, APIs to reuse, milestones with test names, definition of done). They supersede
   the rough drafts in `docs/drafts/`.

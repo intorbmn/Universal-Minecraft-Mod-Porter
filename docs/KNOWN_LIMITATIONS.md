@@ -96,6 +96,25 @@ Each entry names the module and the phase expected to address it.
   GitHub builds validate it, local builds need `--yes`.
 - Full list: `docs/BACKLOG.md`.
 
+## Modpacks (Phase 10)
+- "Supports the target" means exact Minecraft version equality plus the same loader; version
+  ranges are not widened. A JAR whose descriptor cannot be read (the analyzer falls back to
+  1.20.1) must not be trusted to fit a target.
+- Closed JARs are never ported; only mods whose source you supply with `--sources` are.
+  A ported mod is left out of the exported pack (you build it and add it yourself).
+- UMMP never downloads JARs. An updated or replacement mod is written as URL + hash; folder,
+  Prism and CurseForge outputs cannot hold URL-only entries and say so in the report.
+- CurseForge: no API key, so entries stay unresolved and CurseForge packs only list entries
+  that already had project/file ids. A Modrinth-only update cannot be written there.
+- The mrpack hash check covers files bundled in the zip; listed downloads are verified by the
+  launcher. Modrinth `env` is defaulted to required/required when the index omits it.
+- `client-overrides/` and `server-overrides/` are merged into one overrides tree (a later
+  file wins and a warning is added).
+- Update versions' own required dependencies are not added; range upper bounds are
+  under-reported.
+- A server start is not a gameplay test, and no exported pack has been launched yet.
+- Config migration knows only the rules in `pack_config_rules.toml` (synthetic sample data).
+
 ## Not started
-Phases 10-14 (modpacks, UI, REST/MCP API,
+Phases 11-14 (UI, REST/MCP API,
 production readiness, community) have no code yet.

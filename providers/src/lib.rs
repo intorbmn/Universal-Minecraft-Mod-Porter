@@ -10,6 +10,9 @@
 //! Credentials come from environment variables only and never appear in
 //! errors, logs or the audit trail.
 
+mod modrinth;
+pub use modrinth::ModrinthIndex;
+
 use serde_json::{json, Value};
 use std::time::Duration;
 use ummp_core::ai::{AiError, AiProvider, AiRequest, AiResponse, Usage};

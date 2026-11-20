@@ -265,7 +265,7 @@ struct JarMetadataFiles {
 /// Cap per metadata entry, so a crafted archive cannot exhaust memory.
 const MAX_METADATA_BYTES: u64 = 1024 * 1024;
 
-fn inspect_jar(jar_path: &Path, fs: &dyn FileSystem) -> Result<ModAnalysis, AnalyzerError> {
+pub fn inspect_jar(jar_path: &Path, fs: &dyn FileSystem) -> Result<ModAnalysis, AnalyzerError> {
     let bytes = fs.read(jar_path)?;
     let cursor = std::io::Cursor::new(bytes);
     let mut archive = ZipArchive::new(cursor)?;

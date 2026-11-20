@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-9 complete; Phase 10 (modpacks) is next; rough designs for 10-14 in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-10 complete; Phase 11 (UI) is next; rough designs for 10-14 in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -60,6 +60,12 @@ ummp build path/to/mod --local
 # Port a mod: source folder or .zip in, ported source out (the original is not touched).
 # Output goes to D:\Claude\ummp-ports\<mod>-<mc>-<loader>-<time> on Windows, ~/ummp-ports elsewhere.
 ummp port path/to/mod-src --to 1.21.1 --loader neoforge --zip
+# Modpacks: .mrpack, CurseForge zip, Prism instance or folder. Output goes to
+# D:\Claude\ummp-packs\<pack>-<mc>-<loader>-<time> on Windows, ~/ummp-packs elsewhere.
+ummp pack inspect path/to/pack.mrpack
+ummp pack migrate path/to/pack.mrpack --to 1.21.1 --loader neoforge [--online] [--sources DIR]
+ummp pack export path/to/instance --to-format mrpack
+# exit codes: 0 done, 2 refused (High-risk JAR; review it, then --allow-risk), 3 done, mods left to you
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 # local model: --provider openai --base-url http://localhost:11434/v1 ; settings: --ai-config ai.json
 ```
