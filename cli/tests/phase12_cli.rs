@@ -94,10 +94,10 @@ fn json_errors_have_a_stable_envelope() {
         .env("UMMP_DATA_DIR", data.path())
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(5));
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
-    assert_eq!(value["error"]["kind"], "error");
+    assert_eq!(value["error"]["kind"], "invalid_input");
     assert!(value["error"]["message"].is_string());
 }
 
