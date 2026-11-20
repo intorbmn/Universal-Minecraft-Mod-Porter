@@ -20,6 +20,55 @@ test('Home to Analysis shows the mod and risk from golden JSON', async ({ page }
   await expect(page.getByTestId('risk-badge').first()).toContainText('High risk');
 });
 
+
+test('ZIP sources use archive port mode and disable AI assist', async ({ page }) => {
+  await page.addInitScript(() => {
+    let portRequest: any = null;
+    (window as any).__testPortRequest = () => portRequest;
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string, args: any) => {
+        if (cmd === 'sessions') return [];
+        if (cmd === 'analyze') return {
+          kind: 'archive',
+          mods: [{ id: 'demomod', name: 'Demo Mod', version: '1.0', loader: 'fabric', minecraft: '1.20.1', java: 21 }],
+          build_system: 'gradle', languages: ['Java'], technologies: [],
+        };
+        if (cmd === 'scan') return { level: null, findings: [] };
+        if (cmd === 'targets') return {
+          loaders: ['fabric'],
+          versions: [{ minecraft: '1.21.1', loaders: ['fabric'] }],
+        };
+        if (cmd === 'plan') return {
+          source_minecraft: '1.20.1', target_minecraft: '1.21.1',
+          source_loader: 'fabric', target_loader: 'fabric',
+          files: [], moves: [], deletes: [], technologies: [], skipped: [], warnings: [], files_scanned: 2,
+        };
+        if (cmd === 'start_port') { portRequest = args.request; return 'job-zip'; }
+        if (cmd === 'job') return {
+          id: 'job-zip', session: 'session-zip', step: 'scan', state: 'Running',
+          progress: null, log: [], result: null, error: null,
+        };
+        if (cmd === 'plugin:event|listen') return 1;
+        if (cmd === 'plugin:event|unlisten') return null;
+        return null;
+      },
+      transformCallback: () => 0,
+      unregisterCallback: () => undefined,
+    };
+  });
+  await page.goto('/');
+  await page.getByLabel('Path to a mod').fill('/mods/demo.zip');
+  await page.getByRole('button', { name: 'Analyze' }).click();
+  await expect(page.getByTestId('mod-id')).toHaveText('demomod');
+  await page.getByRole('button', { name: 'Choose target' }).click();
+  await page.getByLabel('Minecraft version').selectOption('1.21.1');
+  await page.getByLabel('Mod loader').selectOption('fabric');
+  await page.getByRole('button', { name: 'Preview changes' }).click();
+  await expect(page.getByRole('button', { name: 'AI assist' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Start port' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__testPortRequest()?.zip)).toBe(true);
+});
+
 test('Target → Plan → reviewed in-place Run → Report → Rollback', async ({ page }) => {
   const completedJob = {
     id: 'job-11c',
