@@ -7,7 +7,10 @@
   let rollbackError = $state<UiError | null>(null);
   let rolledBack = $state(false);
 
-  let report = $derived((job.result?.report ?? null) as ReportView | null);
+  let report = $derived((job.result?.report && typeof job.result.report === 'object'
+    ? job.result.report : null) as ReportView | null);
+  let buildReport = $derived(typeof job.result?.report === 'string' ? job.result.report : null);
+  let isBuild = $derived(typeof job.result?.passed === 'boolean');
   let output = $derived(typeof job.result?.output === 'string'
     ? job.result.output
     : typeof job.result?.workdir === 'string' ? job.result.workdir : null);
@@ -30,6 +33,7 @@
 <h1>{t('report.title')}</h1>
 <p><strong>{t(`state.${job.state}`)}</strong> · {job.step}</p>
 {#if job.error}<div class="error" role="alert">{job.error}</div>{/if}
+
 {#if report}
   <section class="metrics">
     <div><strong>{report.files_changed}</strong><span>{t('report.changed')}</span></div>
@@ -43,12 +47,22 @@
     <h2>{t('plan.warnings')}</h2>
     <ul>{#each report.warnings as warning (warning)}<li>{warning}</li>{/each}</ul>
   {/if}
+{:else if isBuild}
+  <section class="metrics">
+    <div><strong>{job.result?.passed ? t('build.passed') : t('build.failed')}</strong><span>{t('build.status')}</span></div>
+    <div><strong>{String(job.result?.stages_passed ?? 0)}/{String(job.result?.stages_run ?? 0)}</strong><span>{t('build.stages')}</span></div>
+  </section>
+  {#if buildReport}<h2>{t('build.report')}</h2><pre>{buildReport}</pre>{/if}
+{:else if Array.isArray(job.result?.proposed)}
+  <h2>{t('ai.summary')}</h2>
+  <p>{t('ai.proposed')}: {String(job.result.proposed.length)} · {t('ai.applied')}: {String(Array.isArray(job.result.applied) ? job.result.applied.length : 0)} · {t('ai.rejected')}: {String(job.result.rejected ?? 0)}</p>
 {:else}
   <p class="muted">{t('report.noMigrationReport')}</p>
 {/if}
+
 {#if output}
   <p><strong>{t('report.output')}:</strong> <code>{output}</code></p>
-  <button onclick={() => onBuild(output)}>{t('report.build')}</button>
+  {#if !isBuild}<button onclick={() => onBuild(output)}>{t('report.build')}</button>{/if}
 {/if}
 {#if checkpoint}
   <button class="danger" onclick={rollback} disabled={rolledBack}>{rolledBack ? t('report.rolledBack') : t('report.rollback')}</button>
@@ -60,4 +74,5 @@
   .metrics div { display: flex; flex-direction: column; gap: 3px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
   .metrics strong { font-size: 20px; } .metrics span { color: var(--muted); }
   .danger { margin-left: 8px; color: var(--high); border-color: var(--high); }
+  pre { max-height: 50vh; overflow: auto; padding: 10px; border: 1px solid var(--line); background: var(--panel); white-space: pre-wrap; }
 </style>
