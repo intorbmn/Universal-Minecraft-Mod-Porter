@@ -16,7 +16,7 @@
     const chosen = await open({
       directory,
       multiple: false,
-      filters: directory ? undefined : [{ name: 'JAR', extensions: ['jar'] }],
+      filters: directory ? undefined : [{ name: 'Mod source or JAR', extensions: ['jar', 'zip'] }],
     });
     if (typeof chosen === 'string') path = chosen;
   }
@@ -33,7 +33,7 @@
   <div class="row">
     <input id="mod-path" bind:value={path} />
     <button type="button" onclick={() => browse(true)}>{t('home.pickFolder')}</button>
-    <button type="button" onclick={() => browse(false)}>{t('home.pickJar')}</button>
+    <button type="button" onclick={() => browse(false)}>{t('home.pickFile')}</button>
     <button type="submit" class="primary" disabled={!path.trim()}>{t('home.analyze')}</button>
   </div>
 </form>
