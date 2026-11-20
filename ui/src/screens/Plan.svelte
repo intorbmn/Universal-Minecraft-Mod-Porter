@@ -48,6 +48,23 @@
       <ul>{#each plan.warnings as warning (warning)}<li>{warning}</li>{/each}</ul>
     </section>
   {/if}
+  {#if plan.technologies.length}
+    <section class="findings">
+      <strong>{t('plan.technologies')}</strong>
+      {#each plan.technologies as finding, i (`${finding.tech}-${finding.file}-${i}`)}
+        <p><span class="handling" data-handling={finding.handling}>{t(`handling.${finding.handling}`)}</span>
+          <strong>{finding.tech}</strong> · {finding.message} <code>{finding.file}{finding.line ? `:${finding.line}` : ''}</code></p>
+      {/each}
+    </section>
+  {/if}
+  {#if plan.skipped.length}
+    <details class="skipped">
+      <summary>{t('plan.skipped')} ({plan.skipped.length})</summary>
+      <ul>{#each plan.skipped as item (`${item.description}-${item.reason}`)}
+        <li><strong>{item.description}</strong>: {item.reason}</li>
+      {/each}</ul>
+    </details>
+  {/if}
   <div class="workspace">
     <aside><FileTree {plan} selected={selected?.path ?? ''} onSelect={(file) => (selected = file)} /></aside>
     <section class="preview">
@@ -75,6 +92,12 @@
   .warnings { padding: 8px 12px; border-left: 3px solid var(--medium); background: var(--medium-bg); }
   .warnings ul { margin: 5px 0; }
   .attention { color: var(--medium); font-weight: 700; }
+  .findings, .skipped { margin: 10px 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
+  .findings p { margin: 7px 0; overflow-wrap: anywhere; }
+  .handling { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-right: 7px; }
+  .handling[data-handling="manual"] { color: var(--high); }
+  .handling[data-handling="assisted"] { color: var(--medium); }
+  .skipped summary { cursor: pointer; }
   .review { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
   @media (max-width: 720px) { .workspace { grid-template-columns: 1fr; } }
 </style>
