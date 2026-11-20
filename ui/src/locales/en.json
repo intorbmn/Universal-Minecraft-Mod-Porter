@@ -167,5 +167,6 @@
   "plan.skipped": "Skipped mappings",
   "handling.auto": "Automatic",
   "handling.assisted": "Assisted",
-  "handling.manual": "Manual"
+  "handling.manual": "Manual",
+  "home.pickFile": "Pick JAR / source ZIP"
 }
