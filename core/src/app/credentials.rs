@@ -29,11 +29,7 @@ impl AiProviderKind {
 
 pub trait AiKeyStore: Send + Sync {
     fn get(&self, provider: AiProviderKind) -> Result<Option<Secret>, AppError>;
-    fn set(
-        &self,
-        provider: AiProviderKind,
-        key: &Secret,
-    ) -> Result<Option<String>, AppError>;
+    fn set(&self, provider: AiProviderKind, key: &Secret) -> Result<Option<String>, AppError>;
     fn delete(&self, provider: AiProviderKind) -> Result<(), AppError>;
     fn masked(&self, provider: AiProviderKind) -> Result<Option<String>, AppError>;
     fn openai_base_url(&self) -> Result<Option<String>, AppError>;
@@ -71,11 +67,7 @@ impl AiKeyStore for FileKeyStore {
         self.credentials.get(provider)
     }
 
-    fn set(
-        &self,
-        provider: AiProviderKind,
-        key: &Secret,
-    ) -> Result<Option<String>, AppError> {
+    fn set(&self, provider: AiProviderKind, key: &Secret) -> Result<Option<String>, AppError> {
         self.credentials.set(provider, key)
     }
 
@@ -119,14 +111,13 @@ impl CredentialsFile {
     }
 
     /// Saves one provider key and returns a non-fatal provider-specific warning, if any.
-    pub fn set(
-        &self,
-        provider: AiProviderKind,
-        key: &Secret,
-    ) -> Result<Option<String>, AppError> {
+    pub fn set(&self, provider: AiProviderKind, key: &Secret) -> Result<Option<String>, AppError> {
         let value = validate_key(key.expose())?;
         let warning = (provider == AiProviderKind::Anthropic && !value.starts_with("sk-ant-"))
-            .then_some("This key does not use the usual sk-ant- prefix; it will still be saved.".to_owned());
+            .then_some(
+                "This key does not use the usual sk-ant- prefix; it will still be saved."
+                    .to_owned(),
+            );
         let mut file = self.read()?;
         *Self::key_mut(&mut file, provider) = Some(value);
         self.write(&file)?;
@@ -154,7 +145,8 @@ impl CredentialsFile {
                 || url.chars().any(char::is_control)
         }) {
             return Err(AppError::Input(
-                "OpenAI base URL must use http:// or https:// and contain no control characters".into(),
+                "OpenAI base URL must use http:// or https:// and contain no control characters"
+                    .into(),
             ));
         }
         let mut file = self.read()?;
@@ -178,9 +170,10 @@ impl CredentialsFile {
     }
 
     fn write(&self, file: &StoredCredentials) -> Result<(), AppError> {
-        let parent = self.path.parent().ok_or_else(|| {
-            AppError::Input("credentials file has no parent directory".into())
-        })?;
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| AppError::Input("credentials file has no parent directory".into()))?;
         std::fs::create_dir_all(parent)?;
         let bytes = serde_json::to_vec_pretty(file)
             .map_err(|_| AppError::Input("could not encode credentials".into()))?;
@@ -310,12 +303,27 @@ fn validate_key(key: &str) -> Result<String, AppError> {
 fn mask(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     if chars.len() < 16 {
-        return format!("…{}", chars.iter().rev().take(2).rev().copied().collect::<String>());
+        return format!(
+            "…{}",
+            chars
+                .iter()
+                .rev()
+                .take(2)
+                .rev()
+                .copied()
+                .collect::<String>()
+        );
     }
     format!(
         "{}…{}",
         chars.iter().take(7).copied().collect::<String>(),
-        chars.iter().rev().take(4).rev().copied().collect::<String>()
+        chars
+            .iter()
+            .rev()
+            .take(4)
+            .rev()
+            .copied()
+            .collect::<String>()
     )
 }
 
@@ -331,20 +339,44 @@ mod tests {
     fn credentials_round_trip_and_keep_other_provider() {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
-        store.set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC)).unwrap();
-        store.set(AiProviderKind::Openai, &Secret::new(OPENAI)).unwrap();
-        assert_eq!(store.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(), ANTHROPIC);
-        assert_eq!(store.get(AiProviderKind::Openai).unwrap().unwrap().expose(), OPENAI);
+        store
+            .set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC))
+            .unwrap();
+        store
+            .set(AiProviderKind::Openai, &Secret::new(OPENAI))
+            .unwrap();
+        assert_eq!(
+            store
+                .get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
+            ANTHROPIC
+        );
+        assert_eq!(
+            store.get(AiProviderKind::Openai).unwrap().unwrap().expose(),
+            OPENAI
+        );
         store.delete(AiProviderKind::Anthropic).unwrap();
         assert!(store.get(AiProviderKind::Anthropic).unwrap().is_none());
-        assert_eq!(store.get(AiProviderKind::Openai).unwrap().unwrap().expose(), OPENAI);
+        assert_eq!(
+            store.get(AiProviderKind::Openai).unwrap().unwrap().expose(),
+            OPENAI
+        );
     }
 
     #[test]
     fn environment_value_overrides_file_without_global_environment_mutation() {
         let dir = tempfile::tempdir().unwrap();
-        FileKeyStore::in_dir(dir.path()).set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC)).unwrap();
-        let resolved = resolve_ai_key_from_store(&FileKeyStore::in_dir(dir.path()), AiProviderKind::Anthropic, Some("env-key-value".into())).unwrap();
+        FileKeyStore::in_dir(dir.path())
+            .set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC))
+            .unwrap();
+        let resolved = resolve_ai_key_from_store(
+            &FileKeyStore::in_dir(dir.path()),
+            AiProviderKind::Anthropic,
+            Some("env-key-value".into()),
+        )
+        .unwrap();
         assert_eq!(resolved.unwrap().expose(), "env-key-value");
     }
 
@@ -359,7 +391,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
         for key in ["  ", "bad\nkey", &"x".repeat(513)] {
-            assert!(store.set(AiProviderKind::Openai, &Secret::new(key)).is_err());
+            assert!(store
+                .set(AiProviderKind::Openai, &Secret::new(key))
+                .is_err());
         }
     }
 
@@ -367,7 +401,9 @@ mod tests {
     fn anthropic_prefix_warning_does_not_block_saving() {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
-        let warning = store.set(AiProviderKind::Anthropic, &Secret::new("proxy-key-123456")).unwrap();
+        let warning = store
+            .set(AiProviderKind::Anthropic, &Secret::new("proxy-key-123456"))
+            .unwrap();
         assert!(warning.is_some());
         assert!(store.get(AiProviderKind::Anthropic).unwrap().is_some());
     }
@@ -378,8 +414,13 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
-        store.set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC)).unwrap();
-        assert_eq!(fs::metadata(store.path()).unwrap().permissions().mode() & 0o777, 0o600);
+        store
+            .set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC))
+            .unwrap();
+        assert_eq!(
+            fs::metadata(store.path()).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     #[test]
@@ -387,7 +428,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
         fs::write(store.path(), "{broken").unwrap();
-        let error = store.get(AiProviderKind::Anthropic).unwrap_err().to_string();
+        let error = store
+            .get(AiProviderKind::Anthropic)
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("credentials.json is invalid"));
     }
 
@@ -412,8 +456,13 @@ mod tests {
     fn openai_base_url_is_persisted_and_validated() {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
-        store.set_openai_base_url(Some(" https://api.example.test/v1 ")).unwrap();
-        assert_eq!(store.openai_base_url().unwrap().as_deref(), Some("https://api.example.test/v1"));
+        store
+            .set_openai_base_url(Some(" https://api.example.test/v1 "))
+            .unwrap();
+        assert_eq!(
+            store.openai_base_url().unwrap().as_deref(),
+            Some("https://api.example.test/v1")
+        );
         assert!(store.set_openai_base_url(Some("file:///tmp/key")).is_err());
     }
 }
