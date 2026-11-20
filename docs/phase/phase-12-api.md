@@ -4,7 +4,7 @@
 **Branch:** `phase-12-api` (based on merged Phase 11 `master`)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — CLI output and configuration contract](../decisions/0015-cli-output-and-config.md) (preserved); [0016 — interim AI key storage](../decisions/0016-interim-ai-key-file-storage.md)  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); REST 0016, MCP 0017 and plugins 0018 are planned  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -26,7 +26,7 @@ remain outside `core`.
 
 | Milestone | Status | Notes |
 |---|---|---|
-| 12.0 AI credentials | READY TO START | Interim `AiKeyStore` + `credentials.json`; design and test plan approved. No implementation or verification claimed yet. |
+| 12.0 AI credentials | IN PROGRESS | Core file store, desktop commands/UI and CLI key commands added; automated verification and remaining acceptance checks pending. |
 | 12.A CLI polish | IN PROGRESS | Stable exit-code type, clap completions, TOML config loading and precedence helpers; JSON envelope for analyze/scan. Global JSON and complete command coverage/tests remain. |
 | 12.B REST API | NOT STARTED | Planned in a separate `server/` workspace member; localhost + bearer token. |
 | 12.C MCP server | NOT STARTED | stdio transport; every write must use safe application services and explicit approval. |
@@ -36,8 +36,8 @@ remain outside `core`.
 ## D2 / P1 design record
 
 - User approved the Phase 12 design specification on 2026-11-20.
-- Added ADR 0016, status Accepted (interim), for file-backed AI credentials.
-- ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; later Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).
+- Added ADR 0015, status Accepted (interim), for file-backed AI credentials.
+- Reconciled ADR numbering to the Phase 12 guide: ADR 0015 is interim AI credential storage; the CLI contract remains documented in `docs/CLI.md`; later ADRs are REST 0016, MCP 0017 and plugins 0018.
 - Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
 - At the design approval checkpoint, implementation code had not yet been changed.
 
