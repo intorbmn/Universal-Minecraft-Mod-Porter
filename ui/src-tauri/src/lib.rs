@@ -132,6 +132,7 @@ async fn rollback(
     blocking(&svc, move |s| commands::rollback(s, &project, checkpoint)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn settings(svc: Svc<'_>) -> Settings {
     commands::settings(&svc)
@@ -166,11 +167,13 @@ async fn check_build_risk(
     blocking(&svc, move |s| commands::check_build_risk(s, &path, local)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn start_build(svc: Svc<'_>, request: BuildJobRequest) -> Result<Uuid, UiError> {
     commands::start_build(&svc, request)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn start_pack(svc: Svc<'_>, request: PackRequest) -> Result<Uuid, UiError> {
     commands::start_pack(&svc, request)
