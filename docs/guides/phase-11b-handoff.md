@@ -62,3 +62,11 @@ Root four commands pass. `ui/src-tauri`: build, 4 tests, clippy, fmt pass. `npm 
 - Core returns an empty in-memory knowledge base when the CLI's `open_kb` gets neither `--kb` nor `--mappings`.
 - `#[allow(clippy::needless_pass_by_value)]` on the `targets` command, because Tauri passes `State` by value.
 - Branch history: A1-A3 exist twice (squashed locally, three commits on the remote). A merge commit joined them with identical trees. Do not rewrite history or force-push.
+
+
+## User acceptance update — 2026-11-20
+
+- User reports that the desktop tool basically runs. Record this as a basic runtime smoke test only; no unreported sub-feature is assumed to have passed.
+- AI has not been tested yet; keep AI acceptance open.
+- Cancellation has not been exercised because jobs complete too quickly. Defer this test and use a deliberately long-running cancellable job before marking it passed.
+- Keep the draft PR open. Installer artifacts/hashes, native screenshots, AI acceptance, and the remaining Windows integration checks still need evidence.
