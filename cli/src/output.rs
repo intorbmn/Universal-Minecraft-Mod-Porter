@@ -2,9 +2,14 @@
 
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static JSON_MODE: AtomicBool = AtomicBool::new(false);
+
+thread_local! {
+    static RESULT: RefCell<Option<Value>> = const { RefCell::new(None) };
+}
 
 pub fn set_json_mode(enabled: bool) {
     JSON_MODE.store(enabled, Ordering::Relaxed);
@@ -15,10 +20,13 @@ pub fn is_json_mode() -> bool {
     JSON_MODE.load(Ordering::Relaxed)
 }
 
-pub fn success<T: Serialize>(command: &str, exit_code: i32, result: Option<T>) {
-    let result = result.map_or_else(|| json!({ "exit_code": exit_code }), |value| {
-        serde_json::to_value(value).unwrap_or(Value::Null)
-    });
+pub fn set_result<T: Serialize>(value: T) {
+    RESULT.with(|result| *result.borrow_mut() = serde_json::to_value(value).ok());
+}
+
+pub fn success(command: &str, exit_code: i32) {
+    let result = RESULT.with(|result| result.borrow_mut().take())
+        .unwrap_or_else(|| json!({ "exit_code": exit_code }));
     println!(
         "{}",
         json!({
