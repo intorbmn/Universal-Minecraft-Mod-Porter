@@ -42,7 +42,7 @@ describe('Settings and localization', () => {
   it('changes visible labels immediately when the language changes', async () => {
     render(Settings);
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-    await fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'vi' } });
+    await fireEvent.change(await screen.findByLabelText('Language'), { target: { value: 'vi' } });
     expect(screen.getByRole('heading', { name: 'Cài đặt' })).toBeInTheDocument();
   });
 
