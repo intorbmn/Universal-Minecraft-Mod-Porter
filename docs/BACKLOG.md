@@ -72,3 +72,10 @@ Move an item into a phase file when it is picked up.
 ## Phase 6 — Migration engine
 - [ ] Real mapping dataset in the knowledge base (risks R1/R4).
 - [ ] Method/field renames in bytecode and Mixin injector targets (member mappings).
+
+
+## Phase 11 — Desktop UI follow-up
+- [ ] Replace the default Tauri icons with approved UMMP branding.
+- [ ] Add screenshots after a verified Windows desktop launch.
+- [ ] Record a Windows install and sample-mod smoke test before treating Phase 11 as accepted.
+- [ ] Consider interrupting active Gradle/GitHub build processes; current job cancellation is checked between steps only.
