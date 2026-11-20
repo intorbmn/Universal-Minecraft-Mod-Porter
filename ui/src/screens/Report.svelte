@@ -5,6 +5,7 @@
 
   let { job, input, onBuild }: { job: JobView; input: string; onBuild: (path: string) => void } = $props();
   let rollbackError = $state<UiError | null>(null);
+  let openError = $state<UiError | null>(null);
   let rolledBack = $state(false);
 
   let report = $derived((job.result?.report && typeof job.result.report === 'object'
@@ -21,6 +22,15 @@
     report?.checkpoint_id ??
     (typeof job.result?.checkpoint === 'string' ? job.result.checkpoint : null)
   );
+
+  async function openOutput() {
+    openError = null;
+    try {
+      await api.openOutput(job.id);
+    } catch (e) {
+      openError = e as UiError;
+    }
+  }
 
   async function rollback() {
     rollbackError = null;
@@ -65,8 +75,10 @@
 
 {#if output}
   <p><strong>{t('report.output')}:</strong> <code>{output}</code></p>
+  <button onclick={openOutput}>{t('report.openOutput')}</button>
   {#if !isBuild}<button onclick={() => onBuild(output)}>{t('report.build')}</button>{/if}
 {/if}
+{#if openError}<p class="error" role="alert">{openError.message}</p>{/if}
 {#if checkpoint}
   <button class="danger" onclick={rollback} disabled={rolledBack}>{rolledBack ? t('report.rolledBack') : t('report.rollback')}</button>
 {/if}
