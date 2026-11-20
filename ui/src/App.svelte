@@ -73,17 +73,11 @@
     }
   }
 
-  async function startAi() {
-    if (!request || !canAi) return;
-    error = null;
-    try {
-      jobKind = 'migration';
-      jobId = await api.startAiAssist(request);
-      finishedJob = null;
-      screen = 'run';
-    } catch (e) {
-      error = e as UiError;
-    }
+  function startAi(id: string) {
+    jobKind = 'migration';
+    jobId = id;
+    finishedJob = null;
+    screen = 'run';
   }
 
   function startPack(id: string) {
