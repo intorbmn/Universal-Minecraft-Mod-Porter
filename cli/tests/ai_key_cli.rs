@@ -67,7 +67,12 @@ fn delete_removes_only_the_selected_provider() {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(b"sk-openai-test-0000000000000000\n").unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"sk-openai-test-0000000000000000\n")
+        .unwrap();
     assert_eq!(child.wait().unwrap().code(), Some(0));
 
     let deleted = Command::new(binary())
