@@ -16,10 +16,12 @@ use std::process::Stdio;
 use std::sync::Arc;
 use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
 use ummp_core::adapter::{AdapterRegistry, Handling};
-use ummp_core::app::credentials::{default_data_dir, resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore};
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
+use ummp_core::app::credentials::{
+    default_data_dir, resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore,
+};
 use ummp_core::app::helpers::{
     detected_loader, mod_identity, open_kb, pack_format, risk_decision, side, NoIndex, RiskDecision,
 };
@@ -539,7 +541,10 @@ fn parse_ai_provider(value: &str) -> Result<AiProviderKind, CliFailure> {
     match value {
         "anthropic" => Ok(AiProviderKind::Anthropic),
         "openai" => Ok(AiProviderKind::Openai),
-        _ => Err(CliFailure::new(ExitCode::InvalidInput, "provider must be anthropic or openai")),
+        _ => Err(CliFailure::new(
+            ExitCode::InvalidInput,
+            "provider must be anthropic or openai",
+        )),
     }
 }
 
@@ -588,7 +593,10 @@ fn read_api_key() -> Result<String, Box<dyn std::error::Error>> {
     }
     #[cfg(not(any(unix, windows)))]
     {
-        Err("hidden terminal input is not supported on this platform; pipe the key through stdin".into())
+        Err(
+            "hidden terminal input is not supported on this platform; pipe the key through stdin"
+                .into(),
+        )
     }
 }
 
@@ -614,7 +622,11 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
             if json_mode {
                 output::set_result(result);
             } else {
-                println!("Saved {} API key: {}", provider, result["masked"].as_str().unwrap_or("saved"));
+                println!(
+                    "Saved {} API key: {}",
+                    provider,
+                    result["masked"].as_str().unwrap_or("saved")
+                );
                 if let Some(warning) = warning {
                     eprintln!("Warning: {warning}");
                 }
@@ -628,7 +640,14 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
                 ],
                 Some(name) => {
                     let kind = parse_ai_provider(&name)?;
-                    vec![(if kind == AiProviderKind::Anthropic { "anthropic" } else { "openai" }, kind)]
+                    vec![(
+                        if kind == AiProviderKind::Anthropic {
+                            "anthropic"
+                        } else {
+                            "openai"
+                        },
+                        kind,
+                    )]
                 }
             };
             let entries = providers
@@ -650,10 +669,16 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
             if json_mode {
                 output::set_result(result);
             } else {
-                println!("Credentials: {}", result["path"].as_str().unwrap_or_default());
+                println!(
+                    "Credentials: {}",
+                    result["path"].as_str().unwrap_or_default()
+                );
                 for entry in result["providers"].as_array().into_iter().flatten() {
-                    println!("{}: {}", entry["provider"].as_str().unwrap_or_default(),
-                        entry["masked"].as_str().unwrap_or("not saved"));
+                    println!(
+                        "{}: {}",
+                        entry["provider"].as_str().unwrap_or_default(),
+                        entry["masked"].as_str().unwrap_or("not saved")
+                    );
                 }
             }
         }
@@ -726,7 +751,10 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         config: config_path,
         command,
     } = cli;
-    let config = if matches!(&command, Commands::Completions { .. } | Commands::AiKey { .. }) {
+    let config = if matches!(
+        &command,
+        Commands::Completions { .. } | Commands::AiKey { .. }
+    ) {
         CliConfig::default()
     } else {
         config_path
