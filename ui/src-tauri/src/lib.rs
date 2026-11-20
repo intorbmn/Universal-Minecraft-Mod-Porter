@@ -164,11 +164,10 @@ async fn delete_secret(store: Secrets<'_>, name: String) -> Result<(), UiError> 
 
 #[tauri::command]
 fn ai_key_status(
-    svc: Svc<'_>,
     keys: AiKeys<'_>,
     provider: String,
 ) -> Result<commands::AiKeyStatus, UiError> {
-    commands::ai_key_status(keys.inner().as_ref(), &provider, &svc.settings().data_dir)
+    commands::ai_key_status(keys.inner().as_ref(), &provider)
 }
 
 #[tauri::command]
