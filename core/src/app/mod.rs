@@ -2,6 +2,7 @@
 //! Rust functions. The UI crate only forwards to these (ADR 0004); it holds no logic.
 
 pub mod approval;
+pub mod credentials;
 pub mod helpers;
 pub mod jobs;
 pub mod runs;
