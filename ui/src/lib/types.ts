@@ -1,5 +1,4 @@
-// Shapes returned by the Rust commands. The golden JSON in tests/fixtures/golden/app-views
-// is checked against the Rust structs (core/tests/app.rs) and against these types (Vitest).
+// Shapes returned by the Rust commands. Rust structs and golden JSON are the source of truth.
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type JobState =
@@ -48,9 +47,84 @@ export interface SessionView {
   error: string | null;
 }
 
+export interface TargetVersion {
+  minecraft: string;
+  loaders: string[];
+}
+
 export interface TargetsView {
   loaders: string[];
-  versions: { minecraft: string; loaders: string[] }[];
+  versions: TargetVersion[];
+}
+
+export type FileKind = 'modified' | 'created';
+
+export interface FileDiffView {
+  path: string;
+  kind: FileKind;
+  diff: string;
+  replacements: number;
+  needs_attention: boolean;
+}
+
+export interface PlanView {
+  source_minecraft: string;
+  target_minecraft: string;
+  source_loader: string | null;
+  target_loader: string;
+  files: FileDiffView[];
+  moves: { from: string; to: string }[];
+  deletes: string[];
+  technologies: unknown[];
+  skipped: { description: string; reason: string }[];
+  warnings: string[];
+  files_scanned: number;
+}
+
+export interface ReportView {
+  files_changed: number;
+  replacements: number;
+  moves: number;
+  deletes: number;
+  skipped_mappings: number;
+  breaking_changes: number;
+  warnings: string[];
+  technologies: unknown[];
+  checkpoint_id: string | null;
+}
+
+export interface ProgressView {
+  done: number;
+  total: number;
+}
+
+export interface JobView {
+  id: string;
+  session: string;
+  step: string;
+  state: JobState;
+  progress: ProgressView | null;
+  log: string[];
+  result: Record<string, unknown> | null;
+  error: string | null;
+}
+
+export interface PlanRequest {
+  input: string;
+  from: string | null;
+  to: string;
+  loader: string | null;
+  min_confidence: number;
+}
+
+export interface PortRequest {
+  input: string;
+  output: string | null;
+  to: string;
+  from: string | null;
+  loader: string | null;
+  zip: boolean;
+  min_confidence: number;
 }
 
 export interface UiError {
@@ -58,7 +132,7 @@ export interface UiError {
   message: string;
 }
 
-/** Every job event arrives in this envelope on `ummp://event`. */
+/** Core's event envelope forwarded by the Tauri shell. */
 export interface CoreEvent {
   id: string;
   kind: string;
