@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import PackReport from '../src/screens/PackReport.svelte';
@@ -44,16 +45,15 @@ describe('AI approval', () => {
 
 describe('Pack report pagination', () => {
   it('renders 50 of 300 rows at a time', async () => {
-    const items = Array.from({ length: 300 }, (_, i) => ({
-      path: `mods/mod-${i}.jar`,
-      mod_id: `mod-${i}`,
-      action: { action: 'keep' },
-      reason: 'already compatible',
-    }));
+    const golden = JSON.parse(readFileSync(
+      new URL('../../tests/fixtures/golden/app-views/pack-report-300.json', import.meta.url),
+      'utf8',
+    ));
+    const items = golden.items;
     render(PackReport, {
       job: {
         id: 'job-pack', session: 'session-pack', step: 'done', state: 'Succeeded',
-        progress: null, log: [], error: null, result: { output: '/tmp/pack-out', items },
+        progress: null, log: [], error: null, result: { output: golden.output, items },
       },
     });
     const table = screen.getByRole('table');
