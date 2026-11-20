@@ -20,7 +20,7 @@ export interface ModView {
 }
 
 export interface AnalysisView {
-  kind: 'folder' | 'zip';
+  kind: 'folder' | 'zip' | 'jar';
   mods: ModView[];
   build_system: string | null;
   languages: string[];
