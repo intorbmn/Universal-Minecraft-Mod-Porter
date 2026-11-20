@@ -708,3 +708,168 @@ fn cancel_in_place_migrate_rolls_back_and_reports_cancelled() {
     );
     assert_eq!(svc.job(job).unwrap().state, JobState::Cancelled);
 }
+
+// ---- 11.A6: AI approvals through the event channel ----
+
+use std::collections::VecDeque;
+use std::sync::Mutex as StdMutex;
+use ummp_core::ai::{AiConfig, AiError, AiProvider, AiRequest, AiResponse, Usage};
+
+/// A scripted stand-in for the model: replays JSON replies in order, offline.
+struct Scripted(StdMutex<VecDeque<serde_json::Value>>);
+
+impl AiProvider for Scripted {
+    fn name(&self) -> &'static str {
+        "scripted"
+    }
+    fn complete(&self, req: &AiRequest) -> Result<AiResponse, AiError> {
+        let v = self
+            .0
+            .lock()
+            .unwrap()
+            .pop_front()
+            .expect("extra model call");
+        Ok(AiResponse {
+            text: v.to_string(),
+            usage: Usage {
+                input_tokens: 10,
+                output_tokens: 5,
+            },
+            model: req.model.clone(),
+        })
+    }
+}
+
+/// Analysis, one edit `DemoWidget -> DemoGadget` in A.java, and the reviewer approving it.
+fn scripted_edit() -> Arc<Scripted> {
+    Arc::new(Scripted(StdMutex::new(VecDeque::from([
+        serde_json::json!({"summary": "s", "risks": [], "files_to_change": ["A.java"]}),
+        serde_json::json!({"edits": [{"path": "A.java", "search": "DemoWidget",
+            "replace": "DemoGadget", "rationale": "r"}], "notes": []}),
+        serde_json::json!({"verdicts": [{"path": "A.java", "approve": true, "concerns": []}]}),
+    ]))))
+}
+
+fn ai_project(dir: &Path) -> PathBuf {
+    let p = dir.join("aiproj");
+    std::fs::create_dir_all(&p).unwrap();
+    std::fs::write(p.join("A.java"), "class A { DemoWidget w; }\n").unwrap();
+    p
+}
+
+fn ai_req(input: PathBuf) -> PlanRequest {
+    PlanRequest {
+        input,
+        from: Some("1.20.1".into()),
+        to: "1.21".into(),
+        loader: Some("fabric".into()),
+        min_confidence: 0.8,
+    }
+}
+
+fn ai_config() -> AiConfig {
+    AiConfig {
+        retry_backoff_ms: 0,
+        ..AiConfig::default()
+    }
+}
+
+/// Reads events until one of `kind` for `job` arrives.
+fn until_kind(rx: &std::sync::mpsc::Receiver<Event>, job: Uuid, kind: &str) -> Event {
+    loop {
+        let e = rx
+            .recv_timeout(std::time::Duration::from_mins(1))
+            .unwrap_or_else(|_| panic!("no {kind} event for {job}"));
+        if e.kind == kind && e.payload["job"] == job.to_string() {
+            return e;
+        }
+        assert!(
+            !(e.kind == "job.finished" && e.payload["job"] == job.to_string()),
+            "job finished before {kind}: {:?}",
+            e.payload
+        );
+    }
+}
+
+/// ★ mutation: make the gate return `true` without waiting (or apply on a `false`) and this
+/// goes red: A.java would change before, or after, the person said no.
+#[test]
+fn ai_edit_waits_for_decision_and_reject_writes_nothing() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let project = ai_project(d.path());
+    let original = read_tree(&project);
+    let rx = collect(&svc);
+
+    // Run 1: the person rejects.
+    let job = svc
+        .start_ai_assist(ai_req(project.clone()), scripted_edit(), ai_config())
+        .unwrap();
+    let ask = until_kind(&rx, job, "job.approval");
+    assert_eq!(ask.payload["path"], "A.java");
+    assert!(ask.payload["diff"].as_str().unwrap().contains("DemoGadget"));
+    assert_eq!(svc.job(job).unwrap().state, JobState::Running);
+    assert_eq!(
+        read_tree(&project),
+        original,
+        "nothing is written while waiting"
+    );
+    let approval: Uuid = ask.payload["approval"].as_str().unwrap().parse().unwrap();
+    svc.decide(approval, false).unwrap();
+    let done = until_kind(&rx, job, "job.finished");
+    assert_eq!(done.payload["state"], "Succeeded", "{:?}", done.payload);
+    assert_eq!(
+        read_tree(&project),
+        original,
+        "a rejected edit writes nothing"
+    );
+    assert!(matches!(
+        svc.decide(approval, true),
+        Err(AppError::NotFound(_))
+    ));
+
+    // Run 2: the person approves.
+    let job = svc
+        .start_ai_assist(ai_req(project.clone()), scripted_edit(), ai_config())
+        .unwrap();
+    let ask = until_kind(&rx, job, "job.approval");
+    let approval: Uuid = ask.payload["approval"].as_str().unwrap().parse().unwrap();
+    svc.decide(approval, true).unwrap();
+    until_kind(&rx, job, "job.finished");
+    let text = std::fs::read_to_string(project.join("A.java")).unwrap();
+    assert!(
+        text.contains("DemoGadget") && !text.contains("DemoWidget"),
+        "{text}"
+    );
+}
+
+/// ★ mutation: treat a cancelled or closed gate as approval and this goes red.
+#[test]
+fn ai_gate_cancel_means_reject() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let project = ai_project(d.path());
+    let original = read_tree(&project);
+    let rx = collect(&svc);
+
+    let job = svc
+        .start_ai_assist(ai_req(project.clone()), scripted_edit(), ai_config())
+        .unwrap();
+    until_kind(&rx, job, "job.approval");
+    svc.cancel(job).unwrap();
+    let done = until_kind(&rx, job, "job.finished");
+    assert_eq!(done.payload["state"], "Cancelled", "{:?}", done.payload);
+    assert_eq!(
+        read_tree(&project),
+        original,
+        "cancel must not apply the edit"
+    );
+    // The folder alone cannot tell "the gate said no" from "the edit was applied and then
+    // rolled back". A rejecting gate never starts an apply, so no checkpoint exists.
+    assert!(
+        !default_snapshots(&project)
+            .join("checkpoints.json")
+            .exists(),
+        "the gate must reject on cancel: no apply, no checkpoint"
+    );
+}

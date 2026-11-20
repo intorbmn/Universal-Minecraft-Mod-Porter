@@ -1,12 +1,14 @@
 //! Application services: every action the desktop UI (and the CLI) can take, as plain
 //! Rust functions. The UI crate only forwards to these (ADR 0004); it holds no logic.
 
+pub mod approval;
 pub mod helpers;
 pub mod jobs;
 pub mod snapshots;
 pub mod views;
 
 use crate::adapter::{loader, Handling};
+use crate::ai::orchestrator::OrchestratorError;
 use crate::analyzer::AnalyzerEngine;
 use crate::checkpoint::CheckpointError;
 use crate::filesystem::{FileSystem, LocalFileSystem};
@@ -79,6 +81,8 @@ pub enum AppError {
     Db(#[from] DbError),
     #[error(transparent)]
     Checkpoint(#[from] CheckpointError),
+    #[error(transparent)]
+    Ai(#[from] OrchestratorError),
     #[error("cancelled")]
     Cancelled,
     #[error("not found: {0}")]

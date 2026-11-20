@@ -15,6 +15,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
@@ -56,6 +57,8 @@ pub struct Shared {
     pub db: Mutex<JobDb>,
     pub running: Mutex<HashMap<Uuid, Arc<JobCtx>>>,
     pub hook: Mutex<Option<StepHook>>,
+    /// Open `job.approval` questions, answered through `AppServices::decide`.
+    pub approvals: Mutex<HashMap<Uuid, Sender<bool>>>,
 }
 
 impl Shared {
@@ -66,6 +69,7 @@ impl Shared {
             db: Mutex::new(db),
             running: Mutex::new(HashMap::new()),
             hook: Mutex::new(None),
+            approvals: Mutex::new(HashMap::new()),
         }
     }
 
