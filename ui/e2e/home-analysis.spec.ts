@@ -79,6 +79,7 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
     };
   }, { job: completedJob });
   await page.goto('/');
+  await page.screenshot({ path: 'test-results/phase11-home.png', fullPage: true });
   await page.getByLabel('Path to a mod').fill('/mods/demo');
   await page.getByRole('button', { name: 'Analyze' }).click();
   await expect(page.getByTestId('mod-id')).toHaveText('demomod');
@@ -88,6 +89,7 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
   await page.getByLabel('Migrate in place (checkpoint + rollback)').check();
   await page.getByRole('button', { name: 'Preview changes' }).click();
   await expect(page.getByRole('heading', { name: 'src/main/resources/fabric.mod.json' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/phase11-plan.png', fullPage: true });
   const apply = page.getByRole('button', { name: 'Apply reviewed migration' });
   await expect(apply).toBeDisabled();
   await page.getByLabel('I reviewed the changes and understand what will be modified.').check();
@@ -134,6 +136,7 @@ test('modpack report paginates 300 rows and records first-page render time', asy
   await page.evaluate(() => performance.mark('pack-start'));
   await page.getByRole('button', { name: 'Migrate modpack' }).click();
   await expect(page.getByRole('heading', { name: 'Modpack migration report' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/phase11-pack-report.png', fullPage: true });
   await page.getByRole('button', { name: 'Open output folder' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__testOpenOutput)).toBe(true);
   await expect(page.getByRole('cell', { name: 'mod-0', exact: true })).toBeVisible();
