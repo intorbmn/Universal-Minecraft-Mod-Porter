@@ -2,12 +2,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   AnalysisView,
+  BuildJobRequest,
   JobView,
+  PackRequest,
   PlanRequest,
   PlanView,
   PortRequest,
+  RiskLevel,
   RiskView,
   SessionView,
+  SettingsView,
   TargetsView,
   UiError,
 } from './types';
@@ -41,4 +45,15 @@ export const api = {
   cancel: (id: string) => call<void>('cancel', { id }),
   rollback: (project: string, checkpoint: string | null) =>
     call<void>('rollback', { project, checkpoint }),
+  settings: () => call<SettingsView>('settings'),
+  saveSettings: (value: SettingsView) => call<void>('save_settings', { value }),
+  setSecret: (name: string, value: string) => call<void>('set_secret', { name, value }),
+  hasSecret: (name: string) => call<boolean>('has_secret', { name }),
+  deleteSecret: (name: string) => call<void>('delete_secret', { name }),
+  checkBuildRisk: (path: string, local: boolean) =>
+    call<RiskLevel | null>('check_build_risk', { path, local }),
+  startBuild: (request: BuildJobRequest) => call<string>('start_build', { request }),
+  startPack: (request: PackRequest) => call<string>('start_pack', { request }),
+  startAiAssist: (request: PlanRequest) => call<string>('start_ai_assist', { request }),
+  decide: (approval: string, approve: boolean) => call<void>('decide', { approval, approve }),
 };
