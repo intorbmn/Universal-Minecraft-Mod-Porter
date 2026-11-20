@@ -18,6 +18,7 @@
   let screen = $state<Screen>('home');
   let input = $state('');
   let request = $state<PlanRequest | null>(null);
+  let canAi = $derived(Boolean(request && !request.input.toLowerCase().endsWith('.zip')));
   let mode = $state<'port' | 'in_place'>('port');
   let output = $state<string | null>(null);
   let buildPath = $state('');
@@ -73,7 +74,7 @@
   }
 
   async function startAi() {
-    if (!request) return;
+    if (!request || !canAi) return;
     error = null;
     try {
       jobKind = 'migration';
@@ -116,7 +117,7 @@
     <button class:active={screen === 'home'} onclick={() => (screen = 'home')}>{t('nav.home')}</button>
     <button class:active={screen === 'analysis'} disabled={!input} onclick={() => (screen = 'analysis')}>{t('nav.analysis')}</button>
     <button class:active={screen === 'target' || screen === 'plan'} disabled={!input} onclick={chooseTarget}>{t('nav.target')}</button>
-    <button class:active={screen === 'ai'} disabled={!request} onclick={() => (screen = 'ai')}>{t('nav.ai')}</button>
+    <button class:active={screen === 'ai'} disabled={!canAi} onclick={() => (screen = 'ai')}>{t('nav.ai')}</button>
     <button class:active={screen === 'pack' || screen === 'pack-report'} onclick={() => (screen = 'pack')}>{t('nav.pack')}</button>
     <button class:active={screen === 'settings'} onclick={() => (screen = 'settings')}>{t('nav.settings')}</button>
     <span class="spacer"></span>
@@ -141,7 +142,7 @@
       <Report job={finishedJob} {input} onBuild={openBuild} />
     {:else if screen === 'build'}
       <Build path={buildPath} onStart={startBuild} />
-    {:else if screen === 'ai' && request}
+    {:else if screen === 'ai' && request && canAi}
       <Ai {request} onStart={startAi} />
     {:else if screen === 'pack'}
       <Pack onStart={startPack} />
