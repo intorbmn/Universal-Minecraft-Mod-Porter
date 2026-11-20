@@ -225,7 +225,10 @@ pub fn start_ai_assist(
         "openai" => {
             let key = store
                 .get("openai_api_key")
-                .map_err(|message| UiError { kind: "internal", message })?
+                .map_err(|message| UiError {
+                    kind: "internal",
+                    message,
+                })?
                 .ok_or_else(|| UiError {
                     kind: "refused",
                     message: "Save an OpenAI API key in Settings before starting AI assist.".into(),
