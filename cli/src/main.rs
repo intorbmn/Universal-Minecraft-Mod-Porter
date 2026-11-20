@@ -536,6 +536,7 @@ fn run_build(path: &Path, a: BuildArgs) -> Result<bool, Box<dyn std::error::Erro
             git: "git".into(),
             poll: std::time::Duration::from_secs(15),
             workdir,
+            token: None,
         }
         .run(&req)?
     };
