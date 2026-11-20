@@ -45,6 +45,7 @@ export const api = {
   cancel: (id: string) => call<void>('cancel', { id }),
   rollback: (project: string, checkpoint: string | null) =>
     call<void>('rollback', { project, checkpoint }),
+  openOutput: (id: string) => call<void>('open_output', { id }),
   settings: () => call<SettingsView>('settings'),
   saveSettings: (value: SettingsView) => call<void>('save_settings', { value }),
   setSecret: (name: string, value: string) => call<void>('set_secret', { name, value }),
