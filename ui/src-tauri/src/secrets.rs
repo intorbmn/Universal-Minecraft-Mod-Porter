@@ -56,7 +56,9 @@ impl SecretStore for OsKeyring {
             .map_err(|_| "the operating system credential store is unavailable".to_owned())?;
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => Err("could not delete the credential from the operating system keyring".into()),
+            Err(_) => {
+                Err("could not delete the credential from the operating system keyring".into())
+            }
         }
     }
 }
