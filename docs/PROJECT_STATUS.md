@@ -20,10 +20,10 @@ locally on branch `phase-10-modpack`.
 | 8 Build & Testing Engine | COMPLETED | `ummp scan` (static malware risk), `ummp build` local + GitHub Actions (real run 3/3 verified): build, tests, server launch, scored report; see `docs/phase/phase-08-build.md`, ADR 0011, `docs/BACKLOG.md` |
 | 9 Advanced Technology Adapters | COMPLETED | Adapter SDK + 15 technology rules, native report, Groovy/Scala, Mixin member renames, loader conversion (Fabric/Quilt ↔ NeoForge, Forge ↔ NeoForge), `ummp port`. See `docs/phase/phase-09-adapters.md`, ADR 0012 |
 | 10 Modpack Migration | COMPLETED | `ummp pack inspect|migrate|export`: 4 pack formats read and written, parallel analysis, dependency graph, risk gate, planner, optional read-only Modrinth lookups, config migration through `MigrationEngine`, report. See `docs/phase/phase-10-modpack.md`, ADR 0013 |
-| 11 User Interface | IN_PROGRESS | 11.A–11.E implemented; CI and Windows installer/runtime validation pending. See `docs/phase/phase-11-ui.md` |
+| 11 User Interface | IN_PROGRESS | 11.A–11.E implemented; automated CI green; Windows installer/runtime smoke test pending. See `docs/phase/phase-11-ui.md` |
 | 12 CLI, API & External Integration | NOT_STARTED | CLI has `analyze`, `migrate`, `remap-jar`, `rollback`, `ai-assist`, `ai-debug` (built as part of Phases 4/6) |
 | 13 Optimization & Production Readiness | NOT_STARTED | |
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Current milestone
-Phase 11 — User Interface (Tauri), branch `phase-11-ui`. The application services, desktop shell, workflow screens, keyring integration, AI approvals and modpack report are implemented. CI and the Windows installer/manual smoke test remain the acceptance gates. Follow [`docs/phase/phase-11-ui.md`](phase/phase-11-ui.md) and [`docs/guides/phase-11-ui.md`](guides/phase-11-ui.md).
+Phase 11 — User Interface (Tauri), branch `phase-11-ui`. The application services, desktop shell, workflow screens, keyring integration, AI approvals and modpack report are implemented. The Windows installer and manual smoke test remain the final acceptance gates; automated CI is green. Follow [`docs/phase/phase-11-ui.md`](phase/phase-11-ui.md) and [`docs/guides/phase-11-ui.md`](guides/phase-11-ui.md).
