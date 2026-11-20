@@ -113,6 +113,7 @@ test('modpack report paginates 300 rows and records first-page render time', asy
     result: { output: '/tmp/pack-out', written: [], manual: 0, items, exit_code: 0 },
   };
   await page.addInitScript(({ completedJob }) => {
+    (window as any).__testOpenOutput = false;
     (window as any).__TAURI_INTERNALS__ = {
       invoke: async (cmd: string, args: any) => {
         if (cmd === 'sessions') return [];
@@ -122,6 +123,7 @@ test('modpack report paginates 300 rows and records first-page render time', asy
         };
         if (cmd === 'start_pack') return 'job-pack';
         if (cmd === 'job') return completedJob;
+        if (cmd === 'open_output') { (window as any).__testOpenOutput = true; return null; }
         if (cmd === 'plugin:event|listen') return 1;
         if (cmd === 'plugin:event|unlisten') return null;
         return null;
@@ -136,6 +138,8 @@ test('modpack report paginates 300 rows and records first-page render time', asy
   await page.evaluate(() => performance.mark('pack-start'));
   await page.getByRole('button', { name: 'Migrate modpack' }).click();
   await expect(page.getByRole('heading', { name: 'Modpack migration report' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open output folder' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__testOpenOutput)).toBe(true);
   await expect(page.getByRole('cell', { name: 'mod-0', exact: true })).toBeVisible();
   await expect(page.getByText('mod-50')).toHaveCount(0);
   const elapsed = await page.evaluate(() => performance.now() - performance.getEntriesByName('pack-start')[0].startTime);
