@@ -7,9 +7,10 @@ Each entry names the module and the phase expected to address it.
 - **Minecraft version fallback.** When a descriptor has no readable Minecraft version, the
   analyzer reports `1.20.1` instead of "unknown". `ModMetadata.minecraft` is not optional yet,
   so a missing version cannot be told apart from a real 1.20.1.
-- **Source projects.** Mods are detected from JARs only. A source tree's
-  `src/main/resources/META-INF/mods.toml` or `fabric.mod.json` is not read, so `ummp analyze`
-  on a source project reports `Mods: 0`.
+- **Source descriptor coverage.** Source projects are analyzed from the supported descriptor
+  locations under `src/main/resources`; custom layouts and descriptors outside those paths
+  can still be missed. Standalone JARs now produce a metadata-only analysis view and can be
+  scanned, but cannot be ported or built without source.
 - **Only the first mod** in a multi-mod `mods.toml` is reported.
 - `tests/fixtures/generate.ps1` does not yet generate the three fixtures added in Phase 4
   gap closure (`fabric-classes`, `neoforge-b`, `quilt-a`); `generate.py` does.
