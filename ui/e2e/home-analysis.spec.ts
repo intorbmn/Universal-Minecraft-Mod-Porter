@@ -166,7 +166,6 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
   await page.addInitScript(() => {
     const callbacks = new Map<number, (event: unknown) => void>();
     let nextCallback = 1;
-    (window as any).__testAiStarts = 0;
     let finished = false;
     let aiStarts = 0;
     const decisions: boolean[] = [];
@@ -235,7 +234,7 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
   await page.getByRole('button', { name: 'Preview changes' }).click();
   await page.getByRole('button', { name: 'AI assist' }).click();
   await page.getByRole('button', { name: 'Start AI assist' }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__testAiStarts)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as any).__testAiStarts())).toBe(1);
   await expect(page.getByRole('heading', { name: 'Migration progress' })).toBeVisible();
   await page.waitForFunction(() => (window as any).__testCallbackCount() > 0);
 
