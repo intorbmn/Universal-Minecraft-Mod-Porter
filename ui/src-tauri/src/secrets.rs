@@ -118,7 +118,7 @@ mod tests {
     fn set_then_has_secret() {
         let store = MemorySecretStore::default();
         assert_eq!(store.get("anthropic_api_key").unwrap(), None);
-        store.set("anthropic_api_key", "test-secret-value").unwrap();
+        store.set_legacy("anthropic_api_key", "test-secret-value");
         assert_eq!(
             store.get("anthropic_api_key").unwrap().as_deref(),
             Some("test-secret-value")
