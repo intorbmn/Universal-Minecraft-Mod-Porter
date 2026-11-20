@@ -152,5 +152,6 @@
   "pack.next": "Tiếp",
   "analysis.jarOnly": "Có thể quét JAR độc lập, nhưng để port hoặc build cần thư mục source hoặc tệp ZIP chứa source.",
   "settings.githubTokenHelp": "Fine-grained token cần quyền Contents đọc/ghi và Actions đọc trên repository sandbox. Token chỉ được truyền qua GH_TOKEN cho tiến trình GitHub CLI.",
-  "settings.secretHelp": "API key và token được lưu trong keyring của hệ điều hành, không ghi vào settings.json."
+  "settings.secretHelp": "API key và token được lưu trong keyring của hệ điều hành, không ghi vào settings.json.",
+  "report.openOutput": "Mở thư mục đầu ra"
 }
