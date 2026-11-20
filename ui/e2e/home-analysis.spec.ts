@@ -157,3 +157,103 @@ test('keyboard focus starts on the Home navigation control and remains visible',
   const outline = await focused.evaluate((element) => getComputedStyle(element).outlineStyle);
   expect(outline).not.toBe('none');
 });
+
+
+test('AI approval events require explicit A/R decisions', async ({ page }) => {
+  await page.addInitScript(() => {
+    const callbacks = new Map<number, (event: unknown) => void>();
+    let nextCallback = 1;
+    let finished = false;
+    const decisions: boolean[] = [];
+    (window as any).__testDecisions = decisions;
+    (window as any).__testEmit = (event: unknown) => {
+      for (const callback of callbacks.values()) callback({ payload: event });
+    };
+    (window as any).__testCallbackCount = () => callbacks.size;
+    (window as any).__TAURI_INTERNALS__ = {
+      transformCallback: (callback: (event: unknown) => void) => {
+        const id = nextCallback++;
+        callbacks.set(id, callback);
+        return id;
+      },
+      unregisterCallback: (id: number) => callbacks.delete(id),
+      invoke: async (cmd: string) => {
+        if (cmd === 'sessions') return [];
+        if (cmd === 'analyze') return {
+          kind: 'folder',
+          mods: [{ id: 'demomod', name: 'Demo Mod', version: '1.0', loader: 'fabric', minecraft: '1.20.1', java: 21 }],
+          build_system: 'gradle', languages: ['Java'], technologies: [],
+        };
+        if (cmd === 'scan') return { level: null, findings: [] };
+        if (cmd === 'targets') return {
+          loaders: ['fabric', 'neoforge'],
+          versions: [{ minecraft: '1.21.1', loaders: ['fabric', 'neoforge'] }],
+        };
+        if (cmd === 'plan') return {
+          source_minecraft: '1.20.1', target_minecraft: '1.21.1',
+          source_loader: 'fabric', target_loader: 'neoforge',
+          files: [], moves: [], deletes: [], technologies: [], skipped: [], warnings: [], files_scanned: 2,
+        };
+        if (cmd === 'start_ai_assist') return 'job-ai';
+        if (cmd === 'job') return finished ? {
+          id: 'job-ai', session: 'session-ai', step: 'done', state: 'Succeeded',
+          progress: { done: 4, total: 4 }, log: [], error: null,
+          result: { proposed: ['DemoWidget.java'], applied: ['DemoWidget.java'], rejected: 1, checkpoint: null },
+        } : {
+          id: 'job-ai', session: 'session-ai', step: 'assisting', state: 'Running',
+          progress: { done: 3, total: 4 }, log: [], result: null, error: null,
+        };
+        if (cmd === 'decide') {
+          decisions.push(Boolean((arguments as any)[1]?.approve));
+          return null;
+        }
+        if (cmd === 'plugin:event|listen') return 1;
+        if (cmd === 'plugin:event|unlisten') return null;
+        return null;
+      },
+    };
+    (window as any).__testFinish = () => {
+      finished = true;
+      (window as any).__testEmit({
+        id: 'event-finished', kind: 'job.finished', timestamp: new Date().toISOString(),
+        payload: { job: 'job-ai', state: 'Succeeded', result: null, error: null },
+      });
+    };
+  });
+  await page.goto('/');
+  await page.getByLabel('Path to a mod').fill('/mods/demo');
+  await page.getByRole('button', { name: 'Analyze' }).click();
+  await page.getByRole('button', { name: 'Choose target' }).click();
+  await page.getByLabel('Minecraft version').selectOption('1.21.1');
+  await page.getByLabel('Mod loader').selectOption('neoforge');
+  await page.getByRole('button', { name: 'Preview changes' }).click();
+  await page.getByRole('button', { name: 'AI assist' }).click();
+  await page.getByRole('button', { name: 'Start AI assist' }).click();
+  await expect(page.getByRole('heading', { name: 'Migration progress' })).toBeVisible();
+  await page.waitForFunction(() => (window as any).__testCallbackCount() > 0);
+
+  const emit = async (approval: string) => page.evaluate((id) => {
+    (window as any).__testEmit({
+      id: `event-${id}`, kind: 'job.approval', timestamp: new Date().toISOString(),
+      payload: {
+        job: 'job-ai', approval: id, path: 'src/main/java/DemoWidget.java',
+        diff: '--- a/DemoWidget.java\n+++ b/DemoWidget.java\n-old\n+new',
+        reviewer_approved: true, concerns: [],
+      },
+    });
+  }, approval);
+
+  await emit('approval-a');
+  await expect(page.getByRole('heading', { name: 'Review proposed edit: src/main/java/DemoWidget.java' })).toBeVisible();
+  await page.keyboard.press('a');
+  await expect.poll(() => page.evaluate(() => (window as any).__testDecisions.length)).toBe(1);
+
+  await emit('approval-r');
+  await expect(page.getByRole('heading', { name: 'Review proposed edit: src/main/java/DemoWidget.java' })).toBeVisible();
+  await page.keyboard.press('r');
+  await expect.poll(() => page.evaluate(() => (window as any).__testDecisions.length)).toBe(2);
+  expect(await page.evaluate(() => (window as any).__testDecisions)).toEqual([true, false]);
+
+  await page.evaluate(() => (window as any).__testFinish());
+  await expect(page.getByRole('heading', { name: 'Migration report' })).toBeVisible();
+});
