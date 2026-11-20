@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import Ai from '../src/screens/Ai.svelte';
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -51,13 +51,11 @@ describe('shared AI credentials', () => {
     await fireEvent.input(input, { target: { value: 'sk-ant-test-0000000000000000' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Start AI assist' }));
 
-    const saveCall = invoke.mock.invocationCallOrder.findIndex((order) =>
-      order === invoke.mock.invocationCallOrder[ invoke.mock.calls.findIndex(([cmd]) => cmd === 'ai_key_save') ],
-    );
-    const startCall = invoke.mock.invocationCallOrder[ invoke.mock.calls.findIndex(([cmd]) => cmd === 'start_ai_assist') ];
-    expect(saveCall).toBeGreaterThanOrEqual(0);
-    expect(startCall).toBeGreaterThan(invoke.mock.invocationCallOrder[ invoke.mock.calls.findIndex(([cmd]) => cmd === 'ai_key_save') ]);
-    expect(onStart).toHaveBeenCalledWith('job-1');
+    await waitFor(() => expect(onStart).toHaveBeenCalledWith('job-1'));
+    const saveIndex = invoke.mock.calls.findIndex(([command]) => command === 'ai_key_save');
+    const startIndex = invoke.mock.calls.findIndex(([command]) => command === 'start_ai_assist');
+    expect(saveIndex).toBeGreaterThanOrEqual(0);
+    expect(startIndex).toBeGreaterThan(saveIndex);
     expect(input).toHaveValue('');
   });
 });
