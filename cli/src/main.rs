@@ -608,6 +608,7 @@ fn run_build(path: &Path, a: BuildArgs, config: &CliConfig) -> Result<bool, Box<
 
 fn main() {
     tracing_subscriber::fmt::init();
+    let json_requested = std::env::args_os().any(|arg| arg == "--json");
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => {
@@ -616,7 +617,11 @@ fn main() {
             } else {
                 ExitCode::InvalidInput.value()
             };
-            let _ = error.print();
+            if json_requested {
+                output::failure("invalid_input", &error.to_string());
+            } else {
+                let _ = error.print();
+            }
             std::process::exit(code);
         }
     };
