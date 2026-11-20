@@ -10,7 +10,7 @@ use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
 use ummp_core::app::{
-    AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Settings,
+    AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Secret, Settings,
 };
 use ummp_core::modpack::plan::ModIndex;
 use uuid::Uuid;
@@ -135,8 +135,16 @@ pub fn check_build_risk(
     Ok(svc.check_build_risk(path, local, true, true)?)
 }
 
-pub fn start_build(svc: &AppServices, request: BuildJobRequest) -> Result<Uuid, UiError> {
-    Ok(svc.start_build(request)?)
+pub fn start_build(
+    svc: &AppServices,
+    store: &dyn SecretStore,
+    request: BuildJobRequest,
+) -> Result<Uuid, UiError> {
+    let token = store
+        .get("github_token")
+        .map_err(|message| UiError { kind: "internal", message })?
+        .map(Secret::new);
+    Ok(svc.start_build_with_token(request, token)?)
 }
 
 pub fn start_pack(svc: &AppServices, request: PackRequest) -> Result<Uuid, UiError> {
