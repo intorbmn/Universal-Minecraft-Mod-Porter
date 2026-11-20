@@ -155,5 +155,11 @@
   "analysis.jarOnly": "A standalone JAR can be scanned, but porting and building require its source folder or a source ZIP.",
   "settings.githubTokenHelp": "Fine-grained token: Contents read/write and Actions read on the sandbox repository. It is passed as GH_TOKEN only to the GitHub CLI process.",
   "settings.secretHelp": "API keys and tokens are stored in the OS keyring, never in settings.json.",
-  "report.openOutput": "Open output folder"
+  "report.openOutput": "Open output folder",
+  "step.scan": "Scan",
+  "step.plan": "Plan",
+  "step.port": "Migrate",
+  "step.apply": "Apply / build",
+  "step.verify": "Verify",
+  "step.done": "Done"
 }
