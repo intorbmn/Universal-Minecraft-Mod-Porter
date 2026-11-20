@@ -13,6 +13,7 @@
   let values = $state<Record<SecretName, string>>({
     anthropic_api_key: '', openai_api_key: '', github_token: '',
   });
+  const secretNames: SecretName[] = ['anthropic_api_key', 'openai_api_key', 'github_token'];
   let saved = $state<Record<SecretName, boolean>>({
     anthropic_api_key: false, openai_api_key: false, github_token: false,
   });
@@ -110,7 +111,7 @@
   </section>
 
   <h2>{t('settings.credentials')}</h2>
-  {#each (['anthropic_api_key', 'openai_api_key', 'github_token'] as SecretName[]) as name (name)}
+  {#each secretNames as name (name)}
     <section class="credential">
       <div><strong>{name}</strong><span class="muted">{saved[name] ? t('settings.stored') : t('settings.notStored')}</span></div>
       <input type="password" autocomplete="off" aria-label={`${name} value`} bind:value={values[name]} placeholder={t('settings.secretPlaceholder')} />
