@@ -1,5 +1,7 @@
 //! Stable process exit codes for scripts and CI.
 
+use std::fmt;
+
 /// UMMP's documented CLI process status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
@@ -18,6 +20,27 @@ impl ExitCode {
         self as i32
     }
 }
+
+#[derive(Debug)]
+pub struct CliFailure {
+    pub code: ExitCode,
+    message: String,
+}
+
+impl CliFailure {
+    #[must_use]
+    pub fn new(code: ExitCode, message: impl Into<String>) -> Self {
+        Self { code, message: message.into() }
+    }
+}
+
+impl fmt::Display for CliFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for CliFailure {}
 
 #[cfg(test)]
 mod tests {
