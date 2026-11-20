@@ -110,6 +110,16 @@ mod tests {
     }
 
     #[test]
+    fn config_file_default_is_overridden_by_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ummp.toml");
+        std::fs::write(&path, "output_dir = \"from-file\"\nsandbox_repo = \"file/repo\"\nprovider = \"openai\"\n").unwrap();
+        let config: CliConfig = ummp_core::config::load_any(&path).unwrap();
+        assert_eq!(config.output_dir(None), Some(PathBuf::from("from-file")));
+        assert_eq!(config.output_dir(Some(PathBuf::from("from-cli"))), Some(PathBuf::from("from-cli")));
+    }
+
+    #[test]
     fn built_in_provider_is_anthropic() {
         assert_eq!(CliConfig::default().provider(None), "anthropic");
     }
