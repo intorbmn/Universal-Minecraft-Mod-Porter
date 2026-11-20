@@ -30,7 +30,7 @@ fn fakes(dir: &Path, artifact: &Path, auth_ok: bool) -> (PathBuf, PathBuf) {
         &gh,
         &format!(
             "echo \"gh $*\" >> '{calls}'\n\
-             echo \"GH_TOKEN=${GH_TOKEN:-}\" >> '{calls}'\n\
+             echo \"GH_TOKEN=${{GH_TOKEN:-}}\" >> '{calls}'\n\
              case \"$1 $2\" in\n\
              'auth status') exit 1 ;;\n\
              'api repos/demo-owner/ummp-build-sandbox/actions/runs/42/jobs') echo '{{\"jobs\":[{{\"id\":7}}]}}' ;;\n\
