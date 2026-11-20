@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use serde::Serialize;
-use ummp_core::ai::{AiConfig, AiProvider};
+use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
@@ -181,7 +181,25 @@ pub fn start_ai_assist(
             });
         }
     };
-    Ok(svc.start_ai_assist(request, provider, AiConfig::default())?)
+    let mut config = AiConfig::default();
+    if provider_name == "openai" {
+        for agent in [
+            AgentKind::Analysis,
+            AgentKind::Migration,
+            AgentKind::Debug,
+            AgentKind::Review,
+        ] {
+            config.agents.insert(
+                agent,
+                AgentModel {
+                    model: "gpt-4.1".into(),
+                    effort: "medium".into(),
+                    max_tokens: 16_000,
+                },
+            );
+        }
+    }
+    Ok(svc.start_ai_assist(request, provider, config)?)
 }
 
 #[cfg(test)]
