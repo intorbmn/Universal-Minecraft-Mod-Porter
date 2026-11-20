@@ -399,14 +399,25 @@ fn provider(args: &AiArgs, config: &CliConfig) -> Result<Box<dyn AiProvider>, Bo
     Ok(match provider.as_str() {
         "anthropic" => Box::new(AnthropicProvider::from_env()?),
         "openai" => {
-            let url = args
-                .base_url
-                .as_deref()
-                .ok_or_else(|| CliFailure::new(ExitCode::InvalidInput, "--provider openai needs --base-url"))?;
-            Box::new(OpenAiCompatibleProvider::new(url))
+            let url = config
+                .openai_base_url(args.base_url.clone())
+                .ok_or_else(|| CliFailure::new(ExitCode::InvalidInput, "OpenAI needs --base-url or openai_base_url in ummp.toml"))?;
+            Box::new(OpenAiCompatibleProvider::new(&url))
         }
         other => return Err(CliFailure::new(ExitCode::InvalidInput, format!("unknown provider '{other}'")).into()),
     })
+}
+
+fn open_configured_kb(
+    kb: Option<PathBuf>,
+    mappings: Option<PathBuf>,
+    config: &CliConfig,
+) -> Result<KnowledgeBase, Box<dyn std::error::Error>> {
+    if kb.is_none() && mappings.is_none() {
+        Ok(open_kb(config.kb.clone(), None)?)
+    } else {
+        Ok(open_kb(kb, mappings)?)
+    }
 }
 
 fn gate(args: &AiArgs) -> Box<dyn ApprovalGate> {
@@ -642,10 +653,10 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
             mappings,
             min_confidence,
         } => {
-            let kb = if kb.is_none() && mappings.is_none() {
+            let kb = if kb.is_none() && mappings.is_none() && config.kb.is_none() {
                 KnowledgeBase::open(Path::new(":memory:"))?
             } else {
-                open_kb(kb, mappings)?
+                open_configured_kb(kb, mappings, config)?
             };
             let formats = format
                 .iter()
@@ -750,7 +761,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             report,
         } => {
             let project = pm.open(&path)?;
-            let kb = open_kb(kb, mappings)?;
+            let kb = open_configured_kb(kb, mappings, config)?;
             let request = MigrationRequest {
                 source_minecraft: from,
                 target_minecraft: to,
@@ -800,7 +811,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             mappings,
             min_confidence,
         } => {
-            let kb = open_kb(kb, mappings)?;
+            let kb = open_configured_kb(kb, mappings, config)?;
             let request = MigrationRequest {
                 source_minecraft: from,
                 target_minecraft: to,
@@ -838,7 +849,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             ai,
         } => {
             let project = pm.open(&path)?;
-            let kb = open_kb(kb, mappings)?;
+            let kb = open_configured_kb(kb, mappings, config)?;
             let request = MigrationRequest {
                 source_minecraft: from.clone(),
                 target_minecraft: to.clone(),
@@ -972,7 +983,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 println!("No knowledge base given: structural migration only (descriptors, build files, loader conversion).");
                 KnowledgeBase::open(Path::new(":memory:"))?
             } else {
-                open_kb(kb, mappings)?
+                open_configured_kb(kb, mappings, config)?
             };
             let result = port(
                 &PortOptions {
