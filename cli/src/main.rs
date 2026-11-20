@@ -10,7 +10,7 @@ use config::CliConfig;
 use exit::{CliFailure, ExitCode};
 use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
 use ummp_core::adapter::{AdapterRegistry, Handling};
@@ -543,14 +543,16 @@ fn read_api_key() -> Result<String, Box<dyn std::error::Error>> {
         if !status.success() {
             return Err("could not disable terminal echo".into());
         }
-        let mut value = String::new();
-        let read = std::io::stdin().lock().read_line(&mut value);
-        let restore = Command::new("stty").arg("echo").status();
-        eprintln!();
-        read?;
-        if !restore?.success() {
-            return Err("could not restore terminal echo".into());
+        struct EchoGuard;
+        impl Drop for EchoGuard {
+            fn drop(&mut self) {
+                let _ = Command::new("stty").arg("echo").status();
+                eprintln!();
+            }
         }
+        let _echo_guard = EchoGuard;
+        let mut value = String::new();
+        std::io::stdin().lock().read_line(&mut value)?;
         Ok(value.trim().to_owned())
     }
     #[cfg(windows)]
@@ -558,6 +560,7 @@ fn read_api_key() -> Result<String, Box<dyn std::error::Error>> {
         let script = "$s=Read-Host 'API key' -AsSecureString; $p=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try {[Runtime.InteropServices.Marshal]::PtrToStringBSTR($p)} finally {[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($p)}";
         let output = Command::new("powershell.exe")
             .args(["-NoProfile", "-Command", script])
+            .stdin(Stdio::inherit())
             .output()?;
         if !output.status.success() {
             return Err("could not read the API key securely".into());
