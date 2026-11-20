@@ -39,11 +39,12 @@ This guide lets an agent that has never seen this repository build Phase 11 alon
    - `core/src/ai/mod.rs`: `ApprovalGate`
    - `core/src/jobs.rs`, `core/src/persistence.rs`, `core/src/events.rs`,
      `core/src/session.rs`, `core/src/checkpoint.rs`
-4. **Skill check, before any design work.** Follow §0.1. If a **required** skill is
+4. **Code reading:** use Graphify first (README §2b), then narrow Reads.
+5. **Skill check, before any design work.** Follow §0.1. If a **required** skill is
    missing, stop and ask the user to install it, using the §0.2 message. Wait for the
    answer. Load every available skill with the Skill tool when its step comes. Record
    which ones you used in the phase file.
-5. Ask the user the §3 questions (one message, with defaults). Then write the design doc
+6. Ask the user the §3 questions (one message, with defaults). Then write the design doc
    (§10, step D1).
 
 ### 0.1 Skills this phase needs
