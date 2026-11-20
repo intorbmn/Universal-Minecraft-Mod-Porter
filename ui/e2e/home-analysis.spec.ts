@@ -87,7 +87,7 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
   await page.getByLabel('Mod loader').selectOption('neoforge');
   await page.getByLabel('Migrate in place (checkpoint + rollback)').check();
   await page.getByRole('button', { name: 'Preview changes' }).click();
-  await expect(page.getByText('src/main/resources/fabric.mod.json')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'src/main/resources/fabric.mod.json' })).toBeVisible();
   const apply = page.getByRole('button', { name: 'Apply reviewed migration' });
   await expect(apply).toBeDisabled();
   await page.getByLabel('I reviewed the changes and understand what will be modified.').check();
