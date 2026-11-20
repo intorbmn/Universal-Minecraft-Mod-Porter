@@ -1,12 +1,16 @@
-//! Command bodies. Each one is a single call into `AppServices` (ADR 0004): no migration,
-//! scan, or analysis logic lives here. The `#[tauri::command]` wrappers are in `lib.rs`.
+//! Command bodies. Each one is a thin call into `AppServices` (ADR 0004).
+//! No migration, scan, build, or filesystem business logic lives in this crate.
 
 use std::path::Path;
 
 use serde::Serialize;
-use ummp_core::app::AppError;
-use ummp_core::app::AppServices;
-use ummp_core::app::views::{AnalysisView, RiskView, SessionView, TargetsView};
+use ummp_core::app::views::{
+    AnalysisView, JobView, PlanView, RiskView, SessionView, TargetsView,
+};
+use ummp_core::app::{
+    AppError, AppServices, PlanRequest, PortRequest,
+};
+use uuid::Uuid;
 
 /// The only error shape the web view sees.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -48,6 +52,38 @@ pub fn targets(svc: &AppServices) -> TargetsView {
     svc.targets()
 }
 
+pub fn plan(svc: &AppServices, request: &PlanRequest) -> Result<PlanView, UiError> {
+    Ok(svc.plan(request)?)
+}
+
+pub fn start_port(svc: &AppServices, request: PortRequest) -> Result<Uuid, UiError> {
+    Ok(svc.start_port(request)?)
+}
+
+pub fn start_migrate_in_place(
+    svc: &AppServices,
+    request: PlanRequest,
+    reviewed: bool,
+) -> Result<Uuid, UiError> {
+    Ok(svc.start_migrate_in_place(request, reviewed)?)
+}
+
+pub fn job(svc: &AppServices, id: Uuid) -> Result<JobView, UiError> {
+    Ok(svc.job(id)?)
+}
+
+pub fn cancel(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
+    Ok(svc.cancel(id)?)
+}
+
+pub fn rollback(
+    svc: &AppServices,
+    project: &Path,
+    checkpoint: Option<Uuid>,
+) -> Result<(), UiError> {
+    Ok(svc.rollback(project, checkpoint)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +122,39 @@ mod tests {
         let svc = services(d.path());
         assert!(sessions(&svc, 10).unwrap().is_empty());
         assert!(!targets(&svc).loaders.is_empty());
+    }
+
+    #[test]
+    fn plan_returns_the_core_diff_without_writing_the_source() {
+        let d = tempdir().unwrap();
+        let svc = services(d.path());
+        let source = fixture("loader/fabric-src");
+        let request = PlanRequest {
+            input: source.clone(),
+            from: Some("1.20.1".into()),
+            to: "1.21.1".into(),
+            loader: Some("neoforge".into()),
+            min_confidence: 0.8,
+        };
+        let view = plan(&svc, &request).unwrap();
+        assert_eq!(view.target_minecraft, "1.21.1");
+        assert!(!view.files.is_empty());
+        assert!(source.join("src/main/resources/fabric.mod.json").exists());
+    }
+
+    #[test]
+    fn unreviewed_in_place_apply_is_refused_at_the_command_boundary() {
+        let d = tempdir().unwrap();
+        let svc = services(d.path());
+        let request = PlanRequest {
+            input: fixture("loader/fabric-src"),
+            from: Some("1.20.1".into()),
+            to: "1.21.1".into(),
+            loader: Some("neoforge".into()),
+            min_confidence: 0.8,
+        };
+        let err = start_migrate_in_place(&svc, request, false).unwrap_err();
+        assert_eq!(err.kind, "refused");
     }
 
     #[test]
