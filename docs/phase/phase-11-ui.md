@@ -116,15 +116,17 @@ The root Rust toolchain must not be changed to bypass the pin. The desktop Linux
 ## Outstanding acceptance gates
 
 1. Dispatch `.github/workflows/desktop-release.yml` from branch `phase-11-ui`; verify MSI and NSIS artifacts are produced.
-2. On Windows 10/11, install and launch the app, then verify Credential Manager, file/folder picker, build risk gates, AI approval, modpack output, output-folder opener, cancellation, and rollback using the sample mod.
-3. Commit 2–3 screenshots from the real Windows app under `docs/screenshots/phase-11/`. The three Playwright screenshots are already captured in the CI artifact; they are browser evidence, not a replacement for Windows runtime screenshots.
-4. Record installer hashes and Windows smoke-test results in this file and the draft PR. Do not merge and do not start Phase 12.
+2. Basic desktop runtime: user reports that the application now runs at a basic level. This is a smoke-test signal only; it does not certify every Windows integration or workflow.
+3. AI: NOT TESTED by the user yet. Verify provider/key configuration, request execution, proposal rendering, explicit approve/reject, and resulting job/report before marking accepted.
+4. Cancellation: DEFERRED. The sample job completes too quickly to exercise the cancel path; do not count this as passed or failed. Add a deliberately long-running/cancellable test case before closing this gate.
+5. Commit 2–3 screenshots from the real Windows app under `docs/screenshots/phase-11/`. The three Playwright screenshots are already captured in the CI artifact; they are browser evidence, not a replacement for Windows runtime screenshots.
+6. Record installer hashes and the remaining Windows smoke-test results in this file and the draft PR. Do not merge and do not start Phase 12.
 
 ## Known limitations
 
 - Build cancellation is honored between steps; an active Gradle or GitHub Actions process is not interrupted.
 - The Windows installer is unsigned; macOS/Linux packaging and auto-update are not implemented.
-- The Tauri window has not been launched in this session; real Windows runtime behavior remains unverified.
+- User-reported basic desktop runtime works. Full Windows acceptance is still incomplete: AI has not been tested, cancellation is deferred because jobs finish too quickly, and the remaining OS integrations/installer checks need explicit results.
 - Three real Playwright browser screenshots are available in CI artifact `ummp-phase11-playwright`; native Windows desktop screenshots are still outstanding.
 - AI desktop providers are Anthropic and OpenAI only; local Ollama, custom base URLs, model selection, streaming, and prompt customization are deferred.
 - Recent sessions are listed but cannot yet be reopened into a full event timeline.
