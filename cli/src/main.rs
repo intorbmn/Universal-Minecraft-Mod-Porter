@@ -380,7 +380,11 @@ fn main() {
         }
         Err(error) => {
             let failure = error.downcast_ref::<CliFailure>();
-            let code = failure.map_or(ExitCode::Error.value(), |e| e.code.value());
+            let app_error = error.downcast_ref::<ummp_core::app::AppError>();
+            let code = failure
+                .map(|e| e.code.value())
+                .or_else(|| app_error.map(|e| map_app_error(e).code.value()))
+                .unwrap_or(ExitCode::Error.value());
             if json_mode {
                 let kind = match code {
                     2 => "refused",
