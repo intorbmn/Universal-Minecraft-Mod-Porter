@@ -46,7 +46,7 @@ impl CliConfig {
         });
 
         let mut config = match path {
-            Some(path) => ummp_core::config::load_any(&path)?,
+            Some(path) => load_file(&path)?,
             None => Self::default(),
         };
 
@@ -93,6 +93,28 @@ impl CliConfig {
     pub fn openai_base_url(&self, cli: Option<String>) -> Option<String> {
         cli.or_else(|| self.openai_base_url.clone())
     }
+}
+
+fn load_file(path: &Path) -> Result<CliConfig, Box<dyn std::error::Error>> {
+    let text = std::fs::read_to_string(path)?;
+    if text.lines().any(is_secret_field) {
+        return Err("secret-like fields are not allowed in ummp.toml; use `ummp ai-key set`".into());
+    }
+    ummp_core::config::load_any(path)
+        .map_err(|_| "invalid ummp.toml: check its syntax and supported field names".into())
+}
+
+fn is_secret_field(line: &str) -> bool {
+    let key = line
+        .split('#')
+        .next()
+        .unwrap_or_default()
+        .split_once('=')
+        .map_or("", |(key, _)| key.trim().trim_matches('"').trim_matches('\''))
+        .to_ascii_lowercase();
+    ["key", "token", "secret", "password"]
+        .iter()
+        .any(|part| key.contains(part))
 }
 
 fn env_value(env: &mut impl FnMut(&str) -> Option<String>, key: &str) -> Option<String> {
@@ -220,7 +242,7 @@ openai_base_url = "http://localhost:11434/v1"
         let path = dir.path().join("ummp.toml");
         std::fs::write(&path, "anthropic_api_key = \"synthetic-secret\"").unwrap();
         let error = load(Some(&path), dir.path(), None, &[]).unwrap_err().to_string();
-        assert!(error.contains("unknown field"));
+        assert!(error.contains("secret-like fields"));
         assert!(!error.contains("synthetic-secret"));
     }
 
