@@ -5,7 +5,7 @@
   import type { AiKeyStatus, PlanRequest, UiError } from '../lib/types';
 
   let { request, onStart }: { request: PlanRequest; onStart: (jobId: string) => void } = $props();
-  let loading = $state(false);
+  let loading = $state(true);
   let error = $state<UiError | null>(null);
   let provider = $state('anthropic');
   let status = $state<AiKeyStatus | null>(null);
@@ -27,6 +27,8 @@
       await refresh();
     } catch (e) {
       error = e as UiError;
+    } finally {
+      loading = false;
     }
   });
 
