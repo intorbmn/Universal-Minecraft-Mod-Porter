@@ -79,3 +79,29 @@ result views are being migrated. Errors use:
 ```
 
 Shell completion generation cannot be combined with `--json`.
+
+## AI credentials
+
+AI provider keys are shared by the desktop app and CLI through the interim credential
+store. Enter a key through hidden terminal input, or pipe one line from stdin:
+
+```sh
+ummp ai-key set --provider anthropic
+ummp ai-key set --provider openai --base-url http://localhost:11434/v1
+printf '%s\n' "$MY_AI_KEY" | ummp ai-key set --provider openai
+ummp ai-key status
+ummp ai-key status --provider anthropic
+ummp ai-key delete --provider openai
+ummp ai-key delete
+```
+
+A key is never accepted as a command-line argument. Status shows only a masked value and
+the credentials path. The full key is not printed. Environment variables
+(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) override saved credentials and are not copied
+into the store. The OpenAI-compatible base URL is saved with the credential and can be
+overridden with `--base-url` for an AI command.
+
+The file-backed store is temporary and weaker than an OS keyring: another process running
+as the same user can read it. On Unix the file is created with mode `0600`; on Windows it
+is kept in the per-user application data directory. Do not place it in a repository or
+share it.
