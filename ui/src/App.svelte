@@ -26,6 +26,14 @@
   let finishedJob = $state<JobView | null>(null);
   let error = $state<UiError | null>(null);
 
+  $effect(() => {
+    api.settings()
+      .then((value) => {
+        if (value?.language) setLang(value.language);
+      })
+      .catch(() => undefined);
+  });
+
   function analyze(path: string) {
     input = path;
     screen = 'analysis';
