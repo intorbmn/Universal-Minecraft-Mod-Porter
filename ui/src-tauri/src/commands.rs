@@ -9,6 +9,7 @@ use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
+use ummp_core::app::credentials::{AiKeyStore, AiProviderKind, CREDENTIALS_FILE};
 use ummp_core::app::{
     AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Secret, Settings,
 };
@@ -195,58 +196,133 @@ pub fn start_pack(svc: &AppServices, request: PackRequest) -> Result<Uuid, UiErr
     Ok(svc.start_pack(request, index)?)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AiKeyStatus {
+    pub saved: bool,
+    pub masked: Option<String>,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AiKeySaved {
+    pub masked: String,
+    pub warning: Option<String>,
+}
+
+fn ai_provider(value: &str) -> Result<AiProviderKind, UiError> {
+    match value {
+        "anthropic" => Ok(AiProviderKind::Anthropic),
+        "openai" => Ok(AiProviderKind::Openai),
+        _ => Err(UiError {
+            kind: "input",
+            message: "Choose Anthropic or OpenAI.".into(),
+        }),
+    }
+}
+
+pub fn ai_key_status(
+    store: &dyn AiKeyStore,
+    provider: &str,
+    data_dir: &Path,
+) -> Result<AiKeyStatus, UiError> {
+    let masked = store.masked(ai_provider(provider)?).map_err(UiError::from)?;
+    Ok(AiKeyStatus {
+        saved: masked.is_some(),
+        masked,
+        path: data_dir.join(CREDENTIALS_FILE).to_string_lossy().into_owned(),
+    })
+}
+
+pub fn ai_key_save(
+    store: &dyn AiKeyStore,
+    provider: &str,
+    key: &str,
+    base_url: Option<&str>,
+) -> Result<AiKeySaved, UiError> {
+    let provider = ai_provider(provider)?;
+    let secret = Secret::new(key);
+    let warning = store.set(provider, &secret).map_err(UiError::from)?;
+    if provider == AiProviderKind::Openai {
+        store
+            .set_openai_base_url(base_url)
+            .map_err(UiError::from)?;
+    }
+    let masked = store
+        .masked(provider)
+        .map_err(UiError::from)?
+        .ok_or_else(|| UiError {
+            kind: "internal",
+            message: "credential was not available after saving".into(),
+        })?;
+    Ok(AiKeySaved { masked, warning })
+}
+
+pub fn ai_key_delete(store: &dyn AiKeyStore, provider: &str) -> Result<(), UiError> {
+    let provider = ai_provider(provider)?;
+    store.delete(provider).map_err(UiError::from)?;
+    if provider == AiProviderKind::Openai {
+        store.set_openai_base_url(None).map_err(UiError::from)?;
+    }
+    Ok(())
+}
+
+/// Moves legacy AI keys once. A failed keyring operation never prevents app startup.
+pub fn migrate_legacy_ai_keys(legacy: &dyn SecretStore, keys: &dyn AiKeyStore) {
+    for (name, provider, label) in [
+        ("anthropic_api_key", AiProviderKind::Anthropic, "Anthropic"),
+        ("openai_api_key", AiProviderKind::Openai, "OpenAI"),
+    ] {
+        let Ok(Some(value)) = legacy.get(name) else {
+            continue;
+        };
+        let Ok(None) = keys.get(provider) else {
+            continue;
+        };
+        if keys.set(provider, &Secret::new(value)).is_ok() {
+            if legacy.delete(name).is_ok() {
+                eprintln!("moved {label} key from keyring to shared credentials");
+            }
+        }
+    }
+}
+
 pub fn start_ai_assist(
     svc: &AppServices,
-    store: &dyn SecretStore,
+    keys: &dyn AiKeyStore,
     request: PlanRequest,
 ) -> Result<Uuid, UiError> {
     let provider_name = svc
         .settings()
         .ai_provider
         .unwrap_or_else(|| "anthropic".into());
-    let provider: Arc<dyn AiProvider> = match provider_name.as_str() {
-        "anthropic" => {
-            let key = store
-                .get("anthropic_api_key")
-                .map_err(|message| UiError {
-                    kind: "internal",
-                    message,
-                })?
-                .ok_or_else(|| UiError {
-                    kind: "refused",
-                    message: "Save an Anthropic API key in Settings before starting AI assist."
-                        .into(),
-                })?;
-            Arc::new(AnthropicProvider::with_api_key(
-                key,
-                "https://api.anthropic.com",
-            ))
-        }
-        "openai" => {
-            let key = store
-                .get("openai_api_key")
-                .map_err(|message| UiError {
-                    kind: "internal",
-                    message,
-                })?
-                .ok_or_else(|| UiError {
-                    kind: "refused",
-                    message: "Save an OpenAI API key in Settings before starting AI assist.".into(),
-                })?;
+    let kind = ai_provider(&provider_name)?;
+    let key = keys
+        .get(kind)
+        .map_err(UiError::from)?
+        .ok_or_else(|| UiError {
+            kind: "refused",
+            message: format!(
+                "No {provider_name} API key is saved. Enter it in the AI screen or save it with `ummp ai-key set`."
+            ),
+        })?;
+    let provider: Arc<dyn AiProvider> = match kind {
+        AiProviderKind::Anthropic => Arc::new(AnthropicProvider::with_api_key(
+            key.expose().to_owned(),
+            "https://api.anthropic.com",
+        )),
+        AiProviderKind::Openai => {
+            let url = keys
+                .openai_base_url()
+                .map_err(UiError::from)?
+                .unwrap_or_else(|| "https://api.openai.com/v1".into());
             Arc::new(OpenAiCompatibleProvider::with_api_key(
-                "https://api.openai.com/v1",
-                key,
+                url,
+                key.expose().to_owned(),
             ))
-        }
-        _ => {
-            return Err(UiError {
-                kind: "input",
-                message: "Unsupported AI provider. Choose Anthropic or OpenAI in Settings.".into(),
-            });
         }
     };
     let mut config = AiConfig::default();
-    if provider_name == "openai" {
+    if kind == AiProviderKind::Openai {
         for agent in [
             AgentKind::Analysis,
             AgentKind::Migration,
