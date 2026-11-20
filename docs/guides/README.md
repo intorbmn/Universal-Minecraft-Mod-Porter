@@ -56,7 +56,7 @@ which java javac gradle gh      # Java 21, Gradle 8.x, GitHub CLI are used by te
 The `mcp__Graphify__*` tools answer code-structure questions from a prebuilt code graph.
 Use them before reading whole files.
 1. **Check the index.** Call `list_repositories` and look for
-   `intorbmn/universal-minecraft-mod-porter` with `queryable: true`.
+   `intorbmn/Universal-Minecraft-Mod-Porter` (case as shown by Graphify; pass it as `repository_id`) with `queryable: true`. The build sandbox `intorbmn/ummp-build-sandbox` is indexed too.
    - If it is not listed, ask the user once to connect the repo in Graphify. Until then,
      use grep and partial Reads.
 2. **Check freshness.** Compare the result's `commitSha` with `git rev-parse HEAD`.
