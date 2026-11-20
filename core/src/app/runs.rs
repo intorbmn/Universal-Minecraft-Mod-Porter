@@ -270,12 +270,17 @@ impl AppServices {
                 )));
             }
             ctx.progress("done", 3, 3);
+            let output = slash(&outcome.output);
+            let written = outcome.written.iter().map(|p| slash(p)).collect::<Vec<_>>();
+            let manual = outcome.plan.manual_count();
+            let exit_code = outcome.exit_code();
+            let items = outcome.plan.items;
             Ok(serde_json::json!({
-                "output": slash(&outcome.output),
-                "written": outcome.written.iter().map(|p| slash(p)).collect::<Vec<_>>(),
-                "manual": outcome.plan.manual_count(),
-                "items": outcome.plan.items,
-                "exit_code": outcome.exit_code(),
+                "output": output,
+                "written": written,
+                "manual": manual,
+                "items": items,
+                "exit_code": exit_code,
             }))
         })
     }
