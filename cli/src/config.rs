@@ -164,7 +164,12 @@ mod tests {
         let path = dir.path().join("ummp.toml");
         std::fs::write(
             &path,
-            "output_root = \"out\"\nkb = \"mappings.db\"\nsandbox_repo = \"owner/repo\"\nai_provider = \"openai\"\nopenai_base_url = \"http://localhost:11434/v1\"\n",
+            r#"output_root = "out"
+kb = "mappings.db"
+sandbox_repo = "owner/repo"
+ai_provider = "openai"
+openai_base_url = "http://localhost:11434/v1"
+"#,
         ).unwrap();
         let config = load(Some(&path), dir.path(), None, &[]).unwrap();
         assert_eq!(config.output_root, Some(PathBuf::from("out")));
