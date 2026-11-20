@@ -1,7 +1,7 @@
 //! CLI configuration and precedence: flags > environment > file > built-ins.
 
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 #[serde(default)]
@@ -19,7 +19,7 @@ impl CliConfig {
         } else {
             user_config_dir().map(|dir| dir.join("ummp.toml")).filter(|p| p.is_file())
         };
-        let mut config = match path {
+        let mut config: Self = match path {
             Some(path) => ummp_core::config::load_any(&path)?,
             None => Self::default(),
         };
@@ -78,11 +78,6 @@ fn user_config_dir() -> Option<PathBuf> {
     {
         None
     }
-}
-
-#[must_use]
-pub fn config_path_in(dir: &Path) -> PathBuf {
-    dir.join("ummp.toml")
 }
 
 #[cfg(test)]
