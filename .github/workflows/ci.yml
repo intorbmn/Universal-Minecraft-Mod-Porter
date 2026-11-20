@@ -79,7 +79,7 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev || echo "npm audit reported advisories; review before release"
       - run: npx vitest run
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: npx playwright test
       - name: Upload Playwright screenshots and traces
         if: always()
