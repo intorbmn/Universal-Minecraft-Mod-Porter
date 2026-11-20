@@ -136,7 +136,7 @@ test('modpack report paginates 300 rows and records first-page render time', asy
   await page.evaluate(() => performance.mark('pack-start'));
   await page.getByRole('button', { name: 'Migrate modpack' }).click();
   await expect(page.getByRole('heading', { name: 'Modpack migration report' })).toBeVisible();
-  await expect(page.getByText('mod-0')).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'mod-0', exact: true })).toBeVisible();
   await expect(page.getByText('mod-50')).toHaveCount(0);
   const elapsed = await page.evaluate(() => performance.now() - performance.getEntriesByName('pack-start')[0].startTime);
   test.info().annotations.push({ type: 'pack-first-page-render-ms', description: elapsed.toFixed(1) });
