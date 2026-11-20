@@ -16,9 +16,9 @@
   const steps = ['step.scan', 'step.plan', 'step.port', 'step.apply', 'step.verify', 'step.done'];
   const stepMap: Record<string, string> = {
     scan: 'step.scan', validate: 'step.scan',
-    plan: 'step.plan', planning: 'step.plan',
+    plan: 'step.plan', planning: 'step.plan', analysing: 'step.plan',
     port: 'step.port', porting: 'step.port', migrating: 'step.port',
-    apply: 'step.apply', applying: 'step.apply', building: 'step.apply',
+    apply: 'step.apply', applying: 'step.apply', building: 'step.apply', assisting: 'step.apply',
     review: 'step.apply', awaiting_approval: 'step.apply',
     verify: 'step.verify', done: 'step.done',
   };
