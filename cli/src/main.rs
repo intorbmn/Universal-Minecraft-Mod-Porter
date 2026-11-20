@@ -770,6 +770,15 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
     }
 }
 
+fn map_app_error(error: ummp_core::app::AppError) -> CliFailure {
+    let code = match error {
+        ummp_core::app::AppError::Input(_) => ExitCode::InvalidInput,
+        ummp_core::app::AppError::Refused(_) => ExitCode::Refused,
+        _ => ExitCode::Error,
+    };
+    CliFailure::new(code, error.to_string())
+}
+
 fn app_services(config: &CliConfig) -> Result<ummp_core::app::AppServices, Box<dyn std::error::Error>> {
     use ummp_core::app::{AppServices, Settings};
 
@@ -778,7 +787,7 @@ fn app_services(config: &CliConfig) -> Result<ummp_core::app::AppServices, Box<d
     settings.output_root.clone_from(&config.output_root);
     settings.sandbox_repo.clone_from(&config.sandbox_repo);
     settings.ai_provider.clone_from(&config.ai_provider);
-    AppServices::open(settings).map_err(Into::into)
+    AppServices::open(settings).map_err(|error| Box::new(map_app_error(error)) as Box<dyn std::error::Error>)
 }
 
 fn command_name(command: &Commands) -> &'static str {
@@ -816,13 +825,19 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
 
     match command {
         Commands::Completions { shell } => {
+            if json_mode {
+                return Err(CliFailure::new(
+                    ExitCode::InvalidInput,
+                    "--json cannot be combined with shell completion generation",
+                ).into());
+            }
             let mut command = Cli::command();
             generate(shell, &mut command, "ummp", &mut std::io::stdout());
         }
         Commands::Analyze { path } => {
             if json_mode {
                 let services = app_services(&config)?;
-                output::set_result(services.analyze(&path)?);
+                output::set_result(services.analyze(&path).map_err(map_app_error)?);
             } else {
                 let project = pm.open(&path)?;
                 let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
@@ -1032,7 +1047,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         Commands::Scan { path } => {
             if json_mode {
                 let services = app_services(&config)?;
-                let report = services.scan(&path)?;
+                let report = services.scan(&path).map_err(map_app_error)?;
                 if report.level == Some(ummp_core::app::views::RiskLevel::High) {
                     exit_code = ExitCode::Refused.value();
                 }
