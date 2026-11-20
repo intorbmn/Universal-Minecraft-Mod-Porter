@@ -148,11 +148,17 @@ fn scan_json_has_stable_versioned_envelope() {
         String::from_utf8_lossy(&output.stderr)
     );
     let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let golden: serde_json::Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/golden/cli/scan-envelope.json"))
-            .unwrap();
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/scan-envelope.json"
+    ))
+    .unwrap();
     let keys = |value: &serde_json::Value| {
-        let mut keys = value.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+        let mut keys = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         keys.sort();
         keys
     };
