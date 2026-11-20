@@ -8,3 +8,13 @@ from = "demowidget-legacy"
 to = "demowidget"
 loader = "fabric"
 note = "Synthetic example: the legacy build was merged into the main mod."
+
+# [[config_rule]]: since Minecraft `since_mc`, mod `mod_id` renamed a key (and/or the file) in `file`.
+# Applied when a pack moves from before `since_mc` to `since_mc` or later. Keys are matched exactly,
+# in TOML, JSON, .properties and Forge .cfg files; formatting and comments are kept.
+
+[[config_rule]]
+mod_id = "demowidget"
+since_mc = "1.21"
+file = "config/demowidget.toml"
+rename_key = [{ from = "size", to = "capacity" }]

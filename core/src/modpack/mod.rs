@@ -43,6 +43,8 @@ pub enum PackError {
     Refused(String),
     #[error("mod index: {0}")]
     Index(String),
+    #[error(transparent)]
+    Migration(#[from] crate::migration::MigrationError),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

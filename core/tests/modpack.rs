@@ -865,3 +865,141 @@ fn plan_removes_wrong_side_mod() {
     assert!(matches!(action(&pl, "mods/a.jar"), PackAction::Remove { reason } if reason.contains("wrong side")));
     let _ = PackRules::builtin().unwrap();
 }
+
+// ---------------------------------------------------------------------------
+// 10.E Config migration
+// ---------------------------------------------------------------------------
+
+use std::collections::BTreeSet;
+use ummp_core::migration::MigrationError;
+use ummp_core::modpack::config::{
+    copy_overrides, migrate_config, ConfigRule, KeyRename,
+};
+
+fn tree(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut v: Vec<_> = all_files(root)
+        .into_iter()
+        .map(|p| (p.strip_prefix(root).unwrap().to_path_buf(), std::fs::read(&p).unwrap()))
+        .collect();
+    v.sort();
+    v
+}
+
+fn rule(mod_id: &str, file: &str, from: &str, to: &str) -> ConfigRule {
+    ConfigRule {
+        mod_id: mod_id.into(),
+        since_mc: "1.21".into(),
+        file: file.into(),
+        rename_file: None,
+        rename_key: vec![KeyRename { from: from.into(), to: to.into() }],
+    }
+}
+
+/// An instance folder with a config tree, imported and copied to a fresh output folder.
+fn config_out(tmp: &Path, files: &[(&str, &str)]) -> PathBuf {
+    let dir = tmp.join("pack");
+    for (rel, body) in files {
+        write(&dir, rel, body.as_bytes());
+    }
+    write(&dir, "mods/a.jar", &fabric_jar("demowidget", "1.20.1", &[]));
+    let p = import(&dir, &tmp.join("work")).unwrap();
+    let out = tmp.join("out");
+    copy_overrides(&p, &out).unwrap();
+    out
+}
+
+fn ids(v: &[&str]) -> BTreeSet<String> {
+    v.iter().map(|s| (*s).to_string()).collect()
+}
+
+#[test]
+fn config_rule_renames_key() {
+    let tmp = tempfile::tempdir().unwrap();
+    let toml = "# widget settings\nsize = 4\n[sub]\nsize_x = 1\n  size =  9 # indented\n";
+    let out = config_out(
+        tmp.path(),
+        &[
+            ("config/demowidget.toml", toml),
+            ("config/demowidget.json", "{\"size\": 4, \"nested\": {\"size\": 5}, \"sizes\": 1}"),
+            ("config/demowidget.properties", "size=4\n# size=ignored\nsize.x=1\n"),
+            ("config/demowidget.cfg", "general {\n    I:size=4\n    S:\"size\"=x\n    I:sizes=2\n}\n"),
+        ],
+    );
+    let rules = vec![
+        rule("demowidget", "config/demowidget.toml", "size", "capacity"),
+        rule("demowidget", "config/demowidget.json", "size", "capacity"),
+        rule("demowidget", "config/demowidget.properties", "size", "capacity"),
+        rule("demowidget", "config/demowidget.cfg", "size", "capacity"),
+    ];
+    let snaps = tempfile::tempdir().unwrap();
+    let rep = migrate_config(&out, &rules, &ids(&["demowidget"]), "1.20.1", "1.21.1", snaps.path()).unwrap();
+    assert_eq!(rep.changes.len(), 4);
+    assert!(rep.checkpoint.is_some());
+
+    let read = |f: &str| std::fs::read_to_string(out.join(f)).unwrap();
+    assert_eq!(
+        read("config/demowidget.toml"),
+        "# widget settings\ncapacity = 4\n[sub]\nsize_x = 1\n  capacity =  9 # indented\n"
+    );
+    assert_eq!(
+        read("config/demowidget.json"),
+        "{\"capacity\": 4, \"nested\": {\"capacity\": 5}, \"sizes\": 1}"
+    );
+    assert_eq!(read("config/demowidget.properties"), "capacity=4\n# size=ignored\nsize.x=1\n");
+    assert_eq!(
+        read("config/demowidget.cfg"),
+        "general {\n    I:capacity=4\n    S:\"capacity\"=x\n    I:sizes=2\n}\n"
+    );
+
+    // A rule does not apply when the mod is absent, or the target is before the change.
+    let tmp2 = tempfile::tempdir().unwrap();
+    let out2 = config_out(tmp2.path(), &[("config/demowidget.toml", "size = 4\n")]);
+    let snaps2 = tempfile::tempdir().unwrap();
+    let before = tree(&out2);
+    let r = migrate_config(&out2, &rules[..1], &ids(&["other"]), "1.20.1", "1.21.1", snaps2.path()).unwrap();
+    assert!(r.changes.is_empty() && r.checkpoint.is_none());
+    let r = migrate_config(&out2, &rules[..1], &ids(&["demowidget"]), "1.20.1", "1.20.4", snaps2.path()).unwrap();
+    assert!(r.changes.is_empty());
+    let r = migrate_config(&out2, &rules[..1], &ids(&["demowidget"]), "1.21.1", "1.21.4", snaps2.path()).unwrap();
+    assert!(r.changes.is_empty(), "already past the change");
+    assert_eq!(tree(&out2), before);
+}
+
+#[test]
+fn config_without_rule_is_copied_unchanged() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = config_out(
+        tmp.path(),
+        &[
+            ("config/a.toml", "size = 4\n"),
+            ("kubejs/server_scripts/x.js", "// script\r\nlet a = 1;\r\n"),
+            ("options.txt", "lang:en_us\n"),
+        ],
+    );
+    let snaps = tempfile::tempdir().unwrap();
+    let rep = migrate_config(&out, &[], &ids(&["demowidget"]), "1.20.1", "1.21.1", snaps.path()).unwrap();
+    assert!(rep.changes.is_empty() && rep.moves.is_empty());
+    let t = tree(&out);
+    assert_eq!(t.len(), 3);
+    assert!(t.iter().any(|(p, b)| p == Path::new("kubejs/server_scripts/x.js") && b == b"// script\r\nlet a = 1;\r\n"));
+}
+
+#[test]
+fn config_rollback_restores_original() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = config_out(
+        tmp.path(),
+        &[("config/demowidget.toml", "size = 4\n"), ("config/blocker", "i am a file")],
+    );
+    let before = tree(&out);
+    // The edit is written first; the move then fails because `config/blocker` is a file.
+    let mut r = rule("demowidget", "config/demowidget.toml", "size", "capacity");
+    r.rename_file = Some("config/blocker/demowidget.toml".into());
+    let snaps = tempfile::tempdir().unwrap();
+    let err = migrate_config(&out, &[r], &ids(&["demowidget"]), "1.20.1", "1.21.1", snaps.path()).unwrap_err();
+    assert!(
+        matches!(err, PackError::Migration(MigrationError::ApplyFailed { rolled_back: true, .. })),
+        "{err:?}"
+    );
+    assert_eq!(tree(&out), before);
+}
