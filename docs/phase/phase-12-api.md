@@ -4,7 +4,9 @@
 **Branch:** `phase-12-api` (based on merged Phase 11 `master`)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — CLI output and configuration contract](../decisions/0015-cli-output-and-config.md) (preserved); [0016 — interim AI key storage](../decisions/0016-interim-ai-key-file-storage.md)\n**Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)\n**Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
+**ADRs:** [0015 — CLI output and configuration contract](../decisions/0015-cli-output-and-config.md) (preserved); [0016 — interim AI key storage](../decisions/0016-interim-ai-key-file-storage.md)
+**Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)
+**Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
 ## Working method
 
@@ -24,13 +26,30 @@ remain outside `core`.
 
 | Milestone | Status | Notes |
 |---|---|---|
+| 12.0 AI credentials | READY TO START | Interim `AiKeyStore` + `credentials.json`; design and test plan approved. No implementation or verification claimed yet. |
 | 12.A CLI polish | IN PROGRESS | Stable exit-code type, clap completions, TOML config loading and precedence helpers; JSON envelope for analyze/scan. Global JSON and complete command coverage/tests remain. |
 | 12.B REST API | NOT STARTED | Planned in a separate `server/` workspace member; localhost + bearer token. |
 | 12.C MCP server | NOT STARTED | stdio transport; every write must use safe application services and explicit approval. |
 | 12.D GitHub Action | NOT STARTED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
 
-## D2 / P1 design record\n\n- User approved the Phase 12 design specification on 2026-11-20.\n- Added ADR 0016, status Accepted (interim), for file-backed AI credentials.\n- ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; later Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).\n- Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.\n- No implementation code has been changed yet.\n\n## 12.A implementation record
+## D2 / P1 design record
+
+- User approved the Phase 12 design specification on 2026-11-20.
+- Added ADR 0016, status Accepted (interim), for file-backed AI credentials.
+- ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; later Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).
+- Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
+- No implementation code has been changed yet.
+
+## D2 / P1 design record
+
+- User approved the Phase 12 design specification on 2026-11-20.
+- Added ADR 0016, status Accepted (interim), for file-backed AI credentials.
+- ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; subsequent Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).
+- Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
+- No implementation code has been changed yet.
+
+## 12.A implementation record
 
 - Added `cli/src/exit.rs` with the six documented numeric exit statuses.
 - Added `clap_complete` and `ummp completions bash|zsh|fish|powershell`.
