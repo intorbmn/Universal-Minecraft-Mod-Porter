@@ -703,7 +703,11 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
 }
 
 fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
-    let config = CliConfig::load()?;
+    let config = if matches!(&cli.command, Commands::Completions { .. }) {
+        CliConfig::default()
+    } else {
+        CliConfig::load()?
+    };
     let pm = DefaultProjectManager;
     let mut exit_code = ExitCode::Ok.value();
 
