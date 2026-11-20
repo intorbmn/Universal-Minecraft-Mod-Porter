@@ -18,9 +18,7 @@ impl CliConfig {
         Self::load_with_path(None)
     }
 
-    pub fn load_with_path(
-        explicit: Option<&Path>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn load_with_path(explicit: Option<&Path>) -> Result<Self, Box<dyn std::error::Error>> {
         let cwd = std::env::current_dir()?;
         let data_dir = default_data_dir();
         Self::load_from(explicit, &cwd, data_dir.as_deref(), |key| {
@@ -57,13 +55,12 @@ impl CliConfig {
         config.kb = env_value(&mut env, "UMMP_KB")
             .map(PathBuf::from)
             .or(config.kb);
-        config.sandbox_repo = env_value(&mut env, "UMMP_BUILD_REPO")
-            .or(config.sandbox_repo);
+        config.sandbox_repo = env_value(&mut env, "UMMP_BUILD_REPO").or(config.sandbox_repo);
         config.ai_provider = env_value(&mut env, "UMMP_AI_PROVIDER")
             .or_else(|| env_value(&mut env, "UMMP_PROVIDER"))
             .or(config.ai_provider);
-        config.openai_base_url = env_value(&mut env, "UMMP_OPENAI_BASE_URL")
-            .or(config.openai_base_url);
+        config.openai_base_url =
+            env_value(&mut env, "UMMP_OPENAI_BASE_URL").or(config.openai_base_url);
 
         Ok(config)
     }
@@ -98,7 +95,9 @@ impl CliConfig {
 fn load_file(path: &Path) -> Result<CliConfig, Box<dyn std::error::Error>> {
     let text = std::fs::read_to_string(path)?;
     if text.lines().any(is_secret_field) {
-        return Err("secret-like fields are not allowed in ummp.toml; use `ummp ai-key set`".into());
+        return Err(
+            "secret-like fields are not allowed in ummp.toml; use `ummp ai-key set`".into(),
+        );
     }
     ummp_core::config::load_any(path)
         .map_err(|_| "invalid ummp.toml: check its syntax and supported field names".into())
@@ -110,7 +109,9 @@ fn is_secret_field(line: &str) -> bool {
         .next()
         .unwrap_or_default()
         .split_once('=')
-        .map_or("", |(key, _)| key.trim().trim_matches('"').trim_matches('\''))
+        .map_or("", |(key, _)| {
+            key.trim().trim_matches('"').trim_matches('\'')
+        })
         .to_ascii_lowercase();
     ["key", "token", "secret", "password"]
         .iter()
@@ -143,15 +144,19 @@ fn default_data_dir() -> Option<PathBuf> {
     }
     #[cfg(target_os = "macos")]
     {
-        std::env::var_os("HOME").map(PathBuf::from).map(|path| {
-            path.join("Library/Application Support/io.github.intorbmn.ummp")
-        })
+        std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .map(|path| path.join("Library/Application Support/io.github.intorbmn.ummp"))
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(PathBuf::from).map(|p| p.join(".local/share")))
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .map(PathBuf::from)
+                    .map(|p| p.join(".local/share"))
+            })
             .map(|path| path.join("io.github.intorbmn.ummp"))
     }
     #[cfg(not(any(windows, unix)))]
@@ -172,7 +177,10 @@ mod tests {
         values: &[(&str, &str)],
     ) -> Result<CliConfig, Box<dyn std::error::Error>> {
         CliConfig::load_from(explicit, cwd, data_dir, |key| {
-            values.iter().find(|(name, _)| *name == key).map(|(_, value)| (*value).to_owned())
+            values
+                .iter()
+                .find(|(name, _)| *name == key)
+                .map(|(_, value)| (*value).to_owned())
         })
     }
 
@@ -184,8 +192,14 @@ mod tests {
             ai_provider: Some("openai".into()),
             ..CliConfig::default()
         };
-        assert_eq!(config.output_dir(Some("from-cli".into())), Some("from-cli".into()));
-        assert_eq!(config.sandbox_repo(Some("cli/repo".into())).as_deref(), Some("cli/repo"));
+        assert_eq!(
+            config.output_dir(Some("from-cli".into())),
+            Some("from-cli".into())
+        );
+        assert_eq!(
+            config.sandbox_repo(Some("cli/repo".into())).as_deref(),
+            Some("cli/repo")
+        );
         assert_eq!(config.provider(Some("anthropic".into())), "anthropic");
     }
 
@@ -201,12 +215,16 @@ sandbox_repo = "owner/repo"
 ai_provider = "openai"
 openai_base_url = "http://localhost:11434/v1"
 "#,
-        ).unwrap();
+        )
+        .unwrap();
         let config = load(Some(&path), dir.path(), None, &[]).unwrap();
         assert_eq!(config.output_root, Some(PathBuf::from("out")));
         assert_eq!(config.kb, Some(PathBuf::from("mappings.db")));
         assert_eq!(config.ai_provider.as_deref(), Some("openai"));
-        assert_eq!(config.openai_base_url.as_deref(), Some("http://localhost:11434/v1"));
+        assert_eq!(
+            config.openai_base_url.as_deref(),
+            Some("http://localhost:11434/v1")
+        );
     }
 
     #[test]
@@ -234,13 +252,21 @@ openai_base_url = "http://localhost:11434/v1"
     fn environment_overrides_file_values() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("ummp.toml");
-        std::fs::write(&path, "output_root = \"from-file\"\nai_provider = \"anthropic\"").unwrap();
+        std::fs::write(
+            &path,
+            "output_root = \"from-file\"\nai_provider = \"anthropic\"",
+        )
+        .unwrap();
         let config = load(
             Some(&path),
             dir.path(),
             None,
-            &[("UMMP_OUTPUT_ROOT", "from-env"), ("UMMP_AI_PROVIDER", "openai")],
-        ).unwrap();
+            &[
+                ("UMMP_OUTPUT_ROOT", "from-env"),
+                ("UMMP_AI_PROVIDER", "openai"),
+            ],
+        )
+        .unwrap();
         assert_eq!(config.output_root, Some(PathBuf::from("from-env")));
         assert_eq!(config.ai_provider.as_deref(), Some("openai"));
     }
@@ -250,7 +276,9 @@ openai_base_url = "http://localhost:11434/v1"
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("ummp.toml");
         std::fs::write(&path, "anthropic_api_key = \"synthetic-secret\"").unwrap();
-        let error = load(Some(&path), dir.path(), None, &[]).unwrap_err().to_string();
+        let error = load(Some(&path), dir.path(), None, &[])
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("secret-like fields"));
         assert!(!error.contains("synthetic-secret"));
     }
