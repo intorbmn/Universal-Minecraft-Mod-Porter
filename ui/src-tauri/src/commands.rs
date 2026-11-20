@@ -269,7 +269,7 @@ pub fn ai_key_delete(store: &dyn AiKeyStore, provider: &str) -> Result<(), UiErr
 /// Moves legacy AI keys once. A failed keyring operation never prevents app startup.
 pub fn migrate_legacy_ai_keys(legacy: &dyn SecretStore, keys: &dyn AiKeyStore) {
     for (name, provider, label) in [
-        ("anthropic_api_key", AiProviderKind::Anthropic, "Anthropic"),
+        ("github_token", AiProviderKind::Anthropic, "Anthropic"),
         ("openai_api_key", AiProviderKind::Openai, "OpenAI"),
     ] {
         let Ok(Some(value)) = legacy.get(name) else {
@@ -421,12 +421,12 @@ mod tests {
         let d = tempdir().unwrap();
         let svc = services(d.path());
         let store = MemorySecretStore::default();
-        set_secret(&store, "anthropic_api_key", "test-secret-value").unwrap();
-        assert!(has_secret(&store, "anthropic_api_key").unwrap());
+        set_secret(&store, "github_token", "test-secret-value").unwrap();
+        assert!(has_secret(&store, "github_token").unwrap());
         let returned_settings = serde_json::to_string(&settings(&svc)).unwrap();
         assert!(!returned_settings.contains("test-secret-value"));
-        delete_secret(&store, "anthropic_api_key").unwrap();
-        assert!(!has_secret(&store, "anthropic_api_key").unwrap());
+        delete_secret(&store, "github_token").unwrap();
+        assert!(!has_secret(&store, "github_token").unwrap());
     }
 
     #[test]
@@ -434,7 +434,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let legacy = MemorySecretStore::default();
         let keys = FileKeyStore::in_dir(dir.path());
-        legacy.set_legacy("anthropic_api_key", "sk-ant-test-0000000000000000");
+        legacy.set_legacy("github_token", "sk-ant-test-0000000000000000");
 
         migrate_legacy_ai_keys(&legacy, &keys);
 
@@ -442,17 +442,17 @@ mod tests {
             keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
             "sk-ant-test-0000000000000000"
         );
-        assert_eq!(legacy.get("anthropic_api_key").unwrap(), None);
+        assert_eq!(legacy.get("github_token").unwrap(), None);
 
         keys.set(AiProviderKind::Anthropic, &Secret::new("new-key-1234567890"))
             .unwrap();
-        legacy.set_legacy("anthropic_api_key", "old-key-1234567890");
+        legacy.set_legacy("github_token", "old-key-1234567890");
         migrate_legacy_ai_keys(&legacy, &keys);
         assert_eq!(
             keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
             "new-key-1234567890"
         );
-        assert_eq!(legacy.get("anthropic_api_key").unwrap().as_deref(), Some("old-key-1234567890"));
+        assert_eq!(legacy.get("github_token").unwrap().as_deref(), Some("old-key-1234567890"));
     }
 
     #[test]
