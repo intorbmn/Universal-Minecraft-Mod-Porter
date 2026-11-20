@@ -12,7 +12,8 @@
 </script>
 
 <h1>{t('pack.report')}</h1>
-<p>{items.length} {t('pack.mods')} · {t('state.Succeeded')}</p>
+<p>{items.length} {t('pack.mods')} · {t(`state.${job.state}`)}</p>
+{#if job.error}<div class="error" role="alert">{job.error}</div>{/if}
 {#if output}<p><strong>{t('report.output')}:</strong> <code>{output}</code></p>{/if}
 <div class="table-wrap">
   <table>
