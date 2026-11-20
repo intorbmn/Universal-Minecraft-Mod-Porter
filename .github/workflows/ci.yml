@@ -73,6 +73,12 @@ jobs:
         run: npm run build
       - run: cargo build
         working-directory: ui/src-tauri
+      - name: Upload resolved desktop lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: ummp-desktop-cargo-lockfile
+          path: ui/src-tauri/Cargo.lock
+          if-no-files-found: error
       - run: cargo test
         working-directory: ui/src-tauri
       - run: cargo clippy --all-targets -- -D warnings
