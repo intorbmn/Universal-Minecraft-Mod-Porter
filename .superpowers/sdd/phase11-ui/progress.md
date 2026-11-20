@@ -6,3 +6,9 @@
 - 2026-11-20: Ruling: `AppServices::analyze` accepts folder or .zip only (JAR -> Input error pointing to scan) - CLI `analyze` is folder-only too - cost if wrong: add JAR analysis later in the service
 - 2026-11-20: Ruling: `targets()` returns the four loader families the converter knows; `versions` come from `loader_templates.toml` only (ports to other versions stay possible via `plan`/`port`) - cost if wrong: UI offers fewer versions than the engine supports
 - 2026-11-20: Mutation check (11.A3) `plan_returns_diffs_and_writes_nothing`: (1) plan writes MUTANT.txt into the input -> red at "plan must not write"; (2) plan drops all file views -> red at "files is not empty"; restored -> green.
+
+Task A4 (jobs + events): complete. `core/src/app/jobs.rs` (CancelToken, JobCtx step/log/progress with <=20 log events/s, worker thread + catch_unwind, stale Running -> Failed on open), `start_port`, `job`, `cancel`, `subscribe`, `set_step_hook`; event payload golden JSON in tests/fixtures/golden/app-events/.
+- Ruling: finish order = save job -> remove from running -> publish job.finished -> drain bus (a listener that sees finished can already read the stored job; the queue cannot grow).
+- Ruling: failure text is stored in Job.output as {"error": msg}; JobView.error is derived from it.
+- Mutation check (★ port_job_emits_events_in_order): (1) job.started published under another name -> RED (left "job.skipped", right "job.started"); (2) success finished as Failed -> RED at the state assertion. Restored -> 22/22 green, stable over 6 runs.
+- Four commands pass; cargo test --all green (app: 22 tests).

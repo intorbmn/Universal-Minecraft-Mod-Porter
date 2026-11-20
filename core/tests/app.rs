@@ -325,3 +325,265 @@ fn plan_reads_a_zip_and_refuses_a_downgrade() {
     down.to = "1.16.5".into();
     assert!(matches!(svc.plan(&down), Err(AppError::Migration(_))));
 }
+
+// ---- 11.A4 jobs and events ----
+
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use ummp_core::app::views::{JobApproval, JobFinished, JobLog, JobProgress, JobStarted};
+use ummp_core::app::PortRequest;
+use ummp_core::events::{Event, EventHandler};
+
+struct Collect(Mutex<Sender<Event>>);
+
+impl EventHandler for Collect {
+    fn handle(&self, event: &Event) {
+        let _ = self.0.lock().unwrap().send(event.clone());
+    }
+}
+
+fn collect(svc: &AppServices) -> Receiver<Event> {
+    let (tx, rx) = channel();
+    svc.subscribe(Arc::new(Collect(Mutex::new(tx))));
+    rx
+}
+
+/// Every event up to and including `job.finished` for `job`. No sleeping: it blocks on the
+/// channel, with a generous timeout only so a bug cannot hang the suite.
+fn until_finished(rx: &Receiver<Event>, job: Uuid) -> Vec<Event> {
+    let mut seen = Vec::new();
+    loop {
+        let e = rx
+            .recv_timeout(Duration::from_mins(1))
+            .expect("job.finished was never published");
+        let done = e.kind == "job.finished" && e.payload["job"] == job.to_string();
+        seen.push(e);
+        if done {
+            return seen;
+        }
+    }
+}
+
+fn port_req(input: PathBuf, output: PathBuf) -> PortRequest {
+    PortRequest {
+        input,
+        output: Some(output),
+        to: "1.21.1".into(),
+        from: Some("1.21.1".into()),
+        loader: Some("neoforge".into()),
+        zip: false,
+        min_confidence: 0.8,
+    }
+}
+
+/// ★ mutation: publish `job.finished` before the progress events, skip `job.started`, or
+/// finish as Failed, and this goes red.
+#[test]
+fn port_job_emits_events_in_order() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let rx = collect(&svc);
+    let out = d.path().join("out");
+    let job = svc
+        .start_port(port_req(fixture("loader/fabric-src"), out.clone()))
+        .unwrap();
+    let events = until_finished(&rx, job);
+
+    assert_eq!(events.first().unwrap().kind, "job.started");
+    let last = events.last().unwrap();
+    assert_eq!(last.kind, "job.finished");
+    assert_eq!(last.payload["state"], "Succeeded", "{:?}", last.payload);
+    let middle = &events[1..events.len() - 1];
+    assert!(
+        middle
+            .iter()
+            .all(|e| e.kind == "job.progress" || e.kind == "job.log"),
+        "{middle:?}"
+    );
+    let progress: Vec<u64> = middle
+        .iter()
+        .filter(|e| e.kind == "job.progress")
+        .map(|e| e.payload["done"].as_u64().unwrap())
+        .collect();
+    assert!(progress.len() >= 2, "{progress:?}");
+    assert!(progress.windows(2).all(|w| w[0] <= w[1]), "{progress:?}");
+    let total = middle
+        .iter()
+        .rev()
+        .find(|e| e.kind == "job.progress")
+        .unwrap()
+        .payload["total"]
+        .as_u64()
+        .unwrap();
+    assert_eq!(*progress.last().unwrap(), total);
+
+    assert!(out
+        .join("src/main/resources/META-INF/neoforge.mods.toml")
+        .is_file());
+    assert!(out.join("UMMP_REPORT.md").is_file());
+    assert_eq!(svc.job(job).unwrap().state, JobState::Succeeded);
+}
+
+#[test]
+fn port_refuses_nonempty_or_nested_output_and_leaves_source_untouched() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let input = d.path().join("in");
+    copy_tree(&fixture("loader/fabric-src"), &input);
+    let before = read_tree(&input);
+
+    let busy = d.path().join("busy");
+    std::fs::create_dir(&busy).unwrap();
+    std::fs::write(busy.join("keep.txt"), "x").unwrap();
+    assert!(matches!(
+        svc.start_port(port_req(input.clone(), busy)),
+        Err(AppError::Input(m)) if m.contains("not empty")
+    ));
+
+    let nested = input.join("out");
+    assert!(matches!(
+        svc.start_port(port_req(input.clone(), nested.clone())),
+        Err(AppError::Input(m)) if m.contains("inside")
+    ));
+    assert!(!nested.exists());
+
+    let missing = d.path().join("nope");
+    assert!(matches!(
+        svc.start_port(port_req(missing, d.path().join("o2"))),
+        Err(AppError::Input(_))
+    ));
+    assert_eq!(read_tree(&input), before, "source must stay untouched");
+}
+
+#[test]
+fn running_job_from_previous_run_is_marked_failed_on_open() {
+    let d = tempdir().unwrap();
+    let data = d.path().join("data");
+    std::fs::create_dir_all(&data).unwrap();
+    let db = JobDb::open(&data.join("jobs.db")).unwrap();
+    let mut job = Job::new(Uuid::new_v4(), "port");
+    job.mark_running();
+    db.insert(&job).unwrap();
+    drop(db);
+
+    let svc = AppServices::open(Settings::new(data)).unwrap();
+    let view = svc.job(job.id).unwrap();
+    assert_eq!(view.state, JobState::Failed);
+    assert!(
+        view.log
+            .iter()
+            .any(|l| l.contains("interrupted (app closed)")),
+        "{view:?}"
+    );
+    assert!(matches!(
+        svc.job(Uuid::new_v4()),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+#[test]
+fn worker_panic_is_recorded_as_failed() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    svc.set_step_hook(Arc::new(|_job, step| {
+        assert!(step != "porting", "boom in {step}");
+    }));
+    let rx = collect(&svc);
+    let job = svc
+        .start_port(port_req(fixture("loader/fabric-src"), d.path().join("out")))
+        .unwrap();
+    let events = until_finished(&rx, job);
+    let last = events.last().unwrap();
+    assert_eq!(last.payload["state"], "Failed", "{:?}", last.payload);
+    assert!(
+        last.payload["error"].as_str().unwrap().contains("boom"),
+        "{:?}",
+        last.payload
+    );
+    let view = svc.job(job).unwrap();
+    assert_eq!(view.state, JobState::Failed);
+    assert!(view.error.unwrap().contains("boom"));
+}
+
+fn golden(name: &str) -> serde_json::Value {
+    let file = fixture("golden/app-events").join(format!("{name}.json"));
+    serde_json::from_slice(
+        &std::fs::read(&file).unwrap_or_else(|e| panic!("{}: {e}", file.display())),
+    )
+    .unwrap()
+}
+
+#[test]
+fn app_event_payloads_match_golden_json() {
+    let job = Uuid::from_u128(1);
+    let started = JobStarted {
+        job,
+        session: Uuid::from_u128(2),
+        step: "port".into(),
+    };
+    assert_eq!(
+        serde_json::to_value(&started).unwrap(),
+        golden("job.started")
+    );
+    let progress = JobProgress {
+        job,
+        step: "porting".into(),
+        done: 1,
+        total: 2,
+    };
+    assert_eq!(
+        serde_json::to_value(&progress).unwrap(),
+        golden("job.progress")
+    );
+    let log = JobLog {
+        job,
+        line: "Porting DemoWidget to 1.21.1 (neoforge)".into(),
+    };
+    assert_eq!(serde_json::to_value(&log).unwrap(), golden("job.log"));
+    let approval = JobApproval {
+        job,
+        approval: Uuid::from_u128(3),
+        path: "src/main/java/demo/DemoWidget.java".into(),
+        diff: "--- a/DemoWidget.java\n+++ b/DemoWidget.java\n".into(),
+        reviewer_approved: true,
+        concerns: vec!["touches the registry".into()],
+    };
+    assert_eq!(
+        serde_json::to_value(&approval).unwrap(),
+        golden("job.approval")
+    );
+    let ok = JobFinished {
+        job,
+        state: JobState::Succeeded,
+        result: Some(serde_json::json!({"output": "/tmp/out"})),
+        error: None,
+    };
+    assert_eq!(
+        serde_json::to_value(&ok).unwrap(),
+        golden("job.finished.succeeded")
+    );
+    let failed = JobFinished {
+        job,
+        state: JobState::Failed,
+        result: None,
+        error: Some("boom".into()),
+    };
+    assert_eq!(
+        serde_json::to_value(&failed).unwrap(),
+        golden("job.finished.failed")
+    );
+    let cancelled = JobFinished {
+        job,
+        state: JobState::Cancelled,
+        result: None,
+        error: None,
+    };
+    assert_eq!(
+        serde_json::to_value(&cancelled).unwrap(),
+        golden("job.finished.cancelled")
+    );
+    // The golden files also parse back into the same shapes (the TypeScript tests read them too).
+    let back: JobFinished = serde_json::from_value(golden("job.finished.failed")).unwrap();
+    assert_eq!(back, failed);
+}

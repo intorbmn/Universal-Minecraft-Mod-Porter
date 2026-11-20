@@ -2,6 +2,7 @@
 //! Rust functions. The UI crate only forwards to these (ADR 0004); it holds no logic.
 
 pub mod helpers;
+pub mod jobs;
 pub mod snapshots;
 pub mod views;
 
@@ -11,8 +12,8 @@ use crate::checkpoint::CheckpointError;
 use crate::filesystem::{FileSystem, LocalFileSystem};
 use crate::migration::{MigrationEngine, MigrationError, MigrationPlanner, MigrationRequest};
 use crate::modpack::PackError;
-use crate::persistence::DbError;
-use crate::port::{stage_source, PortError};
+use crate::persistence::{DbError, JobDb};
+use crate::port::{default_port_root, port, stage_source, PortError, PortOptions};
 use crate::project::{DefaultProjectManager, ProjectManager};
 use crate::scan::{scan_path, Severity};
 use helpers::{check_input, loader_label, open_kb, InputKind};
@@ -20,9 +21,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 use views::{
-    AnalysisView, FileDiffView, FileKind, FindingView, ModView, MoveView, PlanView, RiskLevel,
-    RiskView, SkippedView, TargetVersion, TargetsView,
+    AnalysisView, FileDiffView, FileKind, FindingView, ModView, MoveView, PlanView, ReportView,
+    RiskLevel, RiskView, SkippedView, TargetVersion, TargetsView,
 };
 
 /// A key or token held in memory only. Not `Serialize`; prints as `***`.
@@ -121,10 +123,34 @@ pub struct PlanRequest {
     pub min_confidence: f64,
 }
 
+/// Event names the shell forwards to the window (the payloads are in [`views`]).
+pub const EVENT_JOB_STARTED: &str = "job.started";
+pub const EVENT_JOB_PROGRESS: &str = "job.progress";
+pub const EVENT_JOB_LOG: &str = "job.log";
+pub const EVENT_JOB_APPROVAL: &str = "job.approval";
+pub const EVENT_JOB_FINISHED: &str = "job.finished";
+
+/// A port job: the source goes in, a ported copy comes out; the source is never written.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PortRequest {
+    pub input: PathBuf,
+    /// `None` = `settings.output_root` (or the default port root) plus a generated name.
+    pub output: Option<PathBuf>,
+    pub to: String,
+    /// `None` = detect from the descriptor.
+    pub from: Option<String>,
+    /// `None` = keep the current loader.
+    pub loader: Option<String>,
+    pub zip: bool,
+    pub min_confidence: f64,
+}
+
 const SETTINGS_FILE: &str = "settings.json";
+const JOBS_FILE: &str = "jobs.db";
 
 pub struct AppServices {
     settings: Mutex<Settings>,
+    shared: Arc<jobs::Shared>,
 }
 
 impl AppServices {
@@ -137,8 +163,13 @@ impl AppServices {
         std::fs::create_dir_all(&settings.data_dir)?;
         let mut current = read_settings(&settings.data_dir)?.unwrap_or_else(|| settings.clone());
         current.data_dir = settings.data_dir;
+        let shared = Arc::new(jobs::Shared::new(JobDb::open(
+            &current.data_dir.join(JOBS_FILE),
+        )?));
+        shared.fail_stale_jobs()?;
         Ok(Self {
             settings: Mutex::new(current),
+            shared,
         })
     }
 
@@ -380,6 +411,49 @@ fn write_settings(s: &Settings) -> Result<(), AppError> {
 }
 
 /// Wraps an engine error that has no variant of its own as a message for the person.
+/// Canonical form of `p`, or of its nearest existing ancestor with the rest appended.
+fn resolve_loose(p: &Path) -> PathBuf {
+    let mut rest = Vec::new();
+    let mut cur = p;
+    loop {
+        if let Ok(c) = cur.canonicalize() {
+            return rest.iter().rev().fold(c, |acc, n| acc.join(n));
+        }
+        match (cur.parent(), cur.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name.to_owned());
+                cur = parent;
+            }
+            _ => return p.to_path_buf(),
+        }
+    }
+}
+
+/// `{stem}-{to}-{loader}-{timestamp}`, safe as a single folder name.
+fn default_output_name(input: &Path, to: &str, loader: &str) -> String {
+    let stem = input
+        .file_stem()
+        .map_or_else(|| "mod".to_owned(), |s| s.to_string_lossy().into_owned());
+    let clean = |s: &str| {
+        s.chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '.' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+    };
+    format!(
+        "{}-{}-{}-{}",
+        clean(&stem),
+        clean(to),
+        clean(loader),
+        chrono::Utc::now().format("%Y%m%d-%H%M%S")
+    )
+}
+
 fn input_err(e: impl std::fmt::Display) -> AppError {
     AppError::Input(e.to_string())
 }
@@ -393,5 +467,63 @@ const fn risk_level(s: Severity) -> RiskLevel {
         Severity::Low => RiskLevel::Low,
         Severity::Medium => RiskLevel::Medium,
         Severity::High => RiskLevel::High,
+    }
+}
+
+impl AppServices {
+    /// Starts a port job and returns its id at once. Cheap checks run before the job starts,
+    /// so a bad input or output is an error here and not a failed job.
+    ///
+    /// # Errors
+    /// Returns [`AppError::Input`] when the input is missing, the output folder is not empty
+    /// or lies inside the source folder.
+    pub fn start_port(&self, req: PortRequest) -> Result<Uuid, AppError> {
+        check_input(&req.input, false)?;
+        let settings = self.settings();
+        let output = req.output.clone().unwrap_or_else(|| {
+            let root = settings
+                .output_root
+                .clone()
+                .unwrap_or_else(default_port_root);
+            let loader = req.loader.as_deref().unwrap_or("same");
+            root.join(default_output_name(&req.input, &req.to, loader))
+        });
+        if output.exists() && std::fs::read_dir(&output)?.next().is_some() {
+            return Err(AppError::Input(format!(
+                "output folder {} is not empty",
+                output.display()
+            )));
+        }
+        if req.input.is_dir() && resolve_loose(&output).starts_with(resolve_loose(&req.input)) {
+            return Err(AppError::Input(format!(
+                "output folder {} is inside the source folder",
+                output.display()
+            )));
+        }
+        let kb_path = settings.kb_path;
+        self.start_job("port", move |ctx| {
+            ctx.step("validate", 1, 3)?;
+            let kb = open_kb(kb_path, None)?;
+            ctx.step("porting", 2, 3)?;
+            let result = port(
+                &PortOptions {
+                    input: req.input,
+                    output: Some(output),
+                    to: req.to,
+                    loader: req.loader,
+                    from: req.from,
+                    zip: req.zip,
+                    min_confidence: req.min_confidence,
+                },
+                &kb,
+            )?;
+            ctx.log(&format!("wrote {}", result.output.display()));
+            ctx.progress("done", 3, 3);
+            Ok(serde_json::json!({
+                "output": slash(&result.output),
+                "zip": result.zip.as_deref().map(slash),
+                "report": ReportView::from(&result.report),
+            }))
+        })
     }
 }
