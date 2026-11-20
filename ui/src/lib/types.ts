@@ -127,6 +127,50 @@ export interface PortRequest {
   min_confidence: number;
 }
 
+export interface SettingsView {
+  data_dir: string;
+  kb_path: string | null;
+  output_root: string | null;
+  sandbox_repo: string | null;
+  ai_provider: string | null;
+  language: 'vi' | 'en';
+}
+
+export interface BuildJobRequest {
+  path: string;
+  local: boolean;
+  repo: string | null;
+  stages: string[];
+  timeout_secs: number;
+  java: number | null;
+  workdir: string | null;
+  accept_high_risk: boolean;
+  confirm_medium: boolean;
+}
+
+export interface PackRequest {
+  input: string;
+  to: string;
+  loader: string;
+  from_loader: string | null;
+  from_mc: string | null;
+  online: boolean;
+  sources: string | null;
+  side: 'client' | 'server' | 'both' | null;
+  output: string | null;
+  allow_risk: boolean;
+  loader_version: string | null;
+  formats: string[];
+  min_confidence: number;
+}
+
+export interface PackItemView {
+  path: string;
+  mod_id: string;
+  action: { action: string; [key: string]: unknown };
+  reason: string;
+}
+
 export interface UiError {
   kind: 'input' | 'refused' | 'not_found' | 'cancelled' | 'internal';
   message: string;
