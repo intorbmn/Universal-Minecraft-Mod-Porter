@@ -355,10 +355,10 @@ mod tests {
             state: ummp_core::jobs::JobState::Succeeded,
             progress: None,
             log: Vec::new(),
-            result: Some(serde_json::json!({ "output": d.path() })),
+            result: Some(serde_json::json!({ "output": d.path().to_string_lossy().to_string() })),
             error: None,
         };
-        assert_eq!(job_output_path(&job).unwrap(), d.path());
+        assert_eq!(job_output_path(&job).unwrap(), d.path().to_path_buf());
 
         let file = d.path().join("not-a-folder.txt");
         std::fs::write(&file, "x").unwrap();
