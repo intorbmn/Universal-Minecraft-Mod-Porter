@@ -18,7 +18,7 @@ pub struct ModView {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnalysisView {
-    /// `"folder"` or `"zip"`.
+    /// `"folder"`, `"zip"`, or standalone `"jar"` metadata-only view.
     pub kind: String,
     pub mods: Vec<ModView>,
     pub build_system: Option<String>,
