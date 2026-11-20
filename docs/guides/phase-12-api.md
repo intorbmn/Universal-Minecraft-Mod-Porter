@@ -160,6 +160,20 @@ doc as your calls.
 
 ## 4. Milestone 12.0 — type the AI API key in directly and save it to a file (do this first)
 
+> **Interim storage.** The user said on 2026-11-20: "lưu vào file chỉ là tạm thời" (saving
+> the key to a file is only temporary). Build 12.0 so that the storage backend can be
+> replaced later without touching callers:
+> - Put the file behind a small trait in `core/src/app/credentials.rs`:
+>   `trait AiKeyStore { get, set, delete, masked }`, with `FileKeyStore` as the only
+>   implementation for now.
+> - Every caller (CLI, desktop, `resolve_ai_key`) uses the trait, never the file path or
+>   the JSON directly.
+> - The UI and CLI wording says "saved" and must not promise "saved in a file". Only
+>   `ai-key status` shows the file location.
+> - ADR 0015's status is **"Accepted (interim)"**. Record the trigger to revisit it: the
+>   user picks the final storage. The final choice is a BACKLOG item ("final AI key
+>   storage"). Do not choose it yourself.
+
 ### 4.1 What the user sees
 
 **Desktop, AI screen**
@@ -282,8 +296,9 @@ characters, show only `…` + the last 2.
 - `provider(args)` uses `resolve_ai_key(default_data_dir()?, …)`.
 - When `--base-url` is not given, use `openai_base_url` from the file.
 
-**ADR 0015 "AI API keys in a user credentials file":**
-- **Context:** the user asked to type the key in directly and to keep it in a file.
+**ADR 0015 "AI API keys in a user credentials file" — status: Accepted (interim):**
+- **Context:** the user asked to type the key in directly and to keep it in a file, as a
+  temporary solution.
 - **Decision:** the design in this section (§4).
 - **Consequences:**
   - Weaker than the OS keyring: any process running as the user can read the file.
