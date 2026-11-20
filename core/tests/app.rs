@@ -1008,3 +1008,35 @@ fn high_risk_input_refuses_pack_and_local_build_without_ack() {
         .unwrap();
     assert_eq!(clean, None);
 }
+
+// ---- 11.B: recent sessions for the Home screen ----
+
+#[test]
+fn sessions_lists_recent_jobs_newest_first_with_output() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    assert!(svc.sessions(10).unwrap().is_empty(), "no jobs yet");
+    let rx = collect(&svc);
+    let first = svc
+        .start_port(port_req(
+            fixture("loader/fabric-src"),
+            d.path().join("out1"),
+        ))
+        .unwrap();
+    until_finished(&rx, first);
+    let second = svc
+        .start_port(port_req(
+            fixture("loader/fabric-src"),
+            d.path().join("out2"),
+        ))
+        .unwrap();
+    until_finished(&rx, second);
+
+    let all = svc.sessions(10).unwrap();
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].id, second, "newest first");
+    assert_eq!(all[1].id, first);
+    assert_eq!(all[0].state, JobState::Succeeded);
+    assert!(all[0].output.as_deref().unwrap().ends_with("out2"));
+    assert_eq!(svc.sessions(1).unwrap().len(), 1, "the limit applies");
+}

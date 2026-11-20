@@ -81,6 +81,14 @@ impl JobDb {
         self.query("WHERE state = ?1", params![state])
     }
 
+    /// The most recently written jobs, newest first (a rewritten job counts as newest).
+    pub fn recent(&self, limit: usize) -> Result<Vec<Job>, DbError> {
+        let mut all = self.query("", [])?;
+        all.reverse();
+        all.truncate(limit);
+        Ok(all)
+    }
+
     fn query(&self, filter: &str, p: impl rusqlite::Params) -> Result<Vec<Job>, DbError> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT id, session_id, step, state, retries, log, timeout_at, output

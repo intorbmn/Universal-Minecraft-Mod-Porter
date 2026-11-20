@@ -4,7 +4,9 @@
 //! steps, and never stays "Running" forever: a panic is caught, and a job cut off by closing
 //! the app is marked `Failed` the next time the services open.
 
-use super::views::{JobFinished, JobLog, JobProgress, JobStarted, JobView, ProgressView};
+use super::views::{
+    JobFinished, JobLog, JobProgress, JobStarted, JobView, ProgressView, SessionView,
+};
 use super::{
     AppError, AppServices, EVENT_JOB_FINISHED, EVENT_JOB_LOG, EVENT_JOB_PROGRESS, EVENT_JOB_STARTED,
 };
@@ -384,6 +386,32 @@ impl AppServices {
             .by_id(id)?
             .map(|j| job_view(&j, None))
             .ok_or_else(|| AppError::NotFound(format!("job {id}")))
+    }
+
+    /// The latest `limit` jobs, newest first, for the Home screen.
+    ///
+    /// # Errors
+    /// Returns [`AppError::Db`] when the job database cannot be read.
+    pub fn sessions(&self, limit: usize) -> Result<Vec<SessionView>, AppError> {
+        let jobs = self.shared.db.lock().expect("job db lock").recent(limit)?;
+        Ok(jobs
+            .iter()
+            .map(|j| {
+                let v = job_view(j, None);
+                SessionView {
+                    id: v.id,
+                    state: v.state,
+                    step: v.step,
+                    output: v
+                        .result
+                        .as_ref()
+                        .and_then(|r| r.get("output"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                    error: v.error,
+                }
+            })
+            .collect())
     }
 
     /// Asks a running job to stop at its next step boundary. A finished job is left alone.

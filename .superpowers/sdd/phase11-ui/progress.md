@@ -32,3 +32,5 @@ Task A8 (CLI onto services): complete. `cli/src/main.rs` lost its copies of pack
 - Ruling: CLI `open_kb` no longer panics on the impossible (None, None) case; core returns an empty in-memory KB (clap still requires --kb or --mappings for `migrate`). Error text for a corrupt checkpoint store is now AppError::Input's wording.
 - Evidence: four commands pass; cargo test --all green; manual real-binary round trip `migrate --apply` (tree changed, checkpoints.json written) -> `rollback` (tree identical to fixture); `cli/tests/pack_cli.rs` 5/5 unchanged.
 - 11.A COMPLETE (A1-A8). Next: 11.B (Tauri 2 scaffold). Before it: read Tauri 2 docs, load frontend-design + ui-ux-pro-max skills.
+Task B0 (sessions for Home): complete. `JobDb::recent`, `SessionView`, `AppServices::sessions(limit)` newest first; test `sessions_lists_recent_jobs_newest_first_with_output` RED (no method) -> GREEN x3; four commands pass.
+- Ruling: `recent` reads all rows and truncates (job table is small, one row per user action) — avoids a new SQL path — cost if wrong: slow Home load after thousands of jobs; add LIMIT then.

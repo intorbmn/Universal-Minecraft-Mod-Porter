@@ -179,6 +179,18 @@ pub struct JobLog {
     pub line: String,
 }
 
+/// One row of "recent sessions" on the Home screen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionView {
+    pub id: Uuid,
+    pub state: JobState,
+    /// The last step the job reported.
+    pub step: String,
+    /// Where the result went (port and pack jobs), when the job succeeded.
+    pub output: Option<String>,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JobApproval {
     pub job: Uuid,
