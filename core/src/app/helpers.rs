@@ -91,16 +91,58 @@ pub fn mod_identity(path: &Path) -> (String, Option<u32>) {
     (if name.is_empty() { "mod".into() } else { name }, java)
 }
 
+/// Lowercase name of a loader UMMP can convert to or from.
+pub const fn loader_label(l: &Loader) -> Option<&'static str> {
+    match l {
+        Loader::Forge => Some("forge"),
+        Loader::Fabric => Some("fabric"),
+        Loader::NeoForge => Some("neoforge"),
+        Loader::Quilt => Some("quilt"),
+        _ => None,
+    }
+}
+
 /// The loader named in the project's descriptor, lowercase (`fabric`, `neoforge`, ...).
 pub fn detected_loader(path: &Path) -> Option<String> {
     let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
     let report = AnalyzerEngine::default().analyze(path, &fs).ok()?;
-    match &report.mods.first()?.metadata.loader {
-        Loader::Forge => Some("forge".into()),
-        Loader::Fabric => Some("fabric".into()),
-        Loader::NeoForge => Some("neoforge".into()),
-        Loader::Quilt => Some("quilt".into()),
-        _ => None,
+    loader_label(&report.mods.first()?.metadata.loader).map(String::from)
+}
+
+/// What a path from the UI or the CLI points at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputKind {
+    Folder,
+    Zip,
+    Jar,
+}
+
+/// Validates a user-supplied input path: it exists and is a folder, `.zip` or (when
+/// `allow_jar`) `.jar`. Anything else is an `Input` error with a next step.
+pub fn check_input(path: &Path, allow_jar: bool) -> Result<InputKind, AppError> {
+    if !path.exists() {
+        return Err(AppError::Input(format!(
+            "{} does not exist. Choose a mod folder or a .zip file.",
+            path.display()
+        )));
+    }
+    if path.is_dir() {
+        return Ok(InputKind::Folder);
+    }
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("zip") => Ok(InputKind::Zip),
+        Some("jar") if allow_jar => Ok(InputKind::Jar),
+        Some("jar") => Err(AppError::Input(format!(
+            "{} is a compiled JAR; it can be scanned, but analysis and porting need the source folder or .zip.",
+            path.display()
+        ))),
+        _ => Err(AppError::Input(format!(
+            "{} is not a folder or a .zip file.",
+            path.display()
+        ))),
     }
 }
 

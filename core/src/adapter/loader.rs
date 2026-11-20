@@ -49,11 +49,25 @@ struct TemplateFile {
     template: Vec<Template>,
 }
 
+fn all_templates() -> &'static TemplateFile {
+    static T: OnceLock<TemplateFile> = OnceLock::new();
+    T.get_or_init(|| toml::from_str(TEMPLATES).expect("embedded loader_templates.toml is valid"))
+}
+
+/// `(loader, minecraft)` of every shipped build template, in file order.
+#[must_use]
+pub fn templates() -> Vec<(&'static str, &'static str)> {
+    all_templates()
+        .template
+        .iter()
+        .map(|t| (t.loader.as_str(), t.minecraft.as_str()))
+        .collect()
+}
+
 /// The build template for `loader` (family) and `minecraft`, if UMMP ships one.
 #[must_use]
 pub fn template(loader: &str, minecraft: &str) -> Option<&'static Template> {
-    static T: OnceLock<TemplateFile> = OnceLock::new();
-    T.get_or_init(|| toml::from_str(TEMPLATES).expect("embedded loader_templates.toml is valid"))
+    all_templates()
         .template
         .iter()
         .find(|t| t.loader == loader && t.minecraft == minecraft)

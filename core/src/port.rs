@@ -131,6 +131,17 @@ fn safe_name(raw: &str) -> String {
         .collect()
 }
 
+/// The folder to read a mod from: `input` itself, or `input` (a zip) extracted into
+/// `staging`. Shared by `port` and the application services' plan preview.
+pub fn stage_source(input: &Path, staging: &Path) -> Result<PathBuf, PortError> {
+    if input.is_dir() {
+        Ok(input.to_path_buf())
+    } else {
+        extract(input, staging)?;
+        Ok(single_root(staging)?)
+    }
+}
+
 /// Ports `opts.input` into a new output folder. See the module docs.
 ///
 /// # Errors
@@ -146,12 +157,7 @@ pub fn port(opts: &PortOptions, kb: &KnowledgeBase) -> Result<PortResult, PortEr
         }
     }
     let staging = tempfile::tempdir()?;
-    let source = if opts.input.is_dir() {
-        opts.input.clone()
-    } else {
-        extract(&opts.input, staging.path())?;
-        single_root(staging.path())?
-    };
+    let source = stage_source(&opts.input, staging.path())?;
 
     let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
     let first = AnalyzerEngine::default()
