@@ -29,7 +29,7 @@ test('ZIP sources use archive port mode and disable AI assist', async ({ page })
       invoke: async (cmd: string, args: any) => {
         if (cmd === 'sessions') return [];
         if (cmd === 'analyze') return {
-          kind: 'archive',
+          kind: 'zip',
           mods: [{ id: 'demomod', name: 'Demo Mod', version: '1.0', loader: 'fabric', minecraft: '1.20.1', java: 21 }],
           build_system: 'gradle', languages: ['Java'], technologies: [],
         };
