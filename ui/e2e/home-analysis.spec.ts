@@ -166,6 +166,7 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
   await page.addInitScript(() => {
     const callbacks = new Map<number, (event: unknown) => void>();
     let nextCallback = 1;
+    (window as any).__testAiStarts = 0;
     let finished = false;
     let aiStarts = 0;
     const decisions: boolean[] = [];
