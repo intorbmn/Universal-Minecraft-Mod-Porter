@@ -1,7 +1,9 @@
 //! Secret storage boundary. Production uses the operating system credential store;
 //! tests inject an in-memory implementation. Secret values never enter Settings or events.
 
+#[cfg(test)]
 use std::collections::HashMap;
+#[cfg(test)]
 use std::sync::Mutex;
 
 const SERVICE: &str = "ummp";
@@ -60,9 +62,11 @@ impl SecretStore for OsKeyring {
 }
 
 /// Deterministic store for tests; never used by the running desktop application.
+#[cfg(test)]
 #[derive(Default)]
 pub struct MemorySecretStore(Mutex<HashMap<String, String>>);
 
+#[cfg(test)]
 impl SecretStore for MemorySecretStore {
     fn set(&self, name: &str, value: &str) -> Result<(), String> {
         validate_name(name)?;
