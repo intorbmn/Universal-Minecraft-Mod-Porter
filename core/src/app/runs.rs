@@ -8,7 +8,7 @@
 
 use super::helpers::{mod_identity, open_kb, pack_format, risk_decision, side, RiskDecision};
 use super::views::RiskLevel;
-use super::{check_input, risk_level, slash, AppError, AppServices, InputKind};
+use super::{check_input, risk_level, slash, AppError, AppServices, InputKind, Secret};
 use crate::build::github::GithubBackend;
 use crate::build::local::{default_workdir, LocalBackend};
 use crate::build::report::{score, to_markdown};
@@ -148,6 +148,19 @@ impl AppServices {
     /// Returns [`AppError::Refused`] from the risk gate and [`AppError::Input`] when the path
     /// is not a project folder or a stage name is unknown.
     pub fn start_build(&self, req: BuildJobRequest) -> Result<Uuid, AppError> {
+        self.start_build_with_token(req, None)
+    }
+
+    /// Starts a build using an optional GitHub token from the caller's OS keyring.
+    /// The token is passed only to the trusted GitHub CLI process through GH_TOKEN.
+    ///
+    /// # Errors
+    /// Returns the same errors as AppServices::start_build.
+    pub fn start_build_with_token(
+        &self,
+        req: BuildJobRequest,
+        github_token: Option<Secret>,
+    ) -> Result<Uuid, AppError> {
         if check_input(&req.path, true)? != InputKind::Folder {
             return Err(AppError::Input(
                 "JAR-only mods can only be scanned; building needs the source project".into(),
@@ -195,6 +208,7 @@ impl AppServices {
                     git: "git".into(),
                     poll: Duration::from_secs(15),
                     workdir,
+                    token: github_token,
                 }
                 .run(&build)
             }
