@@ -148,11 +148,17 @@ impl CredentialsFile {
     }
 
     pub fn set_openai_base_url(&self, value: Option<&str>) -> Result<(), AppError> {
+        let value = value.map(str::trim).filter(|value| !value.is_empty());
+        if value.is_some_and(|url| {
+            !(url.starts_with("http://") || url.starts_with("https://"))
+                || url.chars().any(char::is_control)
+        }) {
+            return Err(AppError::Input(
+                "OpenAI base URL must use http:// or https:// and contain no control characters".into(),
+            ));
+        }
         let mut file = self.read()?;
-        file.openai_base_url = value
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_owned);
+        file.openai_base_url = value.map(str::to_owned);
         self.write(&file)
     }
 
@@ -255,22 +261,20 @@ fn resolve_ai_key_with_env(
 }
 
 pub fn default_data_dir() -> Result<PathBuf, AppError> {
-    if let Some(path) = std::env::var_os("UMMP_DATA_DIR") {
-        return Ok(PathBuf::from(path));
-    }
+    let override_dir = std::env::var_os("UMMP_DATA_DIR").map(PathBuf::from);
 
     #[cfg(windows)]
-    let path = std::env::var_os("APPDATA")
+    let fallback = std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .map(|path| path.join("io.github.intorbmn.ummp"));
 
     #[cfg(target_os = "macos")]
-    let path = std::env::var_os("HOME")
+    let fallback = std::env::var_os("HOME")
         .map(PathBuf::from)
         .map(|path| path.join("Library/Application Support/io.github.intorbmn.ummp"));
 
     #[cfg(all(unix, not(target_os = "macos")))]
-    let path = std::env::var_os("XDG_DATA_HOME")
+    let fallback = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .or_else(|| {
             std::env::var_os("HOME")
@@ -279,7 +283,16 @@ pub fn default_data_dir() -> Result<PathBuf, AppError> {
         })
         .map(|path| path.join("io.github.intorbmn.ummp"));
 
-    path.ok_or_else(|| AppError::Input("could not determine the UMMP data directory".into()))
+    choose_data_dir(override_dir, fallback)
+}
+
+fn choose_data_dir(
+    override_dir: Option<PathBuf>,
+    fallback: Option<PathBuf>,
+) -> Result<PathBuf, AppError> {
+    override_dir
+        .or(fallback)
+        .ok_or_else(|| AppError::Input("could not determine the UMMP data directory".into()))
 }
 
 fn validate_key(key: &str) -> Result<String, AppError> {
@@ -388,14 +401,17 @@ mod tests {
     #[test]
     fn data_directory_override_is_respected() {
         let dir = tempfile::tempdir().unwrap();
-        let resolved = data_dir_from_override(Some(dir.path().as_os_str().to_owned())).unwrap();
+        let fallback = dir.path().join("fallback");
+        let resolved = choose_data_dir(Some(dir.path().to_path_buf()), Some(fallback)).unwrap();
         assert_eq!(resolved, dir.path());
     }
-}
 
-#[cfg(test)]
-fn data_dir_from_override(value: Option<std::ffi::OsString>) -> Result<PathBuf, AppError> {
-    value
-        .map(PathBuf::from)
-        .ok_or_else(|| AppError::Input("missing data directory override".into()))
+    #[test]
+    fn openai_base_url_is_persisted_and_validated() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FileKeyStore::in_dir(dir.path());
+        store.set_openai_base_url(Some(" https://api.example.test/v1 ")).unwrap();
+        assert_eq!(store.openai_base_url().unwrap().as_deref(), Some("https://api.example.test/v1"));
+        assert!(store.set_openai_base_url(Some("file:///tmp/key")).is_err());
+    }
 }
