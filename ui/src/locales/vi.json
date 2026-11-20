@@ -159,5 +159,11 @@
   "step.port": "Chuyển đổi",
   "step.apply": "Áp dụng / build",
   "step.verify": "Kiểm tra",
-  "step.done": "Hoàn tất"
+  "step.done": "Hoàn tất",
+  "analysis.technologies": "Công nghệ được phát hiện",
+  "plan.technologies": "Cách xử lý công nghệ",
+  "plan.skipped": "Mapping bị bỏ qua",
+  "handling.auto": "Tự động",
+  "handling.assisted": "Có hỗ trợ",
+  "handling.manual": "Thủ công"
 }
