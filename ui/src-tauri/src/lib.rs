@@ -132,6 +132,7 @@ async fn rollback(
     blocking(&svc, move |s| commands::rollback(s, &project, checkpoint)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn open_output(svc: Svc<'_>, id: Uuid) -> Result<(), UiError> {
     commands::open_output(&svc, id)
