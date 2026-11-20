@@ -233,6 +233,8 @@ test('AI approval events require explicit A/R decisions', async ({ page }) => {
       unregisterCallback: (id: number) => callbacks.delete(id),
       invoke: async (cmd: string, args: any) => {
         if (cmd === 'sessions') return [];
+        if (cmd === 'settings') return { ai_provider: 'anthropic' };
+        if (cmd === 'ai_key_status') return { saved: true, masked: 'sk-ant-…0000', base_url: null };
         if (cmd === 'analyze') return {
           kind: 'folder',
           mods: [{ id: 'demomod', name: 'Demo Mod', version: '1.0', loader: 'fabric', minecraft: '1.20.1', java: 21 }],
