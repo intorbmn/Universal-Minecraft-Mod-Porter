@@ -13,7 +13,16 @@
   let error = $state<UiError | null>(null);
   let stopping = $state(false);
   let deciding = $state(false);
-  const steps = ['validate', 'planning', 'porting', 'applying', 'verify', 'done'];
+  const steps = ['step.scan', 'step.plan', 'step.port', 'step.apply', 'step.verify', 'step.done'];
+  const stepMap: Record<string, string> = {
+    scan: 'step.scan', validate: 'step.scan',
+    plan: 'step.plan', planning: 'step.plan',
+    port: 'step.port', porting: 'step.port', migrating: 'step.port',
+    apply: 'step.apply', applying: 'step.apply', building: 'step.apply',
+    review: 'step.apply', awaiting_approval: 'step.apply',
+    verify: 'step.verify', done: 'step.done',
+  };
+  let currentStep = $derived(stepMap[job?.step ?? ''] ?? 'step.scan');
 
   async function refresh() {
     try {
@@ -110,7 +119,7 @@
 {#if error}<div class="error" role="alert">{error.message}</div>{/if}
 {#if job}
   <p><strong>{t(`state.${job.state}`)}</strong> · {job.step}</p>
-  <Stepper {steps} current={job.step} />
+  <Stepper {steps} current={currentStep} />
   {#if job.progress}
     <progress max={job.progress.total || 1} value={job.progress.done}></progress>
     <span>{job.progress.done}/{job.progress.total}</span>
