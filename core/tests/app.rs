@@ -904,6 +904,23 @@ fn fabric_jar(id: &str) -> Vec<u8> {
 
 /// A jar with a webhook URL in a resource: the scanner rates it High.
 #[test]
+fn pack_report_300_rows_match_the_shared_golden_json() {
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/app-views/pack-report-300.json"
+    ))
+    .unwrap();
+    let items: Vec<_> = (0..300)
+        .map(|i| PlanItem {
+            path: format!("mods/mod-{i}.jar"),
+            mod_id: format!("mod-{i}"),
+            action: PackAction::Keep,
+            reason: "already compatible".into(),
+        })
+        .collect();
+    assert_eq!(serde_json::to_value(items).unwrap(), golden["items"]);
+}
+
+#[test]
 fn analyze_standalone_jar_returns_descriptor_metadata_without_source_files() {
     let d = tempdir().unwrap();
     let jar = d.path().join("demo.jar");
