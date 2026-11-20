@@ -10,6 +10,40 @@ fn ummp(args: &[&str]) -> Output {
 }
 
 #[test]
+fn explicit_toml_config_is_loaded() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("custom.toml");
+    std::fs::write(&path, "ai_provider = \"openai\"\\nopenai_base_url = \"http://localhost:11434/v1\"").unwrap();
+    let output = ummp(&["--config", path.to_str().unwrap(), "adapters"]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn config_rejects_api_key_fields_without_echoing_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ummp.toml");
+    std::fs::write(&path, "anthropic_api_key = \"synthetic-secret-value\"").unwrap();
+    let output = ummp(&["--config", path.to_str().unwrap(), "adapters"]);
+    assert_eq!(output.status.code(), Some(5));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unknown field"));
+    assert!(!stderr.contains("synthetic-secret-value"));
+}
+
+#[test]
+fn missing_explicit_config_is_invalid_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("missing.toml");
+    let output = ummp(&["--config", path.to_str().unwrap(), "adapters"]);
+    assert_eq!(output.status.code(), Some(5));
+}
+
+#[test]
 fn invalid_arguments_use_exit_code_five() {
     let output = ummp(&["--unknown-option"]);
     assert_eq!(output.status.code(), Some(5));
