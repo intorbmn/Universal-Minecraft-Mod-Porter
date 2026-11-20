@@ -39,29 +39,34 @@ remain outside `core`.
 - Added ADR 0016, status Accepted (interim), for file-backed AI credentials.
 - ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; later Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).
 - Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
-- No implementation code has been changed yet.
-
-## D2 / P1 design record
-
-- User approved the Phase 12 design specification on 2026-11-20.
-- Added ADR 0016, status Accepted (interim), for file-backed AI credentials.
-- ADR 0015 already existed as Accepted for the CLI contract. It is immutable and remains unchanged; subsequent Phase 12 ADRs are shifted by one (REST 0017, MCP 0018, plugins 0019).
-- Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
-- No implementation code has been changed yet.
+- At the design approval checkpoint, implementation code had not yet been changed.
 
 ## 12.A implementation record
 
 - Added `cli/src/exit.rs` with the six documented numeric exit statuses.
 - Added `clap_complete` and `ummp completions bash|zsh|fish|powershell`.
-- Added `cli/src/config.rs` to load `ummp.toml` from the current directory, then the user
-  config directory; environment values override file values and CLI values override config.
-- Applied configured output root, sandbox repository and AI provider to existing commands.
+- Added `cli/src/config.rs` with strict TOML fields: `output_root`, `kb`,
+  `sandbox_repo`, `ai_provider`, and `openai_base_url`. It supports explicit
+  `--config PATH`, current-directory config, then the shared UMMP data directory.
+- Environment values override TOML; CLI values override both. Existing
+  `UMMP_OUTPUT_DIR` and `UMMP_PROVIDER` remain accepted for compatibility.
+- Rejects unknown TOML fields, including key-like fields, and maps missing/invalid
+  explicit config files to exit code 5 without echoing secret values.
+- Applies configured output root, KB path, sandbox repository, AI provider and OpenAI
+  base URL to the existing command paths.
 - Extended `core::config::load_any` with TOML support (the `toml` dependency already existed).
 - Added a versioned `schema: 1` JSON envelope for `analyze --json` and `scan --json`.
 - Added typed failure mapping for safety refusal (2), invalid command input (5), and build
   backend/stage failure (4); generic failures remain 1.
-- Added CLI integration tests for invalid-argument/help/build-input exit codes, completions,
-  TOML flag precedence and the scan JSON envelope. CI now runs on `phase-12-api`.
+- Added config unit tests for field loading, explicit/local/shared lookup precedence,
+  environment overrides, blank environment values, and secret-field rejection.
+- Added CLI integration tests for explicit config loading, missing config, and secret-field
+  rejection without value leakage, while retaining existing exit/completion/JSON tests.
+- Updated `docs/CLI.md` to match the shared data directory, supported fields, environment
+  variables and `--config` behavior.
+- These new tests have **not yet been executed** in a local checkout. The latest branch
+  commit currently has no reported status checks; no build, test, Clippy or rustfmt success
+  is claimed.
 
 ## Outstanding 12.A acceptance
 
