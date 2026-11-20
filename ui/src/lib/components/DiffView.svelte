@@ -36,7 +36,7 @@
   let segments = $derived(buildSegments(lines));
 </script>
 
-<div class="diff" role="region" aria-label="File diff" tabindex="0">
+<div class="diff" role="region" aria-label="File diff">
   {#each segments as segment, i (i)}
     {#if segment.kind === 'line'}
       <div class:added={segment.line.text.startsWith('+') && !segment.line.text.startsWith('+++')}
