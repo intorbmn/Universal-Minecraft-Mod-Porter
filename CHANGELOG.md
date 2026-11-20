@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Phase 11.B–11.E: desktop workflow screens for Target, Plan/Diff, Run, Report, Build, AI approval, modpack migration and Settings; OS keyring-backed credentials, output-folder opening, bilingual labels, bounded logs and paginated pack reports. See ADR 0014 and `docs/phase/phase-11-ui.md`. CI and Windows runtime validation remain pending.
 
+### Added
+- Phase 11.C: desktop Target, Plan/Diff, Run, and Report screens; typed Tauri command adapters;
+  blocking-pool dispatch; job event progress/cancel; reviewed in-place apply and rollback;
+  source JAR metadata-only analysis; open-output-folder action; unified diff line numbers and
+  collapsible unchanged runs.
+- Phase 11.D: Settings screen for output/KB/sandbox/provider/language; keyring-rs OS credential
+  storage with set/has/delete only; GitHub token injection through GH_TOKEN for remote build
+  child processes; Build screen with core risk preview and explicit local High/Medium gates.
+- Phase 11.E: AI assist screen with per-file diff approval/rejection and A/R keyboard shortcuts;
+  Modrinth-backed modpack workflow and paginated 50-row report; shared 300-mod golden JSON
+  fixture used by Rust and TypeScript tests.
+- Phase 11.F: manually dispatched Windows MSI/NSIS packaging workflow; Linux CI installs
+  Secret Service build headers; npm production audit is warning-only.
+- Standalone JAR analysis now returns descriptor metadata for scan-only workflows; source
+  ZIPs are selectable for porting.
+- ADR 0014 records the desktop application boundary, OS keyring, and workflow decisions.
+
 ### Changed
 - Phase 11.A: the CLI now shares one set of helpers with the desktop app
   (`ummp_core::app::helpers` and `::snapshots`: knowledge-base opening, snapshot store,
