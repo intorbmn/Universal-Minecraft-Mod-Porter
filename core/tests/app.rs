@@ -980,6 +980,11 @@ fn high_risk_input_refuses_pack_and_local_build_without_ack() {
     let done = until_kind(&rx, job, "job.finished");
     assert_eq!(done.payload["state"], "Succeeded", "{:?}", done.payload);
     assert!(out2.join("instance/mods/a.jar").is_file());
+    assert!(
+        done.payload["result"]["items"].as_array().is_some_and(|items| !items.is_empty()),
+        "the desktop pack report needs the per-mod decisions: {:?}",
+        done.payload
+    );
 
     // Local build: refused before any job exists. GitHub builds only warn.
     let bad = high_risk_project(d.path());
