@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(Subcommand)]
-pub(crate) enum PackCmd {
+pub enum PackCmd {
     /// Read a pack (.mrpack, CurseForge .zip, Prism instance or folder) and report. Writes nothing.
     Inspect {
         pack: PathBuf,
@@ -68,19 +68,19 @@ pub(crate) enum PackCmd {
 
 #[derive(Parser)]
 #[command(name = "ummp", version, about = "Universal Minecraft Mod Porter")]
-pub(crate) struct Cli {
+pub struct Cli {
     /// Emit a versioned JSON envelope; human-readable output moves to stderr.
     #[arg(long, global = true)]
-    pub(crate) json: bool,
+    pub json: bool,
     /// Explicit TOML configuration file.
     #[arg(long, global = true, value_name = "PATH")]
-    pub(crate) config: Option<PathBuf>,
+    pub config: Option<PathBuf>,
     #[command(subcommand)]
-    pub(crate) command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Subcommand)]
-pub(crate) enum Commands {
+pub enum Commands {
     /// Generate shell completions.
     Completions { shell: Shell },
     /// Detect loader, Minecraft/Java versions, dependencies and build system.
@@ -253,53 +253,53 @@ pub(crate) enum Commands {
 }
 
 #[derive(clap::Args)]
-pub(crate) struct BuildArgs {
+pub struct BuildArgs {
     /// Build on this machine instead of GitHub.
     #[arg(long)]
-    pub(crate) local: bool,
+    pub local: bool,
     /// GitHub build repository `owner/name` (default: $UMMP_BUILD_REPO or
     /// intorbmn/ummp-build-sandbox).
     #[arg(long)]
-    pub(crate) repo: Option<String>,
+    pub repo: Option<String>,
     /// Folder for build copies (default: D:\Claude\ummp-builds on Windows, ~/ummp-builds).
     #[arg(long)]
-    pub(crate) workdir: Option<PathBuf>,
+    pub workdir: Option<PathBuf>,
     /// Comma-separated stages: build,test,server.
     #[arg(long, value_delimiter = ',', default_value = "build,test,server")]
-    pub(crate) stages: Vec<String>,
+    pub stages: Vec<String>,
     /// Limit per stage, in seconds.
     #[arg(long, default_value_t = 1800)]
-    pub(crate) timeout: u64,
+    pub timeout: u64,
     /// Java major version (default: detected from the mod).
     #[arg(long)]
-    pub(crate) java: Option<u32>,
+    pub java: Option<u32>,
     /// Build a High-risk mod on this machine anyway.
     #[arg(long)]
-    pub(crate) i_accept_risk: bool,
+    pub i_accept_risk: bool,
     /// Build a Medium-risk mod on this machine without asking.
     #[arg(long)]
-    pub(crate) yes: bool,
+    pub yes: bool,
     /// Also write the Markdown report here.
     #[arg(long)]
-    pub(crate) report: Option<PathBuf>,
+    pub report: Option<PathBuf>,
 }
 
 #[derive(clap::Args)]
-pub(crate) struct AiArgs {
+pub struct AiArgs {
     /// `anthropic` (ANTHROPIC_API_KEY) or `openai` (OpenAI-compatible, e.g. Ollama).
     #[arg(long)]
-    pub(crate) provider: Option<String>,
+    pub provider: Option<String>,
     /// Base URL for `--provider openai`, e.g. http://localhost:11434/v1.
     #[arg(long)]
-    pub(crate) base_url: Option<String>,
+    pub base_url: Option<String>,
     /// YAML/JSON AI config: per-agent models, budget, retries, prices.
     #[arg(long)]
-    pub(crate) ai_config: Option<PathBuf>,
+    pub ai_config: Option<PathBuf>,
     /// Apply every change the review agent approved without asking.
     /// Changes the reviewer rejected are never applied by this flag.
     #[arg(long)]
-    pub(crate) approve_reviewed: bool,
+    pub approve_reviewed: bool,
     /// Checkpoint and audit directory.
     #[arg(long)]
-    pub(crate) snapshots: Option<PathBuf>,
+    pub snapshots: Option<PathBuf>,
 }
