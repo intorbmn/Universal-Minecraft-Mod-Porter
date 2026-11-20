@@ -4,22 +4,24 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import PackReport from '../src/screens/PackReport.svelte';
 import Run from '../src/screens/Run.svelte';
 
-const onCoreEvent = vi.fn(async (handler: (event: any) => void) => {
-  handler({
-    id: 'event-approval',
-    kind: 'job.approval',
-    timestamp: '2026-11-20T00:00:00Z',
-    payload: {
-      job: 'job-ai',
-      approval: 'approval-1',
-      path: 'src/main/java/DemoWidget.java',
-      diff: '--- a/DemoWidget.java\n+++ b/DemoWidget.java\n-old\n+new',
-      reviewer_approved: false,
-      concerns: ['Check the method signature'],
-    },
-  });
-  return () => undefined;
-});
+const { onCoreEvent } = vi.hoisted(() => ({
+  onCoreEvent: vi.fn(async (handler: (event: any) => void) => {
+    handler({
+      id: 'event-approval',
+      kind: 'job.approval',
+      timestamp: '2026-11-20T00:00:00Z',
+      payload: {
+        job: 'job-ai',
+        approval: 'approval-1',
+        path: 'src/main/java/DemoWidget.java',
+        diff: '--- a/DemoWidget.java\n+++ b/DemoWidget.java\n-old\n+new',
+        reviewer_approved: false,
+        concerns: ['Check the method signature'],
+      },
+    });
+    return () => undefined;
+  }),
+}));
 
 vi.mock('../src/lib/events', () => ({ onCoreEvent }));
 vi.mock('@tauri-apps/api/core', () => ({
