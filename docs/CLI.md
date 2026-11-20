@@ -16,25 +16,36 @@ ummp completions powershell
 
 ## Configuration
 
-UMMP reads `ummp.toml` from the current working directory first. If it is absent, it checks
-the user configuration directory:
+Configuration is loaded in this order:
 
-- Windows: `%APPDATA%/ummp/ummp.toml`
-- macOS: `~/Library/Application Support/ummp/ummp.toml`
-- Linux: `$XDG_CONFIG_HOME/ummp/ummp.toml`, or `~/.config/ummp/ummp.toml`
+1. `--config PATH`, when explicitly supplied (a missing or invalid file is an error).
+2. `./ummp.toml` in the current working directory.
+3. `<data_dir>/ummp.toml` in UMMP's shared per-user data directory.
+4. Built-in defaults.
+
+The shared data directory can be overridden with `UMMP_DATA_DIR`. Otherwise it is:
+
+- Windows: `%APPDATA%/io.github.intorbmn.ummp`
+- macOS: `~/Library/Application Support/io.github.intorbmn.ummp`
+- Linux: `$XDG_DATA_HOME/io.github.intorbmn.ummp`, or `~/.local/share/io.github.intorbmn.ummp`
 
 Example:
 
 ```toml
-output_dir = "D:/Minecraft/ported"
+output_root = "D:/Minecraft/ported"
+kb = "D:/Minecraft/mappings.db"
 sandbox_repo = "your-name/ummp-build-sandbox"
-provider = "anthropic"
+ai_provider = "anthropic"
+openai_base_url = "http://localhost:11434/v1"
 ```
 
-Precedence is CLI flag > `UMMP_*` environment variable > config file > built-in default.
-Supported environment variables are `UMMP_OUTPUT_DIR`, `UMMP_BUILD_REPO`, and
-`UMMP_PROVIDER`. CLI overrides are `--output`, `--repo`, and `--provider` on the
-commands that expose those options.
+Precedence is CLI flag > `UMMP_*` environment variable > TOML > built-in default.
+Supported variables are `UMMP_OUTPUT_ROOT`, `UMMP_KB`, `UMMP_BUILD_REPO`,
+`UMMP_AI_PROVIDER`, and `UMMP_OPENAI_BASE_URL`. The previous
+`UMMP_OUTPUT_DIR` and `UMMP_PROVIDER` names remain accepted for compatibility.
+
+API keys and other secrets are not valid TOML fields. Configure them with
+`ummp ai-key set`, never in `ummp.toml`.
 
 ## Exit codes
 
