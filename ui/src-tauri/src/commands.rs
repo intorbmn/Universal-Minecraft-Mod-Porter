@@ -274,16 +274,30 @@ pub fn migrate_legacy_ai_keys(legacy: &dyn SecretStore, keys: &dyn AiKeyStore) {
         ("anthropic_api_key", AiProviderKind::Anthropic, "Anthropic"),
         ("openai_api_key", AiProviderKind::Openai, "OpenAI"),
     ] {
-        let Ok(Some(value)) = legacy.get(name) else {
-            continue;
-        };
-        let Ok(None) = keys.get(provider) else {
-            continue;
-        };
-        if keys.set(provider, &Secret::new(value)).is_ok() {
-            if legacy.delete(name).is_ok() {
-                eprintln!("moved {label} key from keyring to shared credentials");
+        let value = match legacy.get(name) {
+            Ok(Some(value)) => value,
+            Ok(None) => continue,
+            Err(_) => {
+                eprintln!("could not read legacy {label} keyring entry; continuing");
+                continue;
             }
+        };
+        match keys.get(provider) {
+            Ok(None) => {}
+            Ok(Some(_)) => continue,
+            Err(_) => {
+                eprintln!("could not read saved {label} key; continuing");
+                continue;
+            }
+        }
+        if keys.set(provider, &Secret::new(value)).is_err() {
+            eprintln!("could not migrate legacy {label} key; continuing");
+            continue;
+        }
+        if legacy.delete(name).is_ok() {
+            eprintln!("moved {label} key from keyring to shared credentials");
+        } else {
+            eprintln!("migrated {label} key but could not remove its old keyring entry");
         }
     }
 }
