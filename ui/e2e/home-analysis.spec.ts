@@ -38,7 +38,6 @@ test('Target → Plan → reviewed in-place Run → Report → Rollback', async 
     },
     error: null,
   };
-  const calls: string[] = [];
   await page.addInitScript(({ job }) => {
     const plan = {
       source_minecraft: '1.20.1',
