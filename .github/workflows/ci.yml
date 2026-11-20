@@ -64,6 +64,8 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - run: npm ci
       - run: npm run check
+      - name: Audit production dependencies
+        run: npm audit --omit=dev || echo "npm audit reported advisories; review before release"
       - run: npx vitest run
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test
