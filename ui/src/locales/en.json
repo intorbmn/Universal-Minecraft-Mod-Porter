@@ -161,5 +161,11 @@
   "step.port": "Migrate",
   "step.apply": "Apply / build",
   "step.verify": "Verify",
-  "step.done": "Done"
+  "step.done": "Done",
+  "analysis.technologies": "Detected technologies",
+  "plan.technologies": "Technology handling",
+  "plan.skipped": "Skipped mappings",
+  "handling.auto": "Automatic",
+  "handling.assisted": "Assisted",
+  "handling.manual": "Manual"
 }
