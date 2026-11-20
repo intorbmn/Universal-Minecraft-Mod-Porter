@@ -117,6 +117,12 @@ fn cancel(svc: Svc<'_>, id: Uuid) -> Result<(), UiError> {
     commands::cancel(&svc, id)
 }
 
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+fn decide(svc: Svc<'_>, approval: Uuid, approve: bool) -> Result<(), UiError> {
+    commands::decide(&svc, approval, approve)
+}
+
 #[tauri::command]
 async fn rollback(
     svc: Svc<'_>,
@@ -214,6 +220,7 @@ pub fn run() {
             start_migrate_in_place,
             job,
             cancel,
+            decide,
             rollback,
             settings,
             save_settings,
