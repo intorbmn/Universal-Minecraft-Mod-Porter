@@ -7,7 +7,7 @@ Move an item into a phase file when it is picked up.
 - [ ] **Final AI key storage.** Phase 12.0 saves AI API keys to `credentials.json` behind
   the `AiKeyStore` trait, as an interim solution (user, 2026-11-20: "lưu vào file chỉ là
   tạm thời"). The user decides the final storage later. When they do, add a new
-  `AiKeyStore` implementation, migrate existing keys, and supersede ADR 0015.
+  `AiKeyStore` implementation, migrate existing keys, and supersede ADR 0016.
 
 ## Phase 11 — Desktop UI
 - [ ] Capture and commit 2–3 real Tauri/Playwright screenshots after the first verified Windows
