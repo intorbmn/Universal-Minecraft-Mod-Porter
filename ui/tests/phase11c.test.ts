@@ -44,7 +44,7 @@ describe('DiffView', () => {
     render(DiffView, { diff: `@@ -1,14 +1,14 @@\n${context}\n-old\n+new` });
     const hidden = screen.getByText('6 unchanged lines hidden');
     expect(hidden).toBeInTheDocument();
-    const line = screen.getByText(' context-3');
+    const line = screen.getByText('context-3');
     expect(line).not.toBeVisible();
     await fireEvent.click(hidden);
     expect(line).toBeVisible();
