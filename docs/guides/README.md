@@ -51,6 +51,35 @@ which java javac gradle gh      # Java 21, Gradle 8.x, GitHub CLI are used by te
 - Tests that need `javac`/`gradle` skip themselves with a message when the tool is missing;
   CI has Java. Do not mark a phase COMPLETED on skipped tests: check the output.
 
+## 2b. Read code with Graphify first (saves tokens)
+
+The `mcp__Graphify__*` tools answer code-structure questions from a prebuilt code graph.
+Use them before reading whole files.
+1. **Check the index.** Call `list_repositories` and look for
+   `intorbmn/universal-minecraft-mod-porter` with `queryable: true`.
+   - If it is not listed, ask the user once to connect the repo in Graphify. Until then,
+     use grep and partial Reads.
+2. **Check freshness.** Compare the result's `commitSha` with `git rev-parse HEAD`.
+   - Equal: trust the answer without grepping again.
+   - Different: Read the current version of any file changed since that commit.
+3. **Which tool for which question:**
+   | Question | Tool |
+   |---|---|
+   | Where is X defined? | `graphify_find` (e.g. `compute_edits`, `ApprovalGate`, `migrate_pack`) |
+   | Who calls X? Before moving or changing it | `graphify_callers`, `graphify_impact` (`include_risk=true`) |
+   | Which tests cover X? | `graphify_tests_for` |
+   | What does a file depend on? | `graphify_file_neighbors` |
+   | How does a behavior work? | `query_graph` (a question in prose) |
+4. **Then read narrowly.** Use Read with `offset`/`limit` on the lines Graphify points to.
+   Do not read a whole 1000-line file when one function is enough.
+5. **Literal text stays with grep.** Config values, TOML data, docs and strings in tests
+   are found with `grep`.
+
+Examples:
+- Phase 11, moving the CLI helpers: run `graphify_callers` on `check_risk`, `run_build`
+  and `load_store` before moving them.
+- Phase 11, adding `JobState::Cancelled`: run `graphify_impact` on `JobState` first.
+
 ## 2a. Skill check (every phase, before design)
 
 The user installs plugins on their account. A new agent may run in a session that lacks
