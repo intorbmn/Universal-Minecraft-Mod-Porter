@@ -115,6 +115,12 @@ Each entry names the module and the phase expected to address it.
 - A server start is not a gameplay test, and no exported pack has been launched yet.
 - Config migration knows only the rules in `pack_config_rules.toml` (synthetic sample data).
 
+## Desktop application (Phase 11)
+- The Windows installer is unsigned. Do not use it on a production machine; code signing is outside Phase 11.
+- The Windows release workflow is manual (`workflow_dispatch`). It has not yet produced a verified installer in this phase.
+- A real Windows install, launch, and sample-mod smoke test still requires a maintainer machine; automated UI tests do not replace this check.
+- Build cancellation is cooperative between pipeline steps. A currently running Gradle or GitHub Actions build is not interrupted.
+- The first implementation uses the default Tauri icons. Branding and screenshots remain follow-up work.
+
 ## Not started
-Phases 11-14 (UI, REST/MCP API,
-production readiness, community) have no code yet.
+Phases 12-14 (REST/MCP API, production readiness, community) have no code yet.
