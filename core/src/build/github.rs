@@ -2,11 +2,11 @@
 //! a branch of a build repository, waits for the run, and downloads its logs.
 
 use super::local::{copy_project, junit_counts, new_build_dir, newest_crash};
-use crate::app::Secret;
 use super::logs::analyze_log;
 use super::{
     BuildBackend, BuildError, BuildOutcome, BuildRequest, Stage, StageResult, StageStatus,
 };
+use crate::app::Secret;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -149,11 +149,10 @@ fn tool_with_token(
     if let Some(token) = token {
         command.env("GH_TOKEN", token.expose());
     }
-    let out = command
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .map_err(|e| BuildError::Tool(format!("cannot run {}: {e}. {NO_GH}", program.display())))?;
+    let out =
+        command.args(args).current_dir(cwd).output().map_err(|e| {
+            BuildError::Tool(format!("cannot run {}: {e}. {NO_GH}", program.display()))
+        })?;
     if !out.status.success() {
         return Err(BuildError::Tool(format!(
             "`{} {}` failed: {}",
@@ -258,7 +257,13 @@ impl BuildBackend for GithubBackend {
         tool_with_token(&self.gh, &["--version"], here, self.token.as_ref())?;
         // Checks login and access to the build repo in one REST call.
         let repo_api = format!("repos/{}", self.repo);
-        tool_with_token(&self.gh, &["api", &repo_api, "--jq", ".full_name"], here, self.token.as_ref()).map_err(|e| {
+        tool_with_token(
+            &self.gh,
+            &["api", &repo_api, "--jq", ".full_name"],
+            here,
+            self.token.as_ref(),
+        )
+        .map_err(|e| {
             BuildError::Tool(format!(
                 "Cannot reach build repo {} with the GitHub CLI ({e}). Create the repo and run \
                  `gh auth login`, or build on this machine with --local",
