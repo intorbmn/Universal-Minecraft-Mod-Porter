@@ -45,7 +45,7 @@
   "report.rollback": "Roll back in-place changes",
   "report.rolledBack": "Rolled back",
   "build.title": "Build",
-  "build.comingSoon": "Build configuration is coming in the next milestone."
+  "build.comingSoon": "Build configuration is coming in the next milestone.",
   "home.title": "Start a migration",
   "home.pick": "Choose a mod (.jar or folder)",
   "home.pickFolder": "Choose folder",
@@ -151,5 +151,6 @@
   "pack.path": "Source path",
   "pack.previous": "Previous",
   "pack.next": "Next",
-  "test.fallback": "English fallback"
+  "test.fallback": "English fallback",
+  "analysis.jarOnly": "A standalone JAR can be scanned, but porting and building require its source folder or a source ZIP."
 }
