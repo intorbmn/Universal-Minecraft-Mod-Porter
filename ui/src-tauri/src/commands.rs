@@ -82,6 +82,10 @@ pub fn cancel(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
     Ok(svc.cancel(id)?)
 }
 
+pub fn decide(svc: &AppServices, approval: Uuid, approve: bool) -> Result<(), UiError> {
+    Ok(svc.decide(approval, approve)?)
+}
+
 pub fn rollback(
     svc: &AppServices,
     project: &Path,
