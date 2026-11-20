@@ -78,7 +78,7 @@ The required Claude Code skills are not available in this ChatGPT session. The h
 - `ui/tests/phase11e.test.ts`: AI approval keyboard decision and 300-row pagination.
 - `ui/e2e/home-analysis.spec.ts`: Home→Analysis, reviewed in-place Run→Report→Rollback, ZIP archive mode and AI restriction, 300-row Pack report first-page timing/output-folder action, keyboard focus, and AI A/R approval events.
 
-Latest green run: [GitHub Actions #44709516766](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44709516766), commit `7607ab2c85388581bfa939eb1ba50e6fb201a7cf`.
+Latest green run on the current PR head: [GitHub Actions #44710673870](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44710673870), commit `0eeafe63a2fdd04d9f25d410c3b20f8d4760d265`. Both the `push` run #44710620730 and `pull_request` run #44710673870 completed successfully; both jobs (`build-test-lint`, `desktop`) passed.
 
 - Root Rust: 248 tests passed; build, Clippy (`-D warnings`) and rustfmt passed.
 - Tauri desktop Rust: 12 tests passed; build, Clippy (`-D warnings`) and rustfmt passed.
