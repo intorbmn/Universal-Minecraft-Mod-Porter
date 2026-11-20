@@ -3,6 +3,7 @@
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Duration;
 use ummp_core::app::Secret;
 use ummp_core::build::github::{workflow_yaml, GithubBackend};
@@ -10,6 +11,9 @@ use ummp_core::build::logs::ErrorKind;
 use ummp_core::build::{BuildBackend, BuildRequest, Stage, StageStatus};
 
 const ALL: [Stage; 3] = [Stage::Build, Stage::Test, Stage::Server];
+
+// Fake executable scripts share the OS exec path; serialize them to avoid Linux ETXTBSY races.
+static FAKE_TOOLS_LOCK: Mutex<()> = Mutex::new(());
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -80,6 +84,7 @@ fn workflow_matches_golden() {
 
 #[test]
 fn fake_gh_round_trip() {
+    let _guard = FAKE_TOOLS_LOCK.lock().unwrap();
     let d = tempfile::tempdir().unwrap();
     let art = d.path().join("art");
     std::fs::create_dir_all(art.join("test-results/test")).unwrap();
@@ -117,6 +122,7 @@ fn fake_gh_round_trip() {
 
 #[test]
 fn optional_token_is_passed_in_environment_and_redacted_from_debug() {
+    let _guard = FAKE_TOOLS_LOCK.lock().unwrap();
     let d = tempfile::tempdir().unwrap();
     let art = d.path().join("art");
     std::fs::create_dir_all(&art).unwrap();
@@ -143,6 +149,7 @@ fn optional_token_is_passed_in_environment_and_redacted_from_debug() {
 
 #[test]
 fn failed_run_reports_failed_stage() {
+    let _guard = FAKE_TOOLS_LOCK.lock().unwrap();
     let d = tempfile::tempdir().unwrap();
     let art = d.path().join("art");
     std::fs::create_dir_all(&art).unwrap();
@@ -165,6 +172,7 @@ fn failed_run_reports_failed_stage() {
 
 #[test]
 fn blocked_artifact_download_falls_back_to_job_log() {
+    let _guard = FAKE_TOOLS_LOCK.lock().unwrap();
     let d = tempfile::tempdir().unwrap();
     let (gh, git) = fakes(d.path(), &d.path().join("no-artifact"), true);
     let o = backend(d.path(), gh, git).run(&request()).unwrap();
@@ -196,6 +204,7 @@ fn blocked_artifact_download_falls_back_to_job_log() {
 
 #[test]
 fn gh_missing_suggests_local() {
+    let _guard = FAKE_TOOLS_LOCK.lock().unwrap();
     let d = tempfile::tempdir().unwrap();
     let b = backend(
         d.path(),
@@ -208,6 +217,7 @@ fn gh_missing_suggests_local() {
 
 #[test]
 fn gh_not_logged_in_suggests_local() {
+    let _guard = FAKE_TOOLS_LOCK.lock().unwrap();
     let d = tempfile::tempdir().unwrap();
     let (gh, git) = fakes(d.path(), d.path(), false);
     let err = backend(d.path(), gh, git)
