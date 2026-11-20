@@ -10,6 +10,7 @@ pub mod config;
 pub mod formats;
 pub mod graph;
 pub mod plan;
+pub mod report;
 
 use crate::analyzer::ModAnalysis;
 use crate::metadata::Loader;

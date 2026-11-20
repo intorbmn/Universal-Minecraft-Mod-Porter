@@ -629,8 +629,16 @@ fn remote(project: &str, version: &str) -> RemoteVersion {
         version: version.into(),
         file_name: format!("{project}-{version}.jar"),
         url: format!("https://cdn.modrinth.com/data/{project}/versions/{version}/{project}-{version}.jar"),
-        sha1: hex(40),
-        sha512: hex(128),
+        // Distinct, non-repeating values so a swapped hash or a truncated one shows up.
+        sha1: sha1_hex(format!("{project}{version}1").as_bytes()),
+        sha512: format!(
+            "{}{}{}{}",
+            sha1_hex(format!("{project}{version}2").as_bytes()),
+            sha1_hex(format!("{project}{version}3").as_bytes()),
+            sha1_hex(format!("{project}{version}4").as_bytes()),
+            sha1_hex(format!("{project}{version}5").as_bytes())
+        )[..128]
+            .to_string(),
         size: 100,
         required_deps: vec![],
         env: Default::default(),
@@ -1002,4 +1010,112 @@ fn config_rollback_restores_original() {
         "{err:?}"
     );
     assert_eq!(tree(&out), before);
+}
+
+// ---------------------------------------------------------------------------
+// 10.F export and report
+// ---------------------------------------------------------------------------
+
+use ummp_core::modpack::formats::{build_output, write_folder, write_mrpack, OutSource};
+use ummp_core::modpack::report::PackReport;
+
+/// Pack with one mod that fits 1.21.1 (kept) and one that the index can update.
+fn export_fixture(tmp: &Path) -> (Pack, PackPlan) {
+    let p = analyzed(
+        tmp,
+        &[
+            ("a.jar", fabric_jar("a", "1.21.1", &[])),
+            ("b.jar", fabric_jar("b", "1.20.1", &[])),
+            ("c.jar", fabric_jar("c", "1.20.1", &[])),
+        ],
+    );
+    let mut idx = FakeIndex::default();
+    idx.versions
+        .insert("b|1.21.1|fabric".into(), vec![remote("b", "2.0.0")]);
+    let mut inp = input("1.21.1", &[]);
+    inp.online = true;
+    let pl = plan(&p, &inp, &idx).unwrap();
+    (p, pl)
+}
+
+#[test]
+fn export_round_trips() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (p, pl) = export_fixture(tmp.path());
+    let out = build_output(&p, &pl, "0.16.2").unwrap();
+    // c has no target version: it is left out of the pack and listed in the report.
+    let paths: Vec<_> = out.entries.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(paths, ["mods/a.jar", "mods/b-2.0.0.jar"]);
+
+    let inst = tmp.path().join("inst");
+    write_folder(&out, &inst).unwrap();
+    assert!(inst.join("mods/a.jar").exists());
+    assert!(!inst.join("mods/c.jar").exists());
+    let file = tmp.path().join("o/pack.mrpack");
+    write_mrpack(&out, &inst, &file).unwrap();
+
+    let back = import(&file, &tmp.path().join("w2")).unwrap();
+    assert_eq!(back.format, PackFormat::Mrpack);
+    assert_eq!(back.mc.as_deref(), Some("1.21.1"));
+    assert_eq!(back.loader, Some(Loader::Fabric));
+    assert_eq!(back.loader_version.as_deref(), Some("0.16.2"));
+    let mut got: Vec<_> = back.entries.iter().map(|e| e.path.clone()).collect();
+    got.sort();
+    assert_eq!(got, ["mods/a.jar", "mods/b-2.0.0.jar"]);
+    let b = back.entries.iter().find(|e| e.path == "mods/b-2.0.0.jar").unwrap();
+    let rv = remote("b", "2.0.0");
+    assert_eq!(b.sha1.as_deref(), Some(rv.sha1.as_str()));
+    assert_eq!(b.sha512.as_deref(), Some(rv.sha512.as_str()));
+    assert_eq!(b.downloads, [rv.url]);
+    assert!(b.local.is_none(), "an updated mod is listed by URL, never bundled");
+    let a = back.entries.iter().find(|e| e.path == "mods/a.jar").unwrap();
+    assert!(a.local.is_some());
+}
+
+#[test]
+fn exported_index_has_required_fields() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (p, pl) = export_fixture(tmp.path());
+    let out = build_output(&p, &pl, "0.16.2").unwrap();
+    let inst = tmp.path().join("inst");
+    write_folder(&out, &inst).unwrap();
+    let file = tmp.path().join("pack.mrpack");
+    write_mrpack(&out, &inst, &file).unwrap();
+    let mut z = zip::ZipArchive::new(std::fs::File::open(&file).unwrap()).unwrap();
+    let mut s = String::new();
+    std::io::Read::read_to_string(&mut z.by_name("modrinth.index.json").unwrap(), &mut s).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+    assert_eq!(v["formatVersion"], 1);
+    assert_eq!(v["game"], "minecraft");
+    assert_eq!(v["dependencies"]["minecraft"], "1.21.1");
+    assert_eq!(v["dependencies"]["fabric-loader"], "0.16.2");
+    let f = &v["files"][0];
+    assert_eq!(f["path"], "mods/b-2.0.0.jar");
+    assert_eq!(f["hashes"]["sha1"].as_str().unwrap().len(), 40);
+    assert_eq!(f["hashes"]["sha512"].as_str().unwrap().len(), 128);
+    assert!(f["downloads"][0].as_str().unwrap().starts_with("https://"));
+    assert!(f["fileSize"].as_u64().unwrap() > 0);
+    assert!(f["env"]["client"].is_string() && f["env"]["server"].is_string());
+    z.by_name("overrides/mods/a.jar").unwrap();
+    assert!(matches!(out.entries[0].source, OutSource::Local(_)));
+}
+
+#[test]
+fn report_lists_every_mod_once_with_action_and_reason() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (p, pl) = export_fixture(tmp.path());
+    let mut r = PackReport::build(&p, &pl, &[], &["w1".to_string()]);
+    assert_eq!(r.rows.len(), 3);
+    let md = r.to_markdown();
+    for (id, act) in [("a", "keep"), ("b", "update"), ("c", "manual")] {
+        let rows: Vec<_> = md.lines().filter(|l| l.starts_with(&format!("| {id} |"))).collect();
+        assert_eq!(rows.len(), 1, "{id} must appear exactly once:\n{md}");
+        assert!(rows[0].contains(&format!("| {act} |")), "{}", rows[0]);
+        let cols: Vec<_> = rows[0].split(" | ").collect();
+        assert!(!cols[4].trim().is_empty(), "reason missing: {}", rows[0]);
+    }
+    assert!(md.contains("- manual: 1"));
+    assert!(md.contains("- w1"));
+    r.rows[0].reason = "x|y".into();
+    assert!(r.to_markdown().contains("x\\|y"), "pipes in cells are escaped");
 }

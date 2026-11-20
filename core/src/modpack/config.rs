@@ -109,10 +109,6 @@ pub struct ConfigReport {
     pub checkpoint: Option<Uuid>,
 }
 
-fn is_key_start(c: char) -> bool {
-    c == ' ' || c == '\t'
-}
-
 /// Renames `key` at the start of a line, keeping everything else. `after` says what may
 /// follow the key (so `size_x` is not `size`).
 fn rename_line_key(line: &str, key: &str, to: &str, kind: &str) -> Option<String> {
@@ -121,11 +117,10 @@ fn rename_line_key(line: &str, key: &str, to: &str, kind: &str) -> Option<String
     match kind {
         "toml" => {
             let rest = body.strip_prefix(key)?;
-            let after = rest.trim_start_matches([' ', '\t']);
-            (rest.starts_with(is_key_start) || rest.starts_with('='))
-                .then_some(())
-                .filter(|()| after.starts_with('='))?;
-            Some(format!("{indent}{to}{rest}"))
+            // `size_x = 1` is a different key: only whitespace may separate key and `=`.
+            rest.trim_start_matches([' ', '\t'])
+                .starts_with('=')
+                .then(|| format!("{indent}{to}{rest}"))
         }
         "properties" => {
             if body.starts_with('#') || body.starts_with('!') {

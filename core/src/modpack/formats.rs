@@ -633,3 +633,339 @@ fn apply_detection(pack: &mut Pack, opts: &ImportOptions) {
 pub fn entry_path(root: &Path, rel: &str) -> PathBuf {
     root.join(rel)
 }
+
+// ---------------------------------------------------------------------------
+// Writers
+// ---------------------------------------------------------------------------
+
+use super::plan::{loader_slug, PackAction, PackPlan};
+use std::io::Write as _;
+
+/// Where an exported entry's bytes come from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutSource {
+    /// Listed by URL and hash; the launcher downloads it. UMMP never does.
+    Remote {
+        url: Option<String>,
+        sha1: Option<String>,
+        sha512: Option<String>,
+        size: Option<u64>,
+        /// CurseForge ids, when the entry came from a CurseForge pack.
+        curseforge: Option<(u64, u64)>,
+    },
+    /// A file on disk that is carried into the new pack.
+    Local(PathBuf),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutEntry {
+    pub path: String,
+    pub source: OutSource,
+    pub env: Env,
+}
+
+/// The pack to write: planned entries plus the target versions.
+#[derive(Debug, Clone)]
+pub struct OutPack {
+    pub name: String,
+    pub version: String,
+    pub mc: String,
+    pub loader: Loader,
+    pub loader_version: String,
+    pub entries: Vec<OutEntry>,
+}
+
+fn remote_of(e: &PackEntry) -> OutSource {
+    OutSource::Remote {
+        url: e.downloads.first().cloned(),
+        sha1: e.sha1.clone(),
+        sha512: e.sha512.clone(),
+        size: e.size,
+        curseforge: e.curseforge,
+    }
+}
+
+fn out_source(e: &PackEntry) -> OutSource {
+    e.local
+        .as_ref()
+        .map_or_else(|| remote_of(e), |p| OutSource::Local(p.clone()))
+}
+
+/// What goes into the new pack: kept entries as they are, updated and resolved replacements
+/// by URL and hash, other files unchanged. Removed, manual, ported (source only) and
+/// unresolved-replacement mods are left out; the report lists them.
+///
+/// # Errors
+/// A remote version whose file name is not a safe single path segment, or two entries that
+/// land on the same path.
+pub fn build_output(
+    pack: &Pack,
+    plan: &PackPlan,
+    loader_version: &str,
+) -> Result<OutPack, PackError> {
+    let mut entries = Vec::new();
+    for e in &pack.entries {
+        if e.kind == EntryKind::Other {
+            entries.push(OutEntry {
+                path: e.path.clone(),
+                source: out_source(e),
+                env: e.env,
+            });
+            continue;
+        }
+        let Some(item) = plan.items.iter().find(|i| i.path == e.path) else {
+            continue;
+        };
+        match &item.action {
+            PackAction::Keep => entries.push(OutEntry {
+                path: e.path.clone(),
+                source: out_source(e),
+                env: e.env,
+            }),
+            PackAction::Update(rv)
+            | PackAction::Replace {
+                resolved: Some(rv), ..
+            } => {
+                let name = safe_rel(&rv.file_name)?;
+                if name.components().count() != 1 {
+                    return Err(PackError::UnsafePath(rv.file_name.clone()));
+                }
+                entries.push(OutEntry {
+                    path: format!("mods/{}", rv.file_name),
+                    source: OutSource::Remote {
+                        url: Some(rv.url.clone()),
+                        sha1: Some(rv.sha1.clone()),
+                        sha512: Some(rv.sha512.clone()),
+                        size: Some(rv.size),
+                        curseforge: None,
+                    },
+                    env: e.env,
+                });
+            }
+            PackAction::Port { .. }
+            | PackAction::Replace { .. }
+            | PackAction::Remove { .. }
+            | PackAction::Manual { .. } => {}
+        }
+    }
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    for w in entries.windows(2) {
+        if w[0].path == w[1].path {
+            return Err(PackError::Invalid(format!(
+                "two entries land on {}",
+                w[0].path
+            )));
+        }
+    }
+    Ok(OutPack {
+        name: pack.name.clone(),
+        version: pack.version.clone(),
+        mc: plan.target.mc.clone(),
+        loader: plan.target.loader.clone(),
+        loader_version: loader_version.to_string(),
+        entries,
+    })
+}
+
+fn support_str(s: Support) -> &'static str {
+    match s {
+        Support::Required => "required",
+        Support::Optional => "optional",
+        Support::Unsupported => "unsupported",
+    }
+}
+
+/// Copies local entries into `instance` (the overrides are copied by the caller).
+/// Returns warnings for entries that exist only as URLs.
+///
+/// # Errors
+/// I/O or an unsafe entry path.
+pub fn write_folder(out: &OutPack, instance: &Path) -> Result<Vec<String>, PackError> {
+    let mut warnings = Vec::new();
+    std::fs::create_dir_all(instance)?;
+    for e in &out.entries {
+        match &e.source {
+            OutSource::Local(src) => {
+                let dest = join_safe(instance, &e.path)?;
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::copy(src, dest)?;
+            }
+            OutSource::Remote { url, .. } => warnings.push(format!(
+                "{} is not in the instance folder: it is listed by URL ({}) and is not downloaded",
+                e.path,
+                url.as_deref().unwrap_or("no URL")
+            )),
+        }
+    }
+    Ok(warnings)
+}
+
+fn add_dir_to_zip(
+    z: &mut zip::ZipWriter<File>,
+    root: &Path,
+    prefix: &str,
+) -> Result<(), PackError> {
+    let options = zip::write::FileOptions::default();
+    for rel in walk_files(root)? {
+        z.start_file(format!("{prefix}{}", rel_string(&rel)), options)?;
+        std::io::copy(&mut File::open(root.join(&rel))?, z)?;
+    }
+    Ok(())
+}
+
+/// Writes a Modrinth `.mrpack`: remote entries in the index, everything in `instance`
+/// (local JARs, configs, scripts) under `overrides/`.
+///
+/// # Errors
+/// I/O or zip errors.
+pub fn write_mrpack(out: &OutPack, instance: &Path, file: &Path) -> Result<(), PackError> {
+    let files: Vec<serde_json::Value> = out
+        .entries
+        .iter()
+        .filter_map(|e| match &e.source {
+            OutSource::Remote {
+                url: Some(url),
+                sha1: Some(sha1),
+                sha512: Some(sha512),
+                size,
+                ..
+            } => Some(serde_json::json!({
+                "path": e.path,
+                "hashes": { "sha1": sha1, "sha512": sha512 },
+                "env": { "client": support_str(e.env.client), "server": support_str(e.env.server) },
+                "downloads": [url],
+                "fileSize": size.unwrap_or(0),
+            })),
+            _ => None,
+        })
+        .collect();
+    let key = match out.loader {
+        Loader::Fabric => "fabric-loader",
+        Loader::Quilt => "quilt-loader",
+        Loader::NeoForge => "neoforge",
+        _ => "forge",
+    };
+    let index = serde_json::json!({
+        "formatVersion": 1,
+        "game": "minecraft",
+        "versionId": if out.version.is_empty() { "1.0.0" } else { out.version.as_str() },
+        "name": out.name,
+        "files": files,
+        "dependencies": { "minecraft": out.mc, key: out.loader_version },
+    });
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut z = zip::ZipWriter::new(File::create(file)?);
+    z.start_file("modrinth.index.json", zip::write::FileOptions::default())?;
+    z.write_all(serde_json::to_string_pretty(&index).map_err(|e| PackError::Invalid(e.to_string()))?.as_bytes())?;
+    add_dir_to_zip(&mut z, instance, "overrides/")?;
+    z.finish()?;
+    Ok(())
+}
+
+/// Writes a CurseForge zip. Only entries that came with CurseForge ids can be listed;
+/// the rest are returned as warnings (there is no way to express a bare URL).
+///
+/// # Errors
+/// I/O or zip errors.
+pub fn write_curseforge(
+    out: &OutPack,
+    instance: &Path,
+    file: &Path,
+) -> Result<Vec<String>, PackError> {
+    let mut warnings = Vec::new();
+    let mut files = Vec::new();
+    for e in &out.entries {
+        match &e.source {
+            OutSource::Remote {
+                curseforge: Some((p, f)),
+                ..
+            } => files.push(serde_json::json!({
+                "projectID": p, "fileID": f, "required": e.env.client != Support::Optional,
+            })),
+            OutSource::Remote { .. } => warnings.push(format!(
+                "{} cannot be written to a CurseForge pack: no CurseForge ids",
+                e.path
+            )),
+            OutSource::Local(_) => {}
+        }
+    }
+    let manifest = serde_json::json!({
+        "minecraft": {
+            "version": out.mc,
+            "modLoaders": [{ "id": format!("{}-{}", loader_slug(&out.loader), out.loader_version), "primary": true }],
+        },
+        "manifestType": "minecraftModpack",
+        "manifestVersion": 1,
+        "name": out.name,
+        "version": out.version,
+        "author": "",
+        "files": files,
+        "overrides": "overrides",
+    });
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut z = zip::ZipWriter::new(File::create(file)?);
+    z.start_file("manifest.json", zip::write::FileOptions::default())?;
+    z.write_all(serde_json::to_string_pretty(&manifest).map_err(|e| PackError::Invalid(e.to_string()))?.as_bytes())?;
+    add_dir_to_zip(&mut z, instance, "overrides/")?;
+    z.finish()?;
+    Ok(warnings)
+}
+
+fn copy_tree(from: &Path, to: &Path) -> Result<(), PackError> {
+    for rel in walk_files(from)? {
+        let dest = to.join(&rel);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(from.join(&rel), dest)?;
+    }
+    Ok(())
+}
+
+/// Writes a Prism/MultiMC instance folder: `instance.cfg`, `mmc-pack.json` and `minecraft/`.
+/// Remote-only entries cannot live in an instance and come back as warnings.
+///
+/// # Errors
+/// I/O errors.
+pub fn write_prism(out: &OutPack, instance: &Path, dir: &Path) -> Result<Vec<String>, PackError> {
+    let loader_uid = match out.loader {
+        Loader::Fabric => "net.fabricmc.fabric-loader",
+        Loader::Quilt => "org.quiltmc.quilt-loader",
+        Loader::NeoForge => "net.neoforged",
+        _ => "net.minecraftforge",
+    };
+    let mmc = serde_json::json!({
+        "formatVersion": 1,
+        "components": [
+            { "uid": "net.minecraft", "version": out.mc, "important": true },
+            { "uid": loader_uid, "version": out.loader_version },
+        ],
+    });
+    std::fs::create_dir_all(dir)?;
+    std::fs::write(
+        dir.join("mmc-pack.json"),
+        serde_json::to_string_pretty(&mmc).map_err(|e| PackError::Invalid(e.to_string()))?,
+    )?;
+    std::fs::write(
+        dir.join("instance.cfg"),
+        format!("[General]\nConfigVersion=1.2\nInstanceType=OneSix\nname={}\n", out.name),
+    )?;
+    copy_tree(instance, &dir.join("minecraft"))?;
+    Ok(out
+        .entries
+        .iter()
+        .filter(|e| matches!(e.source, OutSource::Remote { .. }))
+        .map(|e| {
+            format!(
+                "{} cannot be put in a Prism instance: it is listed by URL and is not downloaded",
+                e.path
+            )
+        })
+        .collect())
+}
