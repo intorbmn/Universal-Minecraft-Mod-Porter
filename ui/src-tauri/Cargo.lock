@@ -4614,6 +4614,7 @@ dependencies = [
  "tempfile",
  "ummp-ai-providers",
  "ummp-core",
+ "uuid",
 ]
 
 [[package]]
