@@ -50,6 +50,58 @@ fn missing_explicit_config_is_invalid_input() {
 }
 
 #[test]
+fn global_json_flag_wraps_scan_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "scan", dir.path().to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "scan");
+    assert!(value["result"]["findings"].is_array());
+}
+
+#[test]
+fn global_json_flag_works_after_subcommand() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["scan", dir.path().to_str().unwrap(), "--json"])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "scan");
+}
+
+#[test]
+fn json_errors_have_a_stable_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "scan", missing.to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["error"]["kind"], "error");
+    assert!(value["error"]["message"].is_string());
+}
+
+#[test]
 fn invalid_arguments_use_exit_code_five() {
     let output = ummp(&["--unknown-option"]);
     assert_eq!(output.status.code(), Some(5));
