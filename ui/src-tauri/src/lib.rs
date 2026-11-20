@@ -168,8 +168,21 @@ async fn check_build_risk(
 }
 
 #[tauri::command]
-async fn start_build(svc: Svc<'_>, request: BuildJobRequest) -> Result<Uuid, UiError> {
-    blocking(&svc, move |s| commands::start_build(s, request)).await
+async fn start_build(
+    svc: Svc<'_>,
+    store: Secrets<'_>,
+    request: BuildJobRequest,
+) -> Result<Uuid, UiError> {
+    let svc = Arc::clone(svc.inner());
+    let store = Arc::clone(store.inner());
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::start_build(&svc, store.as_ref(), request)
+    })
+    .await
+    .map_err(|e| UiError {
+        kind: "internal",
+        message: format!("build setup worker stopped: {e}"),
+    })?
 }
 
 #[allow(clippy::needless_pass_by_value)]
