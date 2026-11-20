@@ -5,7 +5,9 @@
 //! files are listed by URL and hash, CurseForge files by ids. Everything a pack names is
 //! untrusted: paths go through [`safe_rel`], archive sizes are capped on the bytes read.
 
+pub mod analyze;
 pub mod formats;
+pub mod graph;
 
 use crate::analyzer::ModAnalysis;
 use crate::metadata::Loader;
