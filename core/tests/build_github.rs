@@ -4,9 +4,9 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use ummp_core::app::Secret;
 use ummp_core::build::github::{workflow_yaml, GithubBackend};
 use ummp_core::build::logs::ErrorKind;
-use ummp_core::app::Secret;
 use ummp_core::build::{BuildBackend, BuildRequest, Stage, StageStatus};
 
 const ALL: [Stage; 3] = [Stage::Build, Stage::Test, Stage::Server];
@@ -133,7 +133,10 @@ fn optional_token_is_passed_in_environment_and_redacted_from_debug() {
     let calls = std::fs::read_to_string(d.path().join("calls")).unwrap();
     assert!(calls.contains("GH_TOKEN=test-github-token"), "{calls}");
     assert!(
-        calls.lines().filter(|line| line.starts_with("gh ")).all(|line| !line.contains("test-github-token")),
+        calls
+            .lines()
+            .filter(|line| line.starts_with("gh "))
+            .all(|line| !line.contains("test-github-token")),
         "the token must never appear in command arguments: {calls}"
     );
 }
