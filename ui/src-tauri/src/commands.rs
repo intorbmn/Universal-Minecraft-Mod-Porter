@@ -94,6 +94,37 @@ pub fn rollback(
     Ok(svc.rollback(project, checkpoint)?)
 }
 
+pub fn open_output(svc: &AppServices, id: Uuid) -> Result<(), UiError> {
+    let job = svc.job(id)?;
+    let result = job.result.ok_or_else(|| UiError {
+        kind: "not_found",
+        message: "this job has no output folder".into(),
+    })?;
+    let raw = result
+        .get("output")
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| result.get("workdir").and_then(serde_json::Value::as_str))
+        .ok_or_else(|| UiError {
+            kind: "not_found",
+            message: "this job has no output folder".into(),
+        })?;
+    let path = Path::new(raw);
+    let metadata = std::fs::metadata(path).map_err(|e| UiError {
+        kind: "not_found",
+        message: format!("output folder is unavailable: {e}"),
+    })?;
+    if !metadata.is_dir() {
+        return Err(UiError {
+            kind: "input",
+            message: "job output is not a folder".into(),
+        });
+    }
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| UiError {
+        kind: "internal",
+        message: format!("could not open the output folder: {e}"),
+    })
+}
+
 pub fn settings(svc: &AppServices) -> Settings {
     svc.settings()
 }
