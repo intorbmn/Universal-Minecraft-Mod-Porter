@@ -149,10 +149,25 @@ fn tool_with_token(
     if let Some(token) = token {
         command.env("GH_TOKEN", token.expose());
     }
-    let out =
-        command.args(args).current_dir(cwd).output().map_err(|e| {
-            BuildError::Tool(format!("cannot run {}: {e}. {NO_GH}", program.display()))
-        })?;
+    command.args(args).current_dir(cwd);
+    let mut attempts = 0;
+    let out = loop {
+        match command.output() {
+            Ok(output) => break output,
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy && attempts < 3 =>
+            {
+                attempts += 1;
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => {
+                return Err(BuildError::Tool(format!(
+                    "cannot run {}: {error}. {NO_GH}",
+                    program.display()
+                )));
+            }
+        }
+    };
     if !out.status.success() {
         return Err(BuildError::Tool(format!(
             "`{} {}` failed: {}",
