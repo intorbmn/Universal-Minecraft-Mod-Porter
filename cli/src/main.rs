@@ -10,7 +10,9 @@ use config::CliConfig;
 use exit::{CliFailure, ExitCode};
 use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
+#[cfg(windows)]
+use std::process::Stdio;
 use std::sync::Arc;
 use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
 use ummp_core::adapter::{AdapterRegistry, Handling};
