@@ -16,7 +16,7 @@ Status legend: NOT_STARTED | PLANNED | IN_PROGRESS | BLOCKED | NEEDS_REVIEW | TE
 | 9 | Advanced Technology Adapters | PLANNED | XL |
 | 10 | Modpack Migration | PLANNED | L |
 | 11 | User Interface | PLANNED | L |
-| 12 | CLI, API & External Integration | PLANNED | M |
+| 12 | CLI, API & External Integration | IN_PROGRESS | M |
 | 13 | Optimization & Production Readiness | PLANNED | L |
 | 14 | Community & Ecosystem | PLANNED | XL |
 
