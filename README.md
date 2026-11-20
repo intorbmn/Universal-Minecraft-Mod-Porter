@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-10 complete; Phase 11 (desktop UI) is in progress on `phase-11-ui`; CI, Windows runtime validation, and screenshots are still pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-10 complete; Phase 11 (desktop UI) is implemented on `phase-11-ui`; automated CI is green. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
