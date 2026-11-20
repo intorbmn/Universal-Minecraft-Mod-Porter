@@ -1,0 +1,10 @@
+# Data rules for modpack migration (Phase 10, ADR 0013). Sample names are synthetic.
+#
+# [[replacement]]: when a pack contains mod `from` and the target has no version of it, plan to
+# use `to` instead. `loader` limits the rule to one target loader. Adding a rule = adding a row.
+
+[[replacement]]
+from = "demowidget-legacy"
+to = "demowidget"
+loader = "fabric"
+note = "Synthetic example: the legacy build was merged into the main mod."

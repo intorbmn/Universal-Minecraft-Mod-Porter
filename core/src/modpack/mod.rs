@@ -6,8 +6,10 @@
 //! untrusted: paths go through [`safe_rel`], archive sizes are capped on the bytes read.
 
 pub mod analyze;
+pub mod config;
 pub mod formats;
 pub mod graph;
+pub mod plan;
 
 use crate::analyzer::ModAnalysis;
 use crate::metadata::Loader;
@@ -39,6 +41,8 @@ pub enum PackError {
     Unsupported(String),
     #[error("refused: {0}")]
     Refused(String),
+    #[error("mod index: {0}")]
+    Index(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

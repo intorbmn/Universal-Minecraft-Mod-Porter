@@ -569,3 +569,299 @@ fn analysis_is_deterministic() {
     );
     assert_eq!(format!("{:?}", ga.issues), format!("{:?}", gb.issues));
 }
+
+// ---------------------------------------------------------------------------
+// 10.C Plan with a fake index
+// ---------------------------------------------------------------------------
+
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use ummp_core::modpack::config::{PackRules, ReplacementRule};
+use ummp_core::modpack::plan::{
+    plan, ModIndex, PackAction, PackPlan, PlanInput, RemoteVersion, Side, Target,
+};
+
+#[derive(Default)]
+struct FakeIndex {
+    versions: HashMap<String, Vec<RemoteVersion>>, // key "project|mc|loader"
+    hashes: HashMap<String, RemoteVersion>,
+    calls: AtomicUsize,
+}
+
+impl ModIndex for FakeIndex {
+    fn versions(
+        &self,
+        project: &str,
+        mc: &str,
+        loader: &Loader,
+    ) -> Result<Vec<RemoteVersion>, PackError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let l = match loader {
+            Loader::Fabric => "fabric",
+            _ => "other",
+        };
+        Ok(self
+            .versions
+            .get(&format!("{project}|{mc}|{l}"))
+            .cloned()
+            .unwrap_or_default())
+    }
+    fn by_hash(&self, sha1: &str) -> Result<Option<RemoteVersion>, PackError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(self.hashes.get(sha1).cloned())
+    }
+}
+
+/// Fails the test when anything asks it for data.
+struct PanicIndex;
+impl ModIndex for PanicIndex {
+    fn versions(&self, _: &str, _: &str, _: &Loader) -> Result<Vec<RemoteVersion>, PackError> {
+        panic!("offline mode must not call the index");
+    }
+    fn by_hash(&self, _: &str) -> Result<Option<RemoteVersion>, PackError> {
+        panic!("offline mode must not call the index");
+    }
+}
+
+fn remote(project: &str, version: &str) -> RemoteVersion {
+    RemoteVersion {
+        project: project.into(),
+        version: version.into(),
+        file_name: format!("{project}-{version}.jar"),
+        url: format!("https://cdn.modrinth.com/data/{project}/versions/{version}/{project}-{version}.jar"),
+        sha1: hex(40),
+        sha512: hex(128),
+        size: 100,
+        required_deps: vec![],
+        env: Default::default(),
+    }
+}
+
+fn target(mc: &str) -> Target {
+    Target {
+        mc: mc.into(),
+        loader: Loader::Fabric,
+        loader_version: Some("0.16.2".into()),
+    }
+}
+
+fn input<'a>(mc: &str, rules: &'a [ReplacementRule]) -> PlanInput<'a> {
+    PlanInput {
+        target: target(mc),
+        online: false,
+        sources: None,
+        side: Side::Both,
+        allow_risk: false,
+        replacements: rules,
+    }
+}
+
+fn action<'a>(p: &'a PackPlan, path: &str) -> &'a PackAction {
+    &p.items.iter().find(|i| i.path == path).unwrap().action
+}
+
+#[test]
+fn plan_keeps_mod_that_supports_target() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(
+        tmp.path(),
+        &[
+            ("a.jar", fabric_jar("a", "1.21.1", &[])),
+            ("old.jar", fabric_jar("old", "1.20.1", &[])),
+        ],
+    );
+    let plan = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
+    assert!(matches!(action(&plan, "mods/a.jar"), PackAction::Keep));
+    // A mod built for another version is not kept just because it exists.
+    assert!(matches!(action(&plan, "mods/old.jar"), PackAction::Manual { .. }));
+    assert!(plan.items.iter().all(|i| !i.reason.is_empty()));
+}
+
+#[test]
+fn plan_updates_when_index_has_target_version() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(tmp.path(), &[("a.jar", fabric_jar("a", "1.20.1", &[]))]);
+    let mut idx = FakeIndex::default();
+    idx.versions
+        .insert("a|1.21.1|fabric".into(), vec![remote("a", "2.0.0"), remote("a", "1.9.0")]);
+    let mut inp = input("1.21.1", &[]);
+    inp.online = true;
+    let plan = plan(&p, &inp, &idx).unwrap();
+    match action(&plan, "mods/a.jar") {
+        PackAction::Update(rv) => assert_eq!(rv.version, "2.0.0"), // newest first
+        other => panic!("{other:?}"),
+    }
+    // No version for the target: left to the user, with the reason.
+    let mut inp = input("1.99", &[]);
+    inp.online = true;
+    let plan = ummp_core::modpack::plan::plan(&p, &inp, &idx).unwrap();
+    assert!(matches!(action(&plan, "mods/a.jar"), PackAction::Manual { .. }));
+}
+
+#[test]
+fn plan_ports_when_source_supplied() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(tmp.path(), &[("dw.jar", fabric_jar("demowidget", "1.20.1", &[]))]);
+    let sources = tmp.path().join("sources");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/loader/fabric-src");
+    copy_dir(&fixture, &sources.join("demowidget"));
+    let mut inp = input("1.21.1", &[]);
+    inp.sources = Some(&sources);
+    let plan = plan(&p, &inp, &PanicIndex).unwrap();
+    match action(&plan, "mods/dw.jar") {
+        PackAction::Port { source } => assert!(source.ends_with("demowidget")),
+        other => panic!("{other:?}"),
+    }
+}
+
+fn copy_dir(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for e in std::fs::read_dir(from).unwrap() {
+        let e = e.unwrap();
+        let dest = to.join(e.file_name());
+        if e.path().is_dir() {
+            copy_dir(&e.path(), &dest);
+        } else {
+            std::fs::copy(e.path(), dest).unwrap();
+        }
+    }
+}
+
+#[test]
+fn plan_replaces_by_rule() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(tmp.path(), &[("a.jar", fabric_jar("demowidget", "1.20.1", &[]))]);
+    let rules = vec![ReplacementRule {
+        from: "demowidget".into(),
+        to: "demogadget".into(),
+        loader: Some("fabric".into()),
+        note: "synthetic".into(),
+    }];
+    let plan1 = plan(&p, &input("1.21.1", &rules), &PanicIndex).unwrap();
+    assert!(matches!(
+        action(&plan1, "mods/a.jar"),
+        PackAction::Replace { with, resolved: None } if with == "demogadget"
+    ));
+    // Online, the replacement is resolved to a downloadable version.
+    let mut idx = FakeIndex::default();
+    idx.versions
+        .insert("demogadget|1.21.1|fabric".into(), vec![remote("demogadget", "1.0.0")]);
+    let mut inp = input("1.21.1", &rules);
+    inp.online = true;
+    let plan2 = ummp_core::modpack::plan::plan(&p, &inp, &idx).unwrap();
+    assert!(matches!(
+        action(&plan2, "mods/a.jar"),
+        PackAction::Replace { resolved: Some(_), .. }
+    ));
+    // A rule for another loader does not apply.
+    let mut other = rules.clone();
+    other[0].loader = Some("forge".into());
+    let plan3 = ummp_core::modpack::plan::plan(&p, &input("1.21.1", &other), &PanicIndex).unwrap();
+    assert!(matches!(action(&plan3, "mods/a.jar"), PackAction::Manual { .. }));
+}
+
+#[test]
+fn plan_marks_manual_with_reason() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(tmp.path(), &[("a.jar", fabric_jar("a", "1.20.1", &[]))]);
+    let plan = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
+    match action(&plan, "mods/a.jar") {
+        PackAction::Manual { reason } => assert!(reason.contains("no version for 1.21.1/fabric"), "{reason}"),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn plan_rechecks_dependencies_after_decisions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(
+        tmp.path(),
+        &[
+            ("c.jar", fabric_jar("c", "1.21.1", &[("a", "*")])),
+            ("a.jar", fabric_jar("a", "1.21.1", &[("lib", "*")])),
+            ("lib.jar", fabric_jar("lib", "1.20.1", &[])),
+        ],
+    );
+    let plan = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
+    assert!(matches!(action(&plan, "mods/lib.jar"), PackAction::Manual { .. }));
+    // a would be kept on its own, but its dependency is left to the user; c follows a.
+    for (path, missing) in [("mods/a.jar", "lib"), ("mods/c.jar", "a")] {
+        match action(&plan, path) {
+            PackAction::Manual { reason } => assert!(reason.contains(&format!("missing {missing}")), "{path}: {reason}"),
+            other => panic!("{path}: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn offline_mode_never_calls_index() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = analyzed(
+        tmp.path(),
+        &[
+            ("a.jar", fabric_jar("a", "1.20.1", &[])),
+            ("b.jar", fabric_jar("b", "1.21.1", &[])),
+        ],
+    );
+    // PanicIndex panics on any call; online = false must not reach it.
+    let _ = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
+    // And with online = true a counting index is used.
+    let idx = FakeIndex::default();
+    let mut inp = input("1.21.1", &[]);
+    inp.online = true;
+    let _ = ummp_core::modpack::plan::plan(&p, &inp, &idx).unwrap();
+    assert!(idx.calls.load(Ordering::SeqCst) > 0);
+}
+
+#[test]
+fn plan_removes_high_risk_and_refuses() {
+    let tmp = tempfile::tempdir().unwrap();
+    let evil = zip_bytes(&[
+        (
+            "fabric.mod.json",
+            br#"{"schemaVersion":1,"id":"evil","version":"1.0.0","depends":{"minecraft":"1.21.1"}}"#.to_vec(),
+        ),
+        ("x.properties", b"h=https://discord.com/api/webhooks/1/abc\n".to_vec()),
+    ]);
+    let p = analyzed(tmp.path(), &[("evil.jar", evil)]);
+    let pl = plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
+    assert!(matches!(action(&pl, "mods/evil.jar"), PackAction::Remove { reason } if reason.contains("malware risk")));
+    assert!(pl.refused.is_some());
+    let mut inp = input("1.21.1", &[]);
+    inp.allow_risk = true;
+    let pl = ummp_core::modpack::plan::plan(&p, &inp, &PanicIndex).unwrap();
+    assert!(pl.refused.is_none());
+    assert!(matches!(action(&pl, "mods/evil.jar"), PackAction::Keep));
+}
+
+#[test]
+fn plan_keeps_remote_entry_when_target_equals_pack() {
+    let tmp = tempfile::tempdir().unwrap();
+    let pack = write(
+        tmp.path(),
+        "demo.mrpack",
+        &zip_bytes(&[(
+            "modrinth.index.json",
+            index(json!([remote_file("mods/demowidget-1.0.0.jar")])),
+        )]),
+    );
+    let p = import(&pack, &tmp.path().join("work")).unwrap();
+    // Same mc + loader as the pack: the listed file is still valid.
+    let same = plan(&p, &input("1.20.1", &[]), &PanicIndex).unwrap();
+    assert!(matches!(action(&same, "mods/demowidget-1.0.0.jar"), PackAction::Keep));
+    // Another version: nothing is known about it offline.
+    let other = ummp_core::modpack::plan::plan(&p, &input("1.21.1", &[]), &PanicIndex).unwrap();
+    assert!(matches!(action(&other, "mods/demowidget-1.0.0.jar"), PackAction::Manual { .. }));
+}
+
+#[test]
+fn plan_removes_wrong_side_mod() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut p = analyzed(tmp.path(), &[("a.jar", fabric_jar("a", "1.20.1", &[]))]);
+    p.entries[0].env.server = Support::Unsupported;
+    let mut inp = input("1.21.1", &[]);
+    inp.side = Side::Server;
+    let pl = plan(&p, &inp, &PanicIndex).unwrap();
+    assert!(matches!(action(&pl, "mods/a.jar"), PackAction::Remove { reason } if reason.contains("wrong side")));
+    let _ = PackRules::builtin().unwrap();
+}
