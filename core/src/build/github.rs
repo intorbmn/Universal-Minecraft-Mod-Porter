@@ -2,6 +2,7 @@
 //! a branch of a build repository, waits for the run, and downloads its logs.
 
 use super::local::{copy_project, junit_counts, new_build_dir, newest_crash};
+use crate::app::Secret;
 use super::logs::analyze_log;
 use super::{
     BuildBackend, BuildError, BuildOutcome, BuildRequest, Stage, StageResult, StageStatus,
