@@ -135,7 +135,7 @@ impl CredentialsFile {
 
     pub fn delete(&self, provider: AiProviderKind) -> Result<(), AppError> {
         let mut file = self.read()?;
-        *self.key_mut(&mut file, provider) = None;
+        *Self::key_mut(&mut file, provider) = None;
         self.write(&file)
     }
 
