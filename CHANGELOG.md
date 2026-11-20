@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Phase 11.B–11.E: desktop workflow screens for Target, Plan/Diff, Run, Report, Build, AI approval, modpack migration and Settings; OS keyring-backed credentials, output-folder opening, bilingual labels, bounded logs and paginated pack reports. See ADR 0014 and `docs/phase/phase-11-ui.md`. CI and Windows runtime validation remain pending.
+- Phase 11.B–11.E: desktop workflow screens for Target, Plan/Diff, Run, Report, Build, AI approval, modpack migration and Settings; OS keyring-backed credentials, output-folder opening, bilingual labels, bounded logs and paginated pack reports. See ADR 0014 and `docs/phase/phase-11-ui.md`. Automated CI is green; Windows runtime validation remains pending.
 
 ### Added
 - Phase 11.C: desktop Target, Plan/Diff, Run, and Report screens; typed Tauri command adapters;
