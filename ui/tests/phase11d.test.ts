@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import Build from '../src/screens/Build.svelte';
 import Settings from '../src/screens/Settings.svelte';
-import { translate } from '../src/lib/i18n.svelte';
+import { setLang, translate } from '../src/lib/i18n.svelte';
+
+afterEach(() => setLang('en'));
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(async (cmd: string) => {
