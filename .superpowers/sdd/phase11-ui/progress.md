@@ -72,3 +72,7 @@ Task B1 (desktop shell, Home, Analysis): complete. `ui/` (Svelte 5 + Vite 8 + TS
 - Latest PR-head verification: push run #44710620730 and pull-request run #44710673870 both passed on `0eeafe63a2fdd04d9f25d410c3b20f8d4760d265`; both jobs (`build-test-lint`, `desktop`) succeeded and both expected CI artifacts were uploaded.
 - CI artifacts: `ummp-phase11-playwright` (Home, Plan/Diff, PackReport screenshots) and `ummp-desktop-cargo-lockfile` were uploaded successfully.
 - 11.C–11.E: automated implementation and test gates complete. 11.F: manual Windows release dispatch/install/smoke test remains. 11.G: documentation aligned; draft PR is the review handoff. Do not merge.
+
+- 2026-11-20: User acceptance feedback: the desktop tool basically runs. Treat this as a basic runtime smoke test only; do not infer that all Windows integration points passed.
+- 2026-11-20: User has not tested AI yet. AI desktop acceptance remains OPEN until provider setup, request execution, proposal review, explicit approve/reject and resulting job/report are exercised.
+- 2026-11-20: Cancellation test is DEFERRED, not passed/failed: current sample jobs finish too quickly to observe cancellation. A deliberately long-running cancellable test case is needed before closing this item.
