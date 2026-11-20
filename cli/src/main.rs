@@ -606,7 +606,7 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
                 ],
                 Some(name) => {
                     let kind = parse_ai_provider(&name)?;
-                    vec![(name.as_str(), kind)]
+                    vec![(if kind == AiProviderKind::Anthropic { "anthropic" } else { "openai" }, kind)]
                 }
             };
             let entries = providers.into_iter().map(|(name, kind)| {
