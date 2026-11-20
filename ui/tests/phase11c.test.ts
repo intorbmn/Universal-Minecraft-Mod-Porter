@@ -38,6 +38,17 @@ describe('DiffView', () => {
     expect(screen.getByText('-old')).toBeInTheDocument();
     expect(screen.getByText('+new')).toBeInTheDocument();
   });
+
+  it('collapses long unchanged runs and preserves access to the hidden lines', async () => {
+    const context = Array.from({ length: 12 }, (_, i) => ` context-${i}`).join('\n');
+    render(DiffView, { diff: `@@ -1,14 +1,14 @@\n${context}\n-old\n+new` });
+    const hidden = screen.getByText('6 unchanged lines hidden');
+    expect(hidden).toBeInTheDocument();
+    const line = screen.getByText(' context-3');
+    expect(line).not.toBeVisible();
+    await fireEvent.click(hidden);
+    expect(line).toBeVisible();
+  });
 });
 
 describe('Plan', () => {
