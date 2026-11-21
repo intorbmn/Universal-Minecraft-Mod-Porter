@@ -399,6 +399,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn concurrent_provider_updates_preserve_both_credentials_and_base_url() {
+        use std::sync::{Arc, Barrier};
+
+        let dir = tempfile::tempdir().unwrap();
+        let barrier = Arc::new(Barrier::new(3));
+        let mut workers = Vec::new();
+
+        for (provider, key) in [
+            (AiProviderKind::Anthropic, ANTHROPIC),
+            (AiProviderKind::Openai, OPENAI),
+        ] {
+            let path = dir.path().to_path_buf();
+            let barrier = Arc::clone(&barrier);
+            workers.push(std::thread::spawn(move || {
+                let store = FileKeyStore::in_dir(&path);
+                barrier.wait();
+                for _ in 0..20 {
+                    store.set(provider, &Secret::new(key)).unwrap();
+                }
+            }));
+        }
+
+        let path = dir.path().to_path_buf();
+        let barrier_for_url = Arc::clone(&barrier);
+        workers.push(std::thread::spawn(move || {
+            let store = FileKeyStore::in_dir(&path);
+            barrier_for_url.wait();
+            for _ in 0..20 {
+                store
+                    .set_openai_base_url(Some("https://api.example.test/v1"))
+                    .unwrap();
+            }
+        }));
+
+        for worker in workers {
+            worker.join().unwrap();
+        }
+
+        let store = FileKeyStore::in_dir(dir.path());
+        assert_eq!(store.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(), ANTHROPIC);
+        assert_eq!(store.get(AiProviderKind::Openai).unwrap().unwrap().expose(), OPENAI);
+        assert_eq!(
+            store.openai_base_url().unwrap().as_deref(),
+            Some("https://api.example.test/v1")
+        );
+    }
+
     /// ★ Mutation: prefer the file over the environment value; this assertion must fail.
     #[test]
     fn environment_value_overrides_file_without_global_environment_mutation() {
