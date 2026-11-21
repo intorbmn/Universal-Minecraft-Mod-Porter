@@ -821,7 +821,7 @@ fn add_dir_to_zip(
     root: &Path,
     prefix: &str,
 ) -> Result<(), PackError> {
-    let options = zip::write::FileOptions::default();
+    let options = zip::write::SimpleFileOptions::default();
     for rel in walk_files(root)? {
         z.start_file(format!("{prefix}{}", rel_string(&rel)), options)?;
         std::io::copy(&mut File::open(root.join(&rel))?, z)?;
