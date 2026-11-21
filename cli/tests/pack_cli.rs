@@ -9,7 +9,7 @@ fn zip_bytes(entries: &[(&str, Vec<u8>)]) -> Vec<u8> {
     {
         let mut z = zip::ZipWriter::new(&mut buf);
         for (name, bytes) in entries {
-            z.start_file(*name, zip::write::FileOptions::default())
+            z.start_file(*name, zip::write::SimpleFileOptions::default())
                 .unwrap();
             z.write_all(bytes).unwrap();
         }
