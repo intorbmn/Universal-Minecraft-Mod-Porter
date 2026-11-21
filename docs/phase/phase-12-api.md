@@ -1,7 +1,7 @@
 # Phase 12 — CLI, API & Integration
 
 **Status:** IN PROGRESS  
-**Branch:** `phase-12-api` (based on merged Phase 11 `master`)  
+**Branch:** `phase-12b-rest` (based on PR #14 merge commit)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
 **ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); MCP 0017 and plugins 0018 are planned  
@@ -72,7 +72,7 @@ remain outside `core`.
 2. Verify completion installation/behavior in real bash, zsh, fish and PowerShell sessions.
 3. Have the user confirm on their machine that a key saved in desktop appears as masked status in CLI, and vice versa.
 4. Run and record mutation checks for the starred credential, leak, JSON and exit-code tests.
-5. Review and merge PR 1 before starting 12.B or 12.C.
+5. PR #14 was reviewed and merged; 12.B implementation is now in progress.
 
 ## 12.A JSON coverage follow-up
 
@@ -185,7 +185,7 @@ remain outside `core`.
   completion behavior, and mutation-check evidence for starred tests. Do not mark Phase 12
   complete until these and the later PR batches satisfy the guide's definition of done.
 
-- Opened [PR #14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) for review on 2026-11-21. It is mergeable and remains unmerged; wait for the user's review and merge before starting PR 2.
+- Opened [PR #14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) for review on 2026-11-21; it was merged at `e86a914e2926060aecc8c65dcfba652f0d11b3a1`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
@@ -254,8 +254,7 @@ remain outside `core`.
   2. Save a key in Desktop and confirm CLI status shows the same mask; then save through CLI
      and confirm Desktop shows the same mask. Use synthetic keys if preferred; do not send
      an AI request.
-- PR #14 remains open and unmerged. Phase 12.B/12.C stay gated until the user reviews and
-  merges PR #14. No merge, rebase, force-push or history rewrite was performed.
+- PR #14 merged at `e86a914e2926060aecc8c65dcfba652f0d11b3a1`; Phase 12.B gate is cleared.
 
 
 ## 12.B implementation record — 2026-11-21
