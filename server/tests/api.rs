@@ -15,8 +15,7 @@ use ummp_server::router;
 const TOKEN: &str = "test-bearer-token-with-at-least-32-bytes";
 
 fn fixture() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../tests/fixtures/loader/fabric-src")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/loader/fabric-src")
 }
 
 fn copy_tree(from: &Path, to: &Path) {
@@ -49,7 +48,11 @@ struct TestServer {
 async fn start_server(root: &Path) -> TestServer {
     let data = tempfile::tempdir().unwrap();
     let services = Arc::new(AppServices::open(Settings::new(data.path().to_path_buf())).unwrap());
-    let app = router(Arc::clone(&services), TOKEN.into(), vec![root.to_path_buf()]);
+    let app = router(
+        Arc::clone(&services),
+        TOKEN.into(),
+        vec![root.to_path_buf()],
+    );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     tokio::spawn(async move {
@@ -105,7 +108,11 @@ async fn requires_token() {
     let root = tempfile::tempdir().unwrap();
     let server = start_server(root.path()).await;
     assert_eq!(
-        status(agent().get(&format!("{}/v1/openapi.json", server.base)).call()),
+        status(
+            agent()
+                .get(&format!("{}/v1/openapi.json", server.base))
+                .call()
+        ),
         401
     );
 }
@@ -114,12 +121,8 @@ async fn requires_token() {
 async fn rejects_path_outside_allowed_roots() {
     let root = tempfile::tempdir().unwrap();
     let server = start_server(root.path()).await;
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/analyze", server.base),
-    )
-    .send_string(r#"{"path":"/etc/passwd"}"#);
+    let response = authorized(&agent(), "POST", &format!("{}/v1/analyze", server.base))
+        .send_string(r#"{"path":"/etc/passwd"}"#);
     assert_eq!(status(response), 403);
 }
 
@@ -137,14 +140,14 @@ async fn plan_does_not_write() {
         "loader": "neoforge",
         "min_confidence": 0.8
     });
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/plan", server.base),
-    )
-    .send_string(&body.to_string());
+    let response = authorized(&agent(), "POST", &format!("{}/v1/plan", server.base))
+        .send_string(&body.to_string());
     assert_eq!(status(response), 200);
-    assert_eq!(snapshot(&input), before, "planning must not write to source");
+    assert_eq!(
+        snapshot(&input),
+        before,
+        "planning must not write to source"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -161,12 +164,8 @@ async fn migrate_without_reviewed_is_refused() {
         "min_confidence": 0.8,
         "reviewed": false
     });
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/migrate", server.base),
-    )
-    .send_string(&body.to_string());
+    let response = authorized(&agent(), "POST", &format!("{}/v1/migrate", server.base))
+        .send_string(&body.to_string());
     assert_eq!(status(response), 403);
 }
 
@@ -178,14 +177,11 @@ async fn port_job_completes_and_sse_events_are_ordered() {
     copy_tree(&fixture(), &input);
     let server = start_server(root.path()).await;
 
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/port", server.base),
-    )
-    .send_string(&port_body(&input, &output))
-    .unwrap();
-    let started: serde_json::Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let response = authorized(&agent(), "POST", &format!("{}/v1/port", server.base))
+        .send_string(&port_body(&input, &output))
+        .unwrap();
+    let started: serde_json::Value =
+        serde_json::from_str(&response.into_string().unwrap()).unwrap();
     let id = started["job"].as_str().unwrap();
 
     let response = authorized(
@@ -207,8 +203,12 @@ async fn port_job_completes_and_sse_events_are_ordered() {
             break;
         }
     }
-    let started_at = stream_text.find("event: job.started").expect("started event missing");
-    let finished_at = stream_text.find("event: job.finished").expect("finished event missing");
+    let started_at = stream_text
+        .find("event: job.started")
+        .expect("started event missing");
+    let finished_at = stream_text
+        .find("event: job.finished")
+        .expect("finished event missing");
     assert!(started_at < finished_at, "{stream_text}");
     assert!(stream_text.contains("event: job.progress"), "{stream_text}");
     assert!(output.join("UMMP_REPORT.md").is_file());
@@ -232,14 +232,11 @@ async fn cancel_works() {
         }
     }));
 
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/port", server.base),
-    )
-    .send_string(&port_body(&input, &output))
-    .unwrap();
-    let started: serde_json::Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let response = authorized(&agent(), "POST", &format!("{}/v1/port", server.base))
+        .send_string(&port_body(&input, &output))
+        .unwrap();
+    let started: serde_json::Value =
+        serde_json::from_str(&response.into_string().unwrap()).unwrap();
     let id = started["job"].as_str().unwrap();
     entered_rx.recv_timeout(Duration::from_secs(10)).unwrap();
 
@@ -266,7 +263,6 @@ async fn cancel_works() {
     .expect("job was not cancelled");
 }
 
-
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn rejects_symlink_escape() {
@@ -277,12 +273,8 @@ async fn rejects_symlink_escape() {
     let link = root.path().join("escape");
     symlink(outside.path(), &link).unwrap();
     let server = start_server(root.path()).await;
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/analyze", server.base),
-    )
-    .send_string(&serde_json::json!({"path": link}).to_string());
+    let response = authorized(&agent(), "POST", &format!("{}/v1/analyze", server.base))
+        .send_string(&serde_json::json!({"path": link}).to_string());
     assert_eq!(status(response), 403);
 }
 
@@ -291,7 +283,9 @@ fn core_remains_free_of_tokio() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("../core/Cargo.toml");
     let text = std::fs::read_to_string(manifest).unwrap();
     assert!(
-        !text.lines().any(|line| line.trim_start().starts_with("tokio")),
+        !text
+            .lines()
+            .any(|line| line.trim_start().starts_with("tokio")),
         "Tokio belongs only in the presentation server crate"
     );
 }
@@ -301,12 +295,8 @@ async fn body_too_large_is_413() {
     let root = tempfile::tempdir().unwrap();
     let server = start_server(root.path()).await;
     let body = format!(r#"{{"path":"{}"}}"#, "x".repeat(1024 * 1024));
-    let response = authorized(
-        &agent(),
-        "POST",
-        &format!("{}/v1/analyze", server.base),
-    )
-    .send_string(&body);
+    let response =
+        authorized(&agent(), "POST", &format!("{}/v1/analyze", server.base)).send_string(&body);
     assert_eq!(status(response), 413);
 }
 
@@ -318,15 +308,14 @@ async fn openapi_lists_every_route() {
         status(agent().get(&format!("{}/v1/health", server.base)).call()),
         200
     );
-    let response = authorized(
-        &agent(),
-        "GET",
-        &format!("{}/v1/openapi.json", server.base),
-    )
-    .call()
-    .unwrap();
+    let response = authorized(&agent(), "GET", &format!("{}/v1/openapi.json", server.base))
+        .call()
+        .unwrap();
     let openapi = response.into_string().unwrap();
-    assert!(!openapi.contains(TOKEN), "server token leaked in OpenAPI response");
+    assert!(
+        !openapi.contains(TOKEN),
+        "server token leaked in OpenAPI response"
+    );
     let spec: serde_json::Value = serde_json::from_str(&openapi).unwrap();
     let paths = spec["paths"].as_object().unwrap();
     let expected = [
