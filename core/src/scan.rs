@@ -203,7 +203,7 @@ impl Scanner {
             if entry.is_dir() {
                 continue;
             }
-            let name = entry.name().to_string();
+            let name = entry.name()?.into_owned();
             let mut data = Vec::new();
             entry.by_ref().take(MAX_ENTRY).read_to_end(&mut data)?;
             if let Some(class) = name.strip_suffix(".class") {
