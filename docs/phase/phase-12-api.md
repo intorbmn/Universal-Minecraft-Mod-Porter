@@ -307,31 +307,31 @@ remain outside `core`.
 - The real Claude Code client smoke test is NOT RUN: it requires the user's consent and an available local Claude Code installation.
 
 
-## 12.D GitHub Action — implementation in progress
+## 12.D GitHub Action — verified
 
-- Created branch `phase-12d-action` from current `master`; no existing history was rewritten.
-- Added root `action.yml` as a composite action with `analyze`, `scan`, `port` and
-  `build` inputs, `path`, optional target/loader, and the `fail-on-risk` policy
-  (default `high`). Outputs are `exit-code` and `report-path`.
-- The action installs the pinned Rust 1.97.0 toolchain, caches Cargo data, regenerates
-  the stale workspace lockfile only in the action checkout, installs the CLI with
-  `cargo install --path cli --locked`, and runs the selected CLI command with JSON.
-- The action applies a preflight risk scan to non-scan commands, writes
-  `$GITHUB_STEP_SUMMARY`, and uploads the result/report directory.
-- Added `cli/tests/action_contract.rs` to pin required inputs, outputs and execution
-  steps. Added CLI usage documentation and a CI push trigger for this feature branch.
-- Verification status: implementation is not complete until root/desktop CI is green
-  and the required real run in `intorbmn/ummp-build-sandbox` is recorded below.
-- Sandbox smoke run #3 (`44916756565`) failed after successfully installing UMMP: the sandbox fixture is a Gradle demo rather than a complete mod, so `analyze` returned exit 5; inherited Bash `-e` also stopped the action before it could publish outputs/artifacts. Fixed the action to disable inherited `-e` while capturing command status, and changed the smoke command to `scan`. A successful rerun is pending.
+- Added root `action.yml` as a composite Action supporting `analyze`, `scan`, `port` and `build`, with configurable risk gating, schema-1 JSON output, GitHub Step Summary and report artifact.
+- The action installs the pinned Rust 1.97.0 toolchain, caches Cargo data, installs the CLI, and captures command exit status without inherited Bash `-e` interrupting report publication.
+- Added `cli/tests/action_contract.rs` and Action usage documentation.
+- CI #626: `build-test-lint` and `desktop` both passed.
+- Sandbox smoke run #7 (run ID `44917327945`) passed in `intorbmn/ummp-build-sandbox`; verified outputs and JSON report. Artifact `ummp-report-44917327945-1` (ID `14712426834`) uploaded successfully.
+- PR #21 remains Draft and is not merged.
 
-
-## 12.E implementation record — in progress
+## 12.E Out-of-process plugin system — verified
 
 - User explicitly approved manual implementation without skills on 2026-11-21.
-- Re-read Phase 12.E guide: manifest fields are `name`, `version`, `kind`, `command`, `ummp_api = 1`; protocol methods are `hello`, `findings`, and `edits`.
-- Discovery default: `<data_dir>/plugins/`; CLI commands: `ummp plugins list` and `ummp plugins check <dir>`. A check validates the manifest, executable, API version and hello handshake.
-- ADR numbering correction: ADR 0018 already records the project license, so the plugin protocol uses ADR 0019. No existing ADR is renumbered.
-- Runtime uses a scrubbed child-process environment, 30-second timeout, process-tree termination and an 8 MiB stdout cap. Returned paths must identify existing files in the canonical project root; `.jar` and `.class` are refused. Returned original text must match the current file before an edit is accepted.
-- Secret-like files (environment files, credentials, tokens, secret files and package-manager auth files) are excluded from plugin input.
-- Security boundary: the protocol provides no file-write API, but process execution is not an OS sandbox. Plugins still run with the current user's OS permissions.
-- Verification is pending full CI and the CLI smoke tests.
+- Manifest: `ummp-plugin.toml`, fields `name`, `version`, `kind`, `command`, and `ummp_api = 1`.
+- Discovery default: `<data_dir>/plugins/`. CLI: `ummp plugins list` and `ummp plugins check <dir>`; check validates manifest, executable, API version and the `hello` handshake.
+- JSON Lines methods: `hello`, `findings`, and `edits`. Each invocation launches an out-of-process executable.
+- Runtime uses a scrubbed environment, 30-second timeout with process-tree termination, and an 8 MiB stdout cap. Secret/config files, SSH/cloud/container/Kubernetes credential directories and private-key files are excluded from plugin input; source files such as `TokenManager.java` remain eligible.
+- Returned paths must match supplied project files, canonicalize within the project root, and cannot target `.jar` or `.class`. Returned original content must match the current file. Accepted edits flow through MigrationEngine checkpoints and rollback.
+- Added fake-plugin, CLI, API compatibility, path traversal, timeout, stdout-limit and environment-security tests.
+- ADR 0019 records the plugin protocol; ADR 0018 remains the project-license decision.
+- CI #697: both `build-test-lint` and `desktop` passed, including tests, Clippy and formatting.
+- Mutation checks:
+  | Test | Mutation | Result |
+  |---|---|---|
+  | `rejects_plugin_returned_path_traversal` | Bypassed path validation; CI #668 | RED as expected; restored in commit `b43fbe8`, CI #670 green |
+  | `plugin_edit_is_checkpointed_and_rollback_restores_source` | Changed fake plugin output from `DemoGadget` to `DemoMutated`; CI #695 | RED as expected; fixture restored in commit `5d61759`, final CI #697 green |
+- Security boundary: the protocol exposes no file-write operation, but this is not an OS sandbox. Plugins run with the current user's OS permissions. Install only plugins you trust.
+- Protocol and usage details: [`docs/PLUGIN_PROTOCOL.md`](../PLUGIN_PROTOCOL.md).
+
