@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api';
   import { t } from '../lib/i18n.svelte';
-  import type { AiKeyStatus, PlanRequest, UiError } from '../lib/types';
+  import type { AiKeyStatus, PlanRequest, SettingsView, UiError } from '../lib/types';
 
   let { request, onStart }: { request: PlanRequest; onStart: (jobId: string) => void } = $props();
   let loading = $state(true);
@@ -15,14 +15,39 @@
   let showKey = $state(false);
   let warning = $state('');
 
+  let settings: SettingsView | null = null;
+
   async function refresh() {
     status = await api.aiKeyStatus(provider);
     baseUrl = status.base_url ?? '';
   }
 
+  // The backend starts AI with the provider stored in settings, so the choice is saved
+  // before anything else; on failure the previous provider stays selected.
+  async function changeProvider(select: HTMLSelectElement) {
+    const next = select.value;
+    if (next === provider || !settings) return;
+    loading = true;
+    error = null;
+    try {
+      await api.saveSettings({ ...settings, ai_provider: next });
+      settings = { ...settings, ai_provider: next };
+      provider = next;
+      key = '';
+      editing = false;
+      warning = '';
+      await refresh();
+    } catch (e) {
+      error = e as UiError;
+      select.value = provider;
+    } finally {
+      loading = false;
+    }
+  }
+
   onMount(async () => {
     try {
-      const settings = await api.settings();
+      settings = await api.settings();
       provider = settings.ai_provider ?? 'anthropic';
       await refresh();
     } catch (e) {
@@ -81,6 +106,11 @@
 <p class="muted">{t('ai.approvalNote')}</p>
 
 <section class="credential">
+  <label for="ai-provider">{t('settings.provider')}</label>
+  <select id="ai-provider" value={provider} disabled={loading} onchange={(e) => changeProvider(e.currentTarget)}>
+    <option value="anthropic">Anthropic</option>
+    <option value="openai">OpenAI</option>
+  </select>
   <h2>{provider === 'openai' ? t('ai.openaiKey') : t('ai.anthropicKey')}</h2>
   {#if status?.saved && !editing}
     <p><code>{status.masked}</code></p>
