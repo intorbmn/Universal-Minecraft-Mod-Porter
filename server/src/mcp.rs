@@ -4,7 +4,7 @@ use rmcp::{
     handler::server::wrapper::Parameters,
     model::{
         CallToolResult, ContentBlock, ListResourceTemplatesResult, ReadResourceRequestParams,
-        ReadResourceResult, ResourceContents, ResourceTemplate, ServerCapabilities, ServerConfig,
+        ReadResourceResponse, ReadResourceResult, ResourceContents, ResourceTemplate, ServerCapabilities, ServerConfig,
     },
     schemars::JsonSchema,
     tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler, ServiceExt,
@@ -384,7 +384,7 @@ impl ServerHandler for McpServer {
         &self,
         request: ReadResourceRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<ReadResourceResult, ErrorData> {
+    ) -> Result<ReadResourceResponse, ErrorData> {
         let id = request
             .uri
             .strip_prefix("ummp://report/")
@@ -397,7 +397,7 @@ impl ServerHandler for McpServer {
         Ok(ReadResourceResult::new(vec![ResourceContents::text(
             report_markdown(&job),
             &request.uri,
-        )]))
+        )]).into())
     }
 }
 
