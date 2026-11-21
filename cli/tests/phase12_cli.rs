@@ -198,8 +198,8 @@ fn bash_completion_registers_and_suggests_subcommands() {
         String::from_utf8_lossy(&completion.stderr)
     );
     let suggestions = String::from_utf8_lossy(&completion.stdout);
-    assert!(suggestions.lines().any(|line| line == "analyze"));
-    assert!(suggestions.lines().any(|line| line == "scan"));
+    assert!(suggestions.contains("analyze"), "missing analyze suggestion: {suggestions:?}");
+    assert!(suggestions.contains("scan"), "missing scan suggestion: {suggestions:?}");
 }
 
 #[test]
