@@ -163,7 +163,43 @@ fn completions_are_generated_for_supported_shells() {
         let script = String::from_utf8_lossy(&output.stdout);
         assert!(script.contains("ummp"), "{shell} completion was empty");
         assert!(script.contains("analyze"), "{shell} lacks subcommands");
+        let marker = match shell {
+            "bash" => "complete -F",
+            "zsh" => "#compdef ummp",
+            "fish" => "complete -c ummp",
+            "powershell" => "Register-ArgumentCompleter",
+            _ => unreachable!(),
+        };
+        assert!(script.contains(marker), "{shell} completion registration missing");
     }
+}
+
+#[test]
+fn bash_completion_registers_and_suggests_subcommands() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = ummp(&["completions", "bash"]);
+    assert_eq!(output.status.code(), Some(0));
+    let script = dir.path().join("ummp.bash");
+    std::fs::write(&script, output.stdout).unwrap();
+
+    let completion = Command::new("bash")
+        .arg("-c")
+        .arg(
+            r#"source "$1"; complete -p ummp >/dev/null || exit 10; COMP_WORDS=(ummp ""); COMP_CWORD=1; _ummp; printf '%s\\n' "${COMPREPLY[@]}""#,
+        )
+        .arg("ummp-completion")
+        .arg(&script)
+        .output()
+        .expect("bash must be available for the completion smoke test");
+    assert_eq!(
+        completion.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&completion.stderr)
+    );
+    let suggestions = String::from_utf8_lossy(&completion.stdout);
+    assert!(suggestions.lines().any(|line| line == "analyze"));
+    assert!(suggestions.lines().any(|line| line == "scan"));
 }
 
 #[test]
