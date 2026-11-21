@@ -217,8 +217,14 @@ remain outside `core`.
   - CI #380: exposing the raw credential instead of its mask caused the CLI masking test to fail.
   - CI #382: removing environment precedence and skipping legacy keyring deletion caused their
     respective regression tests to fail; restored CI #386 passed.
-  - Remaining starred 12.0 mutation evidence to complete: credential round-trip preservation
-    and the app-level key-leak invariant. Do not mark the 12.0 acceptance fully closed yet.
+  - CI #502: replacing credential read-modify-write with a fresh empty store caused
+    `credentials_round_trip_and_keep_other_provider` and the concurrent-provider preservation
+    test to fail; restored CI #506 passed.
+  - CI #508: exposing `Secret` through `Debug` caused
+    `secret_prints_stars_in_debug_and_display` to fail; restored CI #510 passed.
+  - The file-resolved key integration test continues to assert no raw key in settings,
+    jobs database, job view, job logs, events, or provider prompts. Its full leak-path fault
+    injection remains unverified; do not claim every starred 12.0 mutation is complete yet.
 - Remaining manual acceptance before PR 1 can be closed:
   1. In real Zsh, Fish and PowerShell sessions, verify completion suggestions, not only script
      generation/registration.
