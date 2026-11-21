@@ -137,3 +137,10 @@ Each entry names the module and the phase expected to address it.
 
 ## Not started
 Phases 13-14 (production readiness, community) have no code yet.
+
+
+## MCP server (Phase 12.C)
+- MCP is a local stdio child process, not a remote or multi-user service. A compatible client must launch it.
+- The caller is responsible for obtaining human approval before invoking `ummp_port` with `approve=true` or `ummp_rollback` with `confirm=true`; stdio itself cannot prove that a human reviewed the action.
+- Job reports expose the persisted job result and recent log tail only; they are not a full archival report store.
+- Local builds are permitted only when the application risk check allows Low risk, but build scripts still run with the user's OS permissions. Prefer GitHub Actions.
