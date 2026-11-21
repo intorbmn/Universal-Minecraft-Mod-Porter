@@ -71,7 +71,7 @@ fn default_data_dir() -> PathBuf {
 }
 
 
-fn validate_bind(config: &ServerConfig) -> Result<(), &'static str> {
+const fn validate_bind(config: &ServerConfig) -> Result<(), &'static str> {
     if !config.listen.is_loopback() && !config.allow_remote {
         Err("remote listening requires --i-understand-remote")
     } else {
@@ -103,6 +103,8 @@ pub fn serve(services: Arc<AppServices>, config: ServerConfig) -> Result<(), Box
 }
 
 fn load_or_create_token(data_dir: &FsPath) -> Result<String, Box<dyn Error>> {
+    use std::io::Write;
+
     let path = data_dir.join("server-token");
     if let Ok(meta) = std::fs::symlink_metadata(&path) {
         if meta.file_type().is_symlink() || !meta.is_file() {
@@ -129,7 +131,6 @@ fn load_or_create_token(data_dir: &FsPath) -> Result<String, Box<dyn Error>> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    use std::io::Write;
     let mut file = options.open(path)?;
     file.write_all(token.as_bytes())?;
     file.sync_all()?;
@@ -386,7 +387,7 @@ struct PlanBody {
     snapshots: Option<PathBuf>,
 }
 
-fn default_confidence() -> f64 {
+const fn default_confidence() -> f64 {
     0.8
 }
 
@@ -490,7 +491,7 @@ struct BuildBody {
     confirm_medium: bool,
 }
 
-fn default_timeout() -> u64 {
+const fn default_timeout() -> u64 {
     1800
 }
 
