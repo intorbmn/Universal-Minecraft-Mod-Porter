@@ -166,78 +166,102 @@ pub fn analyze_pack(pack: &mut Pack, opts: &AnalyzeOptions) -> Result<(), PackEr
 /// a cache failure never prevents a fresh analysis from completing.
 pub fn analyze_pack_cached(
     pack: &mut Pack,
-    _opts: &AnalyzeOptions,
+    opts: &AnalyzeOptions,
     kb: &KnowledgeBase,
 ) -> Result<(), PackError> {
-    for entry in &mut pack.entries {
-        if entry.kind != super::EntryKind::Mod {
-            continue;
-        }
+    let n = if opts.threads == 0 {
+        std::thread::available_parallelism().map_or(1, usize::from)
+    } else {
+        opts.threads
+    };
+    let todo: Vec<usize> = pack.entries.iter().enumerate()
+        .filter(|(_, entry)| entry.local.is_some() && entry.kind == super::EntryKind::Mod)
+        .map(|(index, _)| index)
+        .collect();
+
+    let mut results = Vec::new();
+    let mut misses = Vec::new();
+    for &index in &todo {
+        let entry = &pack.entries[index];
         let Some(jar) = entry.local.as_deref() else { continue };
         let Ok(bytes) = std::fs::read(jar) else {
-            let Some(result) = analyze_entry(entry) else { continue };
-            apply_entry_result(entry, result, &mut pack.warnings);
+            misses.push(index);
             continue;
         };
-
-        let analysis_rules = rules_sha256("jar-descriptor-parser-v1", [("descriptor-parser", b"v1".as_slice())]);
+        let analysis_rules = rules_sha256(
+            "jar-descriptor-parser-v1",
+            [("descriptor-parser", b"v1".as_slice())],
+        );
         let analysis_key = CacheKey::new(CacheKind::Analysis, &bytes, analysis_rules);
-        let cached_analysis = kb.cache_get::<ModAnalysis>(&analysis_key).ok().flatten()
-            .filter(|value| !value.metadata.mod_id.trim().is_empty());
-        let mut mod_info = if let Some(value) = cached_analysis {
-            Some(value)
-        } else {
-            match inspect_jar(jar, &LocalFileSystem) {
-                Ok(value) => {
-                    let _ = kb.cache_put(&analysis_key, &value);
-                    Some(value)
-                }
-                Err(_) => None,
-            }
-        };
-
-        if let Some(value) = &mut mod_info {
-            value.jar_path = Some(jar.to_path_buf());
-        }
-
         let scan_rules = rules_sha256(
             "static-scan-engine-v1",
             [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
         );
         let scan_key = CacheKey::new(CacheKind::Scan, &bytes, scan_rules);
-        let cached_scan = kb.cache_get::<crate::scan::ScanReport>(&scan_key).ok().flatten();
-        let scan = if let Some(value) = cached_scan {
-            Some(value)
-        } else {
-            match scan_path(jar) {
-                Ok(value) => {
-                    let _ = kb.cache_put(&scan_key, &value);
-                    Some(value)
-                }
-                Err(_) => None,
-            }
-        };
 
-        let mut result = EntryResult {
-            mod_info,
-            risk: None,
-            findings: Vec::new(),
-            technologies: technologies(jar),
-            warning: None,
-        };
-        let scan_failed = scan.is_none();
-        if let Some(value) = scan {
-            result.risk = value.risk();
-            result.findings = value.findings;
+        let cached_analysis = kb.cache_get::<ModAnalysis>(&analysis_key).ok().flatten()
+            .filter(|value| !value.metadata.mod_id.trim().is_empty());
+        let cached_scan = kb.cache_get::<crate::scan::ScanReport>(&scan_key).ok().flatten();
+        if let (Some(mut mod_info), Some(scan)) = (cached_analysis, cached_scan) {
+            // The serialized result is content-based, but this path is location-specific.
+            mod_info.jar_path = Some(jar.to_path_buf());
+            results.push((index, EntryResult {
+                mod_info: Some(mod_info),
+                risk: scan.risk(),
+                findings: scan.findings,
+                technologies: technologies(jar),
+                warning: None,
+            }));
+        } else {
+            misses.push(index);
         }
-        if result.mod_info.is_none() {
-            result.warning = Some(format!("{}: descriptor unreadable", entry.path));
+    }
+
+    let chunk = misses.len().div_ceil(n.max(1)).max(1);
+    let entries = &pack.entries;
+    let computed: Vec<(usize, EntryResult)> = std::thread::scope(|scope| {
+        #[allow(clippy::needless_collect)]
+        let handles: Vec<_> = misses.chunks(chunk).map(|indices| {
+            scope.spawn(move || {
+                indices.iter()
+                    .filter_map(|&index| analyze_entry(&entries[index]).map(|result| (index, result)))
+                    .collect::<Vec<_>>()
+            })
+        }).collect();
+        handles.into_iter().flat_map(|handle| handle.join().unwrap_or_default()).collect()
+    });
+
+    // Persist only complete successful results. Cache failures are intentionally non-fatal.
+    for (index, result) in &computed {
+        if result.warning.is_some() || result.mod_info.is_none() {
+            continue;
         }
-        if scan_failed {
-            let warning = format!("{}: scan failed", entry.path);
-            result.warning = Some(result.warning.map_or(warning.clone(), |prior| format!("{prior}; {warning}")));
+        let Some(jar) = pack.entries[*index].local.as_deref() else { continue };
+        let Ok(bytes) = std::fs::read(jar) else { continue };
+        let analysis_key = CacheKey::new(
+            CacheKind::Analysis,
+            &bytes,
+            rules_sha256("jar-descriptor-parser-v1", [("descriptor-parser", b"v1".as_slice())]),
+        );
+        let scan_key = CacheKey::new(
+            CacheKind::Scan,
+            &bytes,
+            rules_sha256(
+                "static-scan-engine-v1",
+                [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
+            ),
+        );
+        if let Some(mod_info) = &result.mod_info {
+            let _ = kb.cache_put(&analysis_key, mod_info);
         }
-        apply_entry_result(entry, result, &mut pack.warnings);
+        let _ = kb.cache_put(&scan_key, &crate::scan::ScanReport {
+            findings: result.findings.clone(),
+        });
+    }
+    results.extend(computed);
+    results.sort_by_key(|(index, _)| *index);
+    for (index, result) in results {
+        apply_entry_result(&mut pack.entries[index], result, &mut pack.warnings);
     }
     Ok(())
 }
