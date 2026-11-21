@@ -454,7 +454,6 @@ mod tests {
         assert_eq!(resolved, dir.path());
     }
 
-
     #[test]
     fn unsupported_schema_returns_a_clear_error() {
         let dir = tempfile::tempdir().unwrap();
