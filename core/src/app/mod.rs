@@ -130,6 +130,17 @@ pub struct PlanRequest {
     /// `None` = keep the current loader.
     pub loader: Option<String>,
     pub min_confidence: f64,
+    /// Optional source loader override; otherwise detected from the mod descriptor.
+    #[serde(default)]
+    pub source_loader: Option<String>,
+    /// Optional command-level knowledge base and mappings overrides.
+    #[serde(default)]
+    pub kb: Option<PathBuf>,
+    #[serde(default)]
+    pub mappings: Option<PathBuf>,
+    /// Optional checkpoint directory for in-place migration.
+    #[serde(default)]
+    pub snapshots: Option<PathBuf>,
 }
 
 /// Event names the shell forwards to the window (the payloads are in [`views`]).
@@ -342,7 +353,7 @@ impl AppServices {
             from,
             source_loader,
             target_loader,
-        } = resolve_plan(self.settings().kb_path, &project, req)?;
+        } = resolve_plan(plan_kb_path(&self.settings(), req), req.mappings.clone(), &project, req)?;
         let set = MigrationEngine::default().compute_edits(&plan, &project)?;
         let attention: Vec<String> = set
             .technologies
@@ -428,6 +439,7 @@ struct Resolved {
 /// Detects what the request leaves open (source version, loaders) and plans the migration.
 fn resolve_plan(
     kb_path: Option<PathBuf>,
+    mappings: Option<PathBuf>,
     project: &Project,
     req: &PlanRequest,
 ) -> Result<Resolved, AppError> {
@@ -436,7 +448,8 @@ fn resolve_plan(
         .analyze(&project.root, &fs)
         .map_err(input_err)?;
     let first = report.mods.first();
-    let source_loader = first.and_then(|m| loader_label(&m.metadata.loader).map(str::to_owned));
+    let source_loader = req.source_loader.as_deref().map(str::to_ascii_lowercase)
+        .or_else(|| first.and_then(|m| loader_label(&m.metadata.loader).map(str::to_owned)));
     let from = match (&req.from, first) {
         (Some(f), _) => f.clone(),
         (None, Some(m)) => m.metadata.minecraft.to_string(),
@@ -455,7 +468,7 @@ fn resolve_plan(
             ))
         }
     };
-    let kb = open_kb(kb_path, None)?;
+    let kb = open_kb(kb_path, mappings)?;
     let request = MigrationRequest {
         source_minecraft: from.clone(),
         target_minecraft: req.to.clone(),
@@ -469,6 +482,14 @@ fn resolve_plan(
         from,
         source_loader,
         target_loader,
+    })
+}
+
+
+/// Selects request-level KB overrides before the saved application setting.
+fn plan_kb_path(settings: &Settings, req: &PlanRequest) -> Option<PathBuf> {
+    req.kb.clone().or_else(|| {
+        if req.mappings.is_none() { settings.kb_path.clone() } else { None }
     })
 }
 
@@ -619,14 +640,17 @@ impl AppServices {
                 "in-place migration needs a mod folder, not a .zip file".into(),
             ));
         }
-        let kb_path = self.settings().kb_path;
+        let settings = self.settings();
+        let kb_path = plan_kb_path(&settings, &req);
+        let mappings = req.mappings.clone();
+        let snapshots = req.snapshots.clone();
         self.start_job("migrate", move |ctx| {
             ctx.step("validate", 1, 5)?;
             let project = DefaultProjectManager.open(&req.input).map_err(input_err)?;
             ctx.step("planning", 2, 5)?;
-            let resolved = resolve_plan(kb_path, &project, &req)?;
+            let resolved = resolve_plan(kb_path, mappings, &project, &req)?;
             ctx.step("applying", 3, 5)?;
-            let snap_dir = default_snapshots(&project.root);
+            let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
             let mut store = load_store(&snap_dir)?;
             let report = MigrationEngine::default().run(
                 &resolved.plan,

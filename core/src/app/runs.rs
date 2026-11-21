@@ -43,6 +43,10 @@ pub struct PackRequest {
     /// `mrpack`, `curseforge`, `prism`, `folder`; empty = mrpack + folder.
     pub formats: Vec<String>,
     pub min_confidence: f64,
+    #[serde(default)]
+    pub kb: Option<PathBuf>,
+    #[serde(default)]
+    pub mappings: Option<PathBuf>,
 }
 
 impl Default for PackRequest {
@@ -61,6 +65,8 @@ impl Default for PackRequest {
             loader_version: None,
             formats: Vec::new(),
             min_confidence: 0.8,
+            kb: None,
+            mappings: None,
         }
     }
 }
@@ -251,10 +257,13 @@ impl AppServices {
                 .as_ref()
                 .map(|root| root.join(default_pack_name(&req)))
         });
-        let kb_path = settings.kb_path;
+        let kb_path = req.kb.clone().or_else(|| {
+            if req.mappings.is_none() { settings.kb_path } else { None }
+        });
+        let mappings = req.mappings.clone();
         self.start_job("pack", move |ctx| {
             ctx.step("validate", 1, 3)?;
-            let kb = open_kb(kb_path, None)?;
+            let kb = open_kb(kb_path, mappings)?;
             ctx.step("migrating", 2, 3)?;
             let outcome = migrate_pack(
                 &MigrateOptions {

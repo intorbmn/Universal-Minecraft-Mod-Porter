@@ -119,3 +119,16 @@ remain outside `core`.
 - Added CLI JSON failure-contract tests for invalid `port`, `build`, and `rollback` inputs.
 - Verification pending: the CI run for this routing change must pass before these changes
   are treated as complete.
+
+
+### 12.A AppServices routing follow-up
+
+- Routed `migrate` planning through `AppServices::plan`; `--apply` now requires the
+  explicit flag and runs `start_migrate_in_place` as a tracked job after producing the
+  review plan.
+- Extended `PlanRequest` with backward-compatible optional source-loader, KB, mappings
+  and snapshot overrides. Desktop callers remain compatible through serde defaults.
+- Routed `pack migrate` through `AppServices::start_pack`, retaining online/offline
+  index selection, output options, KB/mappings overrides and pack exit codes.
+- Added regression coverage for request-level mapping overrides and the CLI invalid-input
+  JSON contract. CI verification is pending for this commit.

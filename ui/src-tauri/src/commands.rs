@@ -407,6 +407,10 @@ mod tests {
             to: "1.21.1".into(),
             loader: Some("neoforge".into()),
             min_confidence: 0.8,
+            source_loader: None,
+            kb: None,
+            mappings: None,
+            snapshots: None,
         };
         let view = plan(&svc, &request).unwrap();
         assert_eq!(view.target_minecraft, "1.21.1");
@@ -424,6 +428,10 @@ mod tests {
             to: "1.21.1".into(),
             loader: Some("neoforge".into()),
             min_confidence: 0.8,
+            source_loader: None,
+            kb: None,
+            mappings: None,
+            snapshots: None,
         };
         let err = start_migrate_in_place(&svc, request, false).unwrap_err();
         assert_eq!(err.kind, "refused");

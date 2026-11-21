@@ -107,3 +107,15 @@ The file-backed store is temporary and weaker than an OS keyring: another proces
 as the same user can read it. On Unix the file is created with mode `0600`; on Windows it
 is kept in the per-user application data directory. Do not place it in a repository or
 share it.
+
+
+### Application-service routing
+
+The `migrate` command uses the application plan view for dry runs and starts an
+application migration job only when `--apply` is supplied. The `pack migrate` command
+also runs as an application job. Both commands preserve command-level KB/mappings
+options; `migrate --snapshots` selects the checkpoint directory used by the job.
+
+JSON results for `migrate` contain the versioned `PlanView`; applied migrations include
+the completed job result alongside the reviewed plan. `pack migrate` returns the pack
+job result and retains exit code 2 for a High-risk refusal and 3 for manual items.

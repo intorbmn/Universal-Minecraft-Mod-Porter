@@ -200,7 +200,20 @@ fn plan_req(input: PathBuf) -> PlanRequest {
         to: "1.21.1".into(),
         loader: Some("neoforge".into()),
         min_confidence: 0.8,
+        source_loader: None,
+        kb: None,
+        mappings: None,
+        snapshots: None,
     }
+}
+
+
+#[test]
+fn plan_uses_request_level_mappings_override() {
+    let d = tempdir().unwrap();
+    let mut request = plan_req(fixture("loader/fabric-src"));
+    request.mappings = Some(d.path().join("missing-mappings.json"));
+    assert!(services(d.path()).plan(&request).is_err());
 }
 
 #[test]
@@ -767,6 +780,10 @@ fn ai_req(input: PathBuf) -> PlanRequest {
         to: "1.21".into(),
         loader: Some("fabric".into()),
         min_confidence: 0.8,
+        source_loader: None,
+        kb: None,
+        mappings: None,
+        snapshots: None,
     }
 }
 

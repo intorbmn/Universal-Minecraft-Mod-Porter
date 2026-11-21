@@ -24,7 +24,7 @@ use ummp_core::app::credentials::{
 };
 use ummp_core::app::helpers::{detected_loader, open_kb, pack_format, side, NoIndex};
 use ummp_core::app::snapshots::{default_snapshots, load_store, save_store};
-use ummp_core::app::{AppServices, BuildJobRequest, PortRequest};
+use ummp_core::app::{AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest};
 use ummp_core::build::local::default_workdir;
 use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
@@ -33,7 +33,7 @@ use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
 use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
 use ummp_core::modpack::graph::PackGraph;
-use ummp_core::modpack::plan::Side;
+use ummp_core::modpack::plan::{ModIndex, Side};
 use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
 use ummp_core::modpack::{import_with, ImportOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
@@ -243,11 +243,13 @@ fn wait_for_job(
                 return Ok(job.result.unwrap_or_else(|| serde_json::json!({})));
             }
             JobState::Failed | JobState::TimedOut => {
-                return Err(CliFailure::new(
-                    failure_code,
-                    job.error.unwrap_or_else(|| "application job failed".into()),
-                )
-                .into());
+                let message = job.error.unwrap_or_else(|| "application job failed".into());
+                let code = if message.starts_with("pack refused because of risk:") {
+                    ExitCode::Refused
+                } else {
+                    failure_code
+                };
+                return Err(CliFailure::new(code, message).into());
             }
             JobState::Cancelled | JobState::Skipped => {
                 return Err(
@@ -449,34 +451,42 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
             mappings,
             min_confidence,
         } => {
-            let kb = if kb.is_none() && mappings.is_none() && config.kb.is_none() {
-                KnowledgeBase::open(Path::new(":memory:"))?
+            let services = app_services(config)?;
+            let index: Arc<dyn ModIndex + Send + Sync> = if online {
+                Arc::new(ummp_ai_providers::ModrinthIndex::new())
             } else {
-                open_configured_kb(kb, mappings, config)?
+                Arc::new(NoIndex)
             };
-            let formats = format
-                .iter()
-                .map(|f| pack_format(f))
-                .collect::<Result<Vec<_>, _>>()?;
-            run_pack_migrate(
-                &MigrateOptions {
-                    input: pack,
-                    to,
-                    loader,
-                    from_loader,
-                    from_mc,
-                    online,
-                    sources,
-                    side: side(&s)?,
-                    output,
-                    allow_risk,
-                    loader_version,
-                    formats,
-                    threads: 4,
-                    min_confidence,
-                },
-                &kb,
-            )
+            let id = services
+                .start_pack(
+                    PackRequest {
+                        input: pack,
+                        to,
+                        loader,
+                        from_loader,
+                        from_mc,
+                        online,
+                        sources,
+                        side: Some(s),
+                        output,
+                        allow_risk,
+                        loader_version,
+                        formats: format,
+                        min_confidence,
+                        kb,
+                        mappings,
+                    },
+                    index,
+                )
+                .map_err(|error| map_app_error(&error))?;
+            let result = wait_for_job(&services, id, ExitCode::Error)?;
+            let code = result["exit_code"].as_i64().unwrap_or(0) as i32;
+            println!("Output: {}", result["output"].as_str().unwrap_or("?"));
+            println!("Manual items: {}", result["manual"].as_u64().unwrap_or(0));
+            if output::is_json_mode() {
+                output::set_result(result);
+            }
+            Ok(code)
         }
         PackCmd::Export {
             pack,
@@ -683,6 +693,33 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+
+/// Formats the application plan view for the human-readable CLI.
+fn plan_markdown(plan: &ummp_core::app::views::PlanView) -> String {
+    let mut out = format!(
+        "# Migration plan\n\nMinecraft {} -> {} | loader {} -> {}\n\n{} files scanned, {} files changed\n",
+        plan.source_minecraft,
+        plan.target_minecraft,
+        plan.source_loader.as_deref().unwrap_or("unknown"),
+        plan.target_loader,
+        plan.files_scanned,
+        plan.files.len()
+    );
+    for file in &plan.files {
+        out.push_str(&format!("\n## {} ({:?})\n\n{}\n", file.path, file.kind, file.diff));
+        if file.needs_attention {
+            out.push_str("Needs adapter/manual attention.\n");
+        }
+    }
+    for warning in &plan.warnings {
+        out.push_str(&format!("\nWarning: {warning}\n"));
+    }
+    for skipped in &plan.skipped {
+        out.push_str(&format!("\nSkipped: {} ({})\n", skipped.description, skipped.reason));
+    }
+    out
+}
+
 fn map_app_error(error: &ummp_core::app::AppError) -> CliFailure {
     let code = match &error {
         ummp_core::app::AppError::Input(_) => ExitCode::InvalidInput,
@@ -803,44 +840,50 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             snapshots,
             report,
         } => {
-            let project = pm.open(&path)?;
-            let kb = open_configured_kb(kb, mappings, &config)?;
-            let request = MigrationRequest {
-                source_minecraft: from,
-                target_minecraft: to,
-                target_loader: loader.to_lowercase(),
+            let services = app_services(&config)?;
+            let request = PlanRequest {
+                input: path.clone(),
+                from: Some(from),
+                to,
+                loader: Some(loader.to_lowercase()),
                 min_confidence,
-                source_loader: from_loader
-                    .map(|l| l.to_lowercase())
-                    .or_else(|| detected_loader(&project.root)),
+                source_loader: from_loader.map(|value| value.to_lowercase()),
+                kb,
+                mappings,
+                snapshots,
             };
-            let plan = MigrationPlanner::plan(&kb, &request)?;
-            let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
-            let mut store = load_store(&snap_dir)?;
-
-            let result = MigrationEngine::default().run(
-                &plan,
-                &project,
-                &mut store,
-                &RunOptions {
-                    dry_run: !apply,
-                    snapshot_root: &snap_dir,
-                    session_id: Uuid::new_v4(),
-                },
-            )?;
-            if result.checkpoint_id.is_some() {
-                save_store(&snap_dir, &store)?;
+            let plan = services.plan(&request).map_err(|error| map_app_error(&error))?;
+            let markdown = plan_markdown(&plan);
+            if apply && !json_mode {
+                print!("{markdown}");
             }
-
-            let md = result.to_markdown();
-            print!("{md}");
+            let result = if apply {
+                let id = services
+                    .start_migrate_in_place(request, true)
+                    .map_err(|error| map_app_error(&error))?;
+                let migration = wait_for_job(&services, id, ExitCode::Error)?;
+                serde_json::json!({ "plan": plan, "migration": migration })
+            } else {
+                serde_json::to_value(&plan)?
+            };
             if let Some(out) = report {
-                let is_json = out.extension().is_some_and(|e| e == "json");
-                let body = if is_json { result.to_json()? } else { md };
+                let body = if out.extension().is_some_and(|e| e == "json") {
+                    serde_json::to_string_pretty(&result)?
+                } else {
+                    markdown.clone()
+                };
                 std::fs::write(&out, body)?;
             }
-            if !apply && !result.changes.is_empty() {
-                eprintln!("\nDry run: nothing was written. Re-run with --apply to write.");
+            if json_mode {
+                output::set_result(result);
+            } else if apply {
+                println!("\nMigration completed. Checkpoint: {}",
+                    result["migration"]["checkpoint"].as_str().unwrap_or("created"));
+            } else {
+                print!("{markdown}");
+                if !plan.files.is_empty() {
+                    eprintln!("\nDry run: nothing was written. Re-run with --apply to write.");
+                }
             }
         }
 
