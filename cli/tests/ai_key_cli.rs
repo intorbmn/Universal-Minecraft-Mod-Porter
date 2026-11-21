@@ -142,6 +142,7 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../tests/fixtures/loader/fabric-src");
     let log = dir.path().join("build.log");
+    let snapshots = dir.path().join("snapshots");
     std::fs::write(&log, "synthetic build failure").unwrap();
     let base_url = format!("http://{address}/v1");
     let output = Command::new(binary())
@@ -161,6 +162,8 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
             "openai",
             "--base-url",
             &base_url,
+            "--snapshots",
+            snapshots.to_str().unwrap(),
         ])
         .env("UMMP_DATA_DIR", dir.path())
         .env_remove("ANTHROPIC_API_KEY")
