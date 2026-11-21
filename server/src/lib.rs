@@ -16,11 +16,11 @@ use axum::{
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
+    collections::{HashSet, VecDeque},
     convert::Infallible,
     error::Error,
     net::{IpAddr, SocketAddr},
     path::{Path as FsPath, PathBuf},
-    collections::{HashSet, VecDeque},
     sync::{Arc, Mutex},
 };
 use subtle::ConstantTimeEq;
@@ -28,9 +28,8 @@ use tokio::{net::TcpListener, sync::broadcast};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use ummp_core::{
     app::{
-        helpers::NoIndex,
-        views::JobView,
-        AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest,
+        helpers::NoIndex, views::JobView, AppError, AppServices, BuildJobRequest, PackRequest,
+        PlanRequest, PortRequest,
     },
     events::{Event, EventHandler},
     filesystem::resolve_within,
@@ -69,7 +68,6 @@ fn default_data_dir() -> PathBuf {
             .join(".ummp")
     })
 }
-
 
 const fn validate_bind(config: &ServerConfig) -> Result<(), &'static str> {
     if !config.listen.is_loopback() && !config.allow_remote {
@@ -164,11 +162,7 @@ impl EventHandler for EventForwarder {
 }
 
 /// Builds the router for embedding and integration tests.
-pub fn router(
-    services: Arc<AppServices>,
-    token: String,
-    allowed_roots: Vec<PathBuf>,
-) -> Router {
+pub fn router(services: Arc<AppServices>, token: String, allowed_roots: Vec<PathBuf>) -> Router {
     let (events, _) = broadcast::channel(EVENT_BUFFER);
     let history = Arc::new(Mutex::new(VecDeque::new()));
     services.subscribe(Arc::new(EventForwarder {
@@ -215,7 +209,11 @@ async fn authorize(State(state): State<ApiState>, request: Request<Body>, next: 
     if bool::from(expected_hash.as_slice().ct_eq(supplied_hash.as_slice())) {
         next.run(request).await
     } else {
-        (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response()
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"unauthorized"})),
+        )
+            .into_response()
     }
 }
 
@@ -230,7 +228,10 @@ impl ApiError {
         Self(StatusCode::FORBIDDEN, message.into())
     }
     fn internal() -> Self {
-        Self(StatusCode::INTERNAL_SERVER_ERROR, "internal server error".into())
+        Self(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal server error".into(),
+        )
     }
 }
 
@@ -315,7 +316,10 @@ fn path_is_within(path: &FsPath, root: &FsPath) -> bool {
         let path = path.to_string_lossy().replace('\\', "/").to_lowercase();
         let root = root.to_string_lossy().replace('\\', "/").to_lowercase();
         let root = root.trim_end_matches('/');
-        path == root || path.strip_prefix(root).is_some_and(|tail| tail.starts_with('/'))
+        path == root
+            || path
+                .strip_prefix(root)
+                .is_some_and(|tail| tail.starts_with('/'))
     }
     #[cfg(not(windows))]
     {
@@ -325,10 +329,16 @@ fn path_is_within(path: &FsPath, root: &FsPath) -> bool {
 
 fn allowed_path(state: &ApiState, path: &FsPath) -> Result<PathBuf, ApiError> {
     let resolved = canonical_candidate(path)?;
-    if state.roots.iter().any(|root| path_is_within(&resolved, root)) {
+    if state
+        .roots
+        .iter()
+        .any(|root| path_is_within(&resolved, root))
+    {
         Ok(resolved)
     } else {
-        Err(ApiError::forbidden("path is outside configured allowed_roots"))
+        Err(ApiError::forbidden(
+            "path is outside configured allowed_roots",
+        ))
     }
 }
 
@@ -351,9 +361,13 @@ async fn analyze(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let path = allowed_path(&state, &body.path)?;
     let services = Arc::clone(&state.services);
-    blocking(move || services.analyze(&path).and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string()))))
-        .await
-        .map(Json)
+    blocking(move || {
+        services
+            .analyze(&path)
+            .and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string())))
+    })
+    .await
+    .map(Json)
 }
 
 async fn scan(
@@ -362,9 +376,13 @@ async fn scan(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let path = allowed_path(&state, &body.path)?;
     let services = Arc::clone(&state.services);
-    blocking(move || services.scan(&path).and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string()))))
-        .await
-        .map(Json)
+    blocking(move || {
+        services
+            .scan(&path)
+            .and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string())))
+    })
+    .await
+    .map(Json)
 }
 
 #[derive(Deserialize)]
@@ -413,9 +431,13 @@ async fn plan(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let request = body.into_request(&state)?;
     let services = Arc::clone(&state.services);
-    blocking(move || services.plan(&request).and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string()))))
-        .await
-        .map(Json)
+    blocking(move || {
+        services
+            .plan(&request)
+            .and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string())))
+    })
+    .await
+    .map(Json)
 }
 
 #[derive(Deserialize)]
@@ -430,7 +452,9 @@ async fn migrate(
     Json(body): Json<MigrateBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     if !body.reviewed {
-        return Err(ApiError::forbidden("review the migration plan before applying it"));
+        return Err(ApiError::forbidden(
+            "review the migration plan before applying it",
+        ));
     }
     let request = body.plan.into_request(&state)?;
     let services = Arc::clone(&state.services);
@@ -546,7 +570,10 @@ fn event_job_id(event: &Event) -> Option<Uuid> {
 
 fn to_sse(event: Event) -> SseEvent {
     let kind = event.kind.clone();
-    SseEvent::default().event(kind).json_data(event).unwrap_or_else(|_| SseEvent::default())
+    SseEvent::default()
+        .event(kind)
+        .json_data(event)
+        .unwrap_or_else(|_| SseEvent::default())
 }
 
 async fn job_events(
@@ -586,8 +613,8 @@ async fn rollback(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let project = allowed_path(&state, FsPath::new(&project))?;
     let services = Arc::clone(&state.services);
-    let id = blocking(move || services.rollback_with_snapshots(&project, body.checkpoint, None))
-        .await?;
+    let id =
+        blocking(move || services.rollback_with_snapshots(&project, body.checkpoint, None)).await?;
     Ok(Json(serde_json::json!({"restored":true,"checkpoint":id})))
 }
 
@@ -604,12 +631,17 @@ async fn openapi() -> Response {
 mod tests {
     use super::*;
 
-
     #[cfg(windows)]
     #[test]
     fn windows_root_comparison_is_case_insensitive_and_handles_drive_roots() {
-        assert!(path_is_within(FsPath::new(r"C:\Users\Alice\mod"), FsPath::new(r"c:\users\alice")));
-        assert!(!path_is_within(FsPath::new(r"C:\Users\Alice2"), FsPath::new(r"c:\users\alice")));
+        assert!(path_is_within(
+            FsPath::new(r"C:\Users\Alice\mod"),
+            FsPath::new(r"c:\users\alice")
+        ));
+        assert!(!path_is_within(
+            FsPath::new(r"C:\Users\Alice2"),
+            FsPath::new(r"c:\users\alice")
+        ));
         assert!(path_is_within(FsPath::new(r"C:\mods"), FsPath::new(r"C:\")));
     }
 
@@ -628,9 +660,12 @@ mod tests {
             ..ServerConfig::default()
         };
         assert!(validate_bind(&config).is_err());
-        assert!(validate_bind(&ServerConfig { allow_remote: true, ..config }).is_ok());
+        assert!(validate_bind(&ServerConfig {
+            allow_remote: true,
+            ..config
+        })
+        .is_ok());
     }
-
 
     #[test]
     fn token_never_logged() {
@@ -641,14 +676,21 @@ mod tests {
         struct Capture(Arc<Mutex<Vec<u8>>>);
         impl Write for Capture {
             fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-                self.0.lock().expect("capture lock").extend_from_slice(bytes);
+                self.0
+                    .lock()
+                    .expect("capture lock")
+                    .extend_from_slice(bytes);
                 Ok(bytes.len())
             }
-            fn flush(&mut self) -> io::Result<()> { Ok(()) }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
         }
         impl<'a> MakeWriter<'a> for Capture {
             type Writer = Self;
-            fn make_writer(&'a self) -> Self::Writer { self.clone() }
+            fn make_writer(&'a self) -> Self::Writer {
+                self.clone()
+            }
         }
 
         let output = Arc::new(Mutex::new(Vec::new()));
