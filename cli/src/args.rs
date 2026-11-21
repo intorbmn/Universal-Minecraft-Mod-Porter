@@ -2,6 +2,7 @@
 
 use clap::{ArgGroup, Parser, Subcommand};
 use clap_complete::Shell;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -115,6 +116,16 @@ pub enum Commands {
     },
     /// Generate shell completions.
     Completions { shell: Shell },
+    /// Start the local REST API (localhost only by default).
+    Serve {
+        #[arg(long, default_value = "127.0.0.1")]
+        listen: IpAddr,
+        #[arg(long, default_value_t = 7432)]
+        port: u16,
+        /// Required acknowledgement before listening on a non-loopback interface.
+        #[arg(long)]
+        i_understand_remote: bool,
+    },
     /// Detect loader, Minecraft/Java versions, dependencies and build system.
     Analyze {
         /// Project root path (source tree or a folder of JARs).
