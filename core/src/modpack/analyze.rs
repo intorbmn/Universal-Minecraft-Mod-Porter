@@ -184,7 +184,7 @@ pub fn analyze_pack_cached(
         let analysis_key = CacheKey::new(CacheKind::Analysis, &bytes, analysis_rules);
         let cached_analysis = kb.cache_get::<ModAnalysis>(&analysis_key).ok().flatten()
             .filter(|value| !value.metadata.mod_id.trim().is_empty());
-        let mod_info = if let Some(value) = cached_analysis {
+        let mut mod_info = if let Some(value) = cached_analysis {
             Some(value)
         } else {
             match inspect_jar(jar, &LocalFileSystem) {
@@ -195,6 +195,10 @@ pub fn analyze_pack_cached(
                 Err(_) => None,
             }
         };
+
+        if let Some(value) = &mut mod_info {
+            value.jar_path = Some(jar.to_path_buf());
+        }
 
         let scan_rules = rules_sha256(
             "static-scan-engine-v1",
