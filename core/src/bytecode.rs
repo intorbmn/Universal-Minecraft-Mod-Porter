@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use thiserror::Error;
-use zip::write::FileOptions;
+use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};
 
 /// Per-entry and per-archive caps for untrusted input.
@@ -216,9 +216,9 @@ pub fn remap_jar(
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let name = entry.name().replace('\\', "/");
+        let name = entry.name()?.replace('\\', "/");
         if entry.is_dir() {
-            writer.add_directory(name, SimpleFileOptions::default())?;
+            writer.add_directory(name, SimpleSimpleFileOptions::default())?;
             continue;
         }
         let upper = name.to_ascii_uppercase();
