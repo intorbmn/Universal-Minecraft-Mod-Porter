@@ -305,3 +305,21 @@ remain outside `core`.
 - CI run #593 on `80bf512c`: both `build-test-lint` and `desktop` passed, including tests, Clippy and formatting.
 - Mutation check: renamed the `ummp_analyze` handler to `ummp_analyze_mutated`; the stdio integration test went RED with “tools/list omitted ummp_analyze” (CI #592). Restored the handler; CI #593 is green.
 - The real Claude Code client smoke test is NOT RUN: it requires the user's consent and an available local Claude Code installation.
+
+
+## 12.D GitHub Action — implementation in progress
+
+- Created branch `phase-12d-action` from current `master`; no existing history was rewritten.
+- Added root `action.yml` as a composite action with `analyze`, `scan`, `port` and
+  `build` inputs, `path`, optional target/loader, and the `fail-on-risk` policy
+  (default `high`). Outputs are `exit-code` and `report-path`.
+- The action installs the pinned Rust 1.97.0 toolchain, caches Cargo data, regenerates
+  the stale workspace lockfile only in the action checkout, installs the CLI with
+  `cargo install --path cli --locked`, and runs the selected CLI command with JSON.
+- The action applies a preflight risk scan to non-scan commands, writes
+  `$GITHUB_STEP_SUMMARY`, and uploads the result/report directory.
+- Added `cli/tests/action_contract.rs` to pin required inputs, outputs and execution
+  steps. Added CLI usage documentation and a CI push trigger for this feature branch.
+- Verification status: implementation is not complete until root/desktop CI is green
+  and the required real run in `intorbmn/ummp-build-sandbox` is recorded below.
+- Sandbox run: NOT RUN yet.
