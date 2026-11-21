@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn success_envelope_matches_golden_fixture() {
         let golden: Value = serde_json::from_str(include_str!(
-            "../../tests/fixtures/golden/cli/scan-envelope.json"
+            "../../tests/fixtures/golden/cli/success-envelope.json"
         ))
         .unwrap();
         assert_eq!(success_envelope("scan", &json!({})), golden);
