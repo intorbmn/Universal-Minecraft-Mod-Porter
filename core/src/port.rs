@@ -110,7 +110,7 @@ const fn loader_name(l: &Loader) -> Option<&'static str> {
 
 fn write_zip(root: &Path, zip: &Path) -> Result<(), PortError> {
     let mut z = zip::ZipWriter::new(std::fs::File::create(zip)?);
-    let options = zip::write::FileOptions::default();
+    let options = zip::write::SimpleFileOptions::default();
     for rel in collect_files(root)? {
         z.start_file(rel.to_string_lossy().replace('\\', "/"), options)?;
         z.write_all(&std::fs::read(root.join(&rel))?)?;
