@@ -20,7 +20,8 @@ use std::{
     error::Error,
     net::{IpAddr, SocketAddr},
     path::{Path as FsPath, PathBuf},
-    sync::Arc,
+    collections::{HashSet, VecDeque},
+    sync::{Arc, Mutex},
 };
 use subtle::ConstantTimeEq;
 use tokio::{net::TcpListener, sync::broadcast};
@@ -33,6 +34,7 @@ use ummp_core::{
     },
     events::{Event, EventHandler},
     filesystem::resolve_within,
+    modpack::plan::ModIndex,
 };
 use uuid::Uuid;
 
@@ -146,13 +148,23 @@ struct ApiState {
     token: Arc<String>,
     roots: Arc<Vec<PathBuf>>,
     events: broadcast::Sender<Event>,
+    history: Arc<Mutex<VecDeque<Event>>>,
 }
 
-struct EventForwarder(broadcast::Sender<Event>);
+struct EventForwarder {
+    sender: broadcast::Sender<Event>,
+    history: Arc<Mutex<VecDeque<Event>>>,
+}
 
 impl EventHandler for EventForwarder {
     fn handle(&self, event: &Event) {
-        let _ = self.0.send(event.clone());
+        let mut history = self.history.lock().expect("event history lock");
+        history.push_back(event.clone());
+        while history.len() > 4096 {
+            history.pop_front();
+        }
+        drop(history);
+        let _ = self.sender.send(event.clone());
     }
 }
 
@@ -163,12 +175,17 @@ pub fn router(
     allowed_roots: Vec<PathBuf>,
 ) -> Router {
     let (events, _) = broadcast::channel(EVENT_BUFFER);
-    services.subscribe(Arc::new(EventForwarder(events.clone())));
+    let history = Arc::new(Mutex::new(VecDeque::new()));
+    services.subscribe(Arc::new(EventForwarder {
+        sender: events.clone(),
+        history: Arc::clone(&history),
+    }));
     let state = ApiState {
         services,
         token: Arc::new(token),
         roots: Arc::new(canonical_roots(allowed_roots)),
         events,
+        history,
     };
     let protected = Router::new()
         .route("/v1/analyze", post(analyze))
@@ -448,7 +465,12 @@ async fn pack(
     request.kb = optional_path(&state, request.kb)?;
     request.mappings = optional_path(&state, request.mappings)?;
     let services = Arc::clone(&state.services);
-    let id = blocking(move || services.start_pack(request, Arc::new(NoIndex))).await?;
+    let index: Arc<dyn ModIndex + Send + Sync> = if request.online {
+        Arc::new(ummp_ai_providers::ModrinthIndex::new())
+    } else {
+        Arc::new(NoIndex)
+    };
+    let id = blocking(move || services.start_pack(request, index)).await?;
     Ok(Json(serde_json::json!({"job":id})))
 }
 
@@ -518,26 +540,41 @@ async fn cancel(
     Ok(StatusCode::ACCEPTED)
 }
 
+fn event_job_id(event: &Event) -> Option<Uuid> {
+    event
+        .payload
+        .get("job")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+}
+
+fn to_sse(event: Event) -> SseEvent {
+    let kind = event.kind.clone();
+    SseEvent::default().event(kind).json_data(event).unwrap_or_default()
+}
+
 async fn job_events(
     State(state): State<ApiState>,
     Path(id): Path<Uuid>,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<SseEvent, Infallible>>> {
-    let receiver = BroadcastStream::new(state.events.subscribe());
-    let stream = receiver.filter_map(move |item| match item {
-        Ok(event)
-            if event
-                .payload
-                .get("job")
-                .and_then(serde_json::Value::as_str)
-                .and_then(|value| Uuid::parse_str(value).ok())
-                == Some(id) =>
-        {
-            let kind = event.kind.clone();
-            SseEvent::default().event(kind).json_data(event).ok().map(Ok)
+    let receiver = state.events.subscribe();
+    let past: Vec<Event> = state
+        .history
+        .lock()
+        .expect("event history lock")
+        .iter()
+        .filter(|event| event_job_id(event) == Some(id))
+        .cloned()
+        .collect();
+    let seen: HashSet<Uuid> = past.iter().map(|event| event.id).collect();
+    let replay = tokio_stream::iter(past.into_iter().map(|event| Ok(to_sse(event))));
+    let live = BroadcastStream::new(receiver).filter_map(move |item| match item {
+        Ok(event) if event_job_id(&event) == Some(id) && !seen.contains(&event.id) => {
+            Some(Ok(to_sse(event)))
         }
         _ => None,
     });
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Sse::new(replay.chain(live)).keep_alive(KeepAlive::default())
 }
 
 #[derive(Deserialize)]
