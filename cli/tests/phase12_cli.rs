@@ -12,7 +12,11 @@ fn ummp(args: &[&str]) -> Output {
 #[test]
 fn explicit_toml_config_is_loaded() {
     let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
     let path = dir.path().join("custom.toml");
+    let log = dir.path().join("build.log");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/loader/fabric-src");
     std::fs::write(
         &path,
         r#"ai_provider = "openai"
@@ -20,13 +24,38 @@ openai_base_url = "http://localhost:11434/v1"
 "#,
     )
     .unwrap();
-    let output = ummp(&["--config", path.to_str().unwrap(), "adapters"]);
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    std::fs::write(&log, "synthetic build failure").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--config",
+            path.to_str().unwrap(),
+            "--json",
+            "ai-debug",
+            fixture.to_str().unwrap(),
+            "--log",
+            log.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .env_remove("UMMP_AI_PROVIDER")
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("OPENAI_API_KEY")
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["error"]["kind"], "refused");
+    assert!(value["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("No openai API key"));
 }
 
 #[test]
