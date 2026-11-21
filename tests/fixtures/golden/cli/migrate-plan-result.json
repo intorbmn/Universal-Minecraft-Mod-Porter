@@ -18,14 +18,14 @@
       "to": ""
     }
   ],
-  "deletes": [],
-  "technologies": [],
+  "deletes": [""],
+  "technologies": [""],
   "skipped": [
     {
       "description": "",
       "reason": ""
     }
   ],
-  "warnings": [],
+  "warnings": [""],
   "files_scanned": 0
 }
