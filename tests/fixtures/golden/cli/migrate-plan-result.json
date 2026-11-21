@@ -1,0 +1,31 @@
+{
+  "source_minecraft": "",
+  "target_minecraft": "",
+  "source_loader": null,
+  "target_loader": "",
+  "files": [
+    {
+      "path": "",
+      "kind": "modified",
+      "diff": "",
+      "replacements": 0,
+      "needs_attention": false
+    }
+  ],
+  "moves": [
+    {
+      "from": "",
+      "to": ""
+    }
+  ],
+  "deletes": [],
+  "technologies": [],
+  "skipped": [
+    {
+      "description": "",
+      "reason": ""
+    }
+  ],
+  "warnings": [],
+  "files_scanned": 0
+}
