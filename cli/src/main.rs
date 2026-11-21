@@ -898,13 +898,23 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 .into());
             }
             let stats = remap_jar(&input, &output, &stages)?;
-            println!(
-                "Wrote {}: {} classes remapped, {} class files moved, {} signature files dropped",
-                output.display(),
-                stats.classes_changed,
-                stats.entries_moved,
-                stats.signatures_dropped
-            );
+            let result = serde_json::json!({
+                "output": output,
+                "classes_remapped": stats.classes_changed,
+                "class_files_moved": stats.entries_moved,
+                "signature_files_dropped": stats.signatures_dropped,
+            });
+            if json_mode {
+                output::set_result(result);
+            } else {
+                println!(
+                    "Wrote {}: {} classes remapped, {} class files moved, {} signature files dropped",
+                    output.display(),
+                    stats.classes_changed,
+                    stats.entries_moved,
+                    stats.signatures_dropped
+                );
+            }
         }
 
         Commands::AiAssist {
@@ -1101,9 +1111,18 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         }
 
         Commands::Adapters => {
-            println!("{:<20} level", "adapter");
-            for (id, level) in AdapterRegistry::default().list() {
-                println!("{id:<20} {level:?}");
+            let adapters = AdapterRegistry::default().list();
+            if json_mode {
+                output::set_result(serde_json::json!({
+                    "adapters": adapters.iter().map(|(id, level)| {
+                        serde_json::json!({ "id": id, "level": level })
+                    }).collect::<Vec<_>>(),
+                }));
+            } else {
+                println!("{:<20} level", "adapter");
+                for (id, level) in adapters {
+                    println!("{id:<20} {level:?}");
+                }
             }
         }
 
@@ -1130,7 +1149,16 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 }
             };
             store.restore(id, &project.root)?;
-            println!("Restored {} to checkpoint {id}", project.root.display());
+            let result = serde_json::json!({
+                "restored": true,
+                "project": project.root,
+                "checkpoint": id,
+            });
+            if json_mode {
+                output::set_result(result);
+            } else {
+                println!("Restored {} to checkpoint {id}", project.root.display());
+            }
         }
     }
 
