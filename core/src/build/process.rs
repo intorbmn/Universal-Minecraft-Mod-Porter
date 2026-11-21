@@ -58,7 +58,11 @@ where
     I: IntoIterator<Item = (String, String)>,
 {
     vars.into_iter()
-        .filter(|(key, _)| ENV_ALLOW.iter().any(|allowed| allowed.eq_ignore_ascii_case(key)))
+        .filter(|(key, _)| {
+            ENV_ALLOW
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(key))
+        })
         .collect()
 }
 

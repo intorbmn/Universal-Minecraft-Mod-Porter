@@ -447,8 +447,8 @@ mod tests {
     }
 
     fn fake_plugin(dir: &Path) {
-        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../cli/tests/fixtures/fake_plugin.rs");
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../cli/tests/fixtures/fake_plugin.rs");
         let binary_name = if cfg!(windows) {
             "fake-plugin.exe"
         } else {
@@ -550,9 +550,18 @@ mod tests {
         let plugin = PluginAdapter::load(plugin_dir.path()).unwrap();
         let env = scrubbed_env_from(vec![
             ("PATH".to_owned(), "/usr/bin".to_owned()),
-            ("OPENAI_API_KEY".to_owned(), "synthetic-openai-secret".to_owned()),
-            ("GITHUB_TOKEN".to_owned(), "synthetic-github-secret".to_owned()),
-            ("UMMP_REST_TOKEN".to_owned(), "synthetic-rest-secret".to_owned()),
+            (
+                "OPENAI_API_KEY".to_owned(),
+                "synthetic-openai-secret".to_owned(),
+            ),
+            (
+                "GITHUB_TOKEN".to_owned(),
+                "synthetic-github-secret".to_owned(),
+            ),
+            (
+                "UMMP_REST_TOKEN".to_owned(),
+                "synthetic-rest-secret".to_owned(),
+            ),
         ]);
         let echoed = plugin
             .invoke_with_env(&json!({"method":"env"}), env)
