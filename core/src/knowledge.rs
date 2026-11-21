@@ -204,7 +204,8 @@ impl KnowledgeBase {
     }
 
     /// Maximum serialized cache payload accepted from SQLite (64 MiB).
-    const MAX_CACHE_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+    const MAX_CACHE_PAYLOAD_BYTES: i64 = 64 * 1024 * 1024;
+    const MAX_CACHE_PAYLOAD_BYTES_USIZE: usize = 64 * 1024 * 1024;
 
     /// Read and deserialize a cache entry. Corrupt rows are deleted and treated as misses.
     pub fn cache_get<T: DeserializeOwned>(&self, key: &CacheKey) -> Result<Option<T>, DbError> {
@@ -217,7 +218,7 @@ impl KnowledgeBase {
                 key.content_sha256,
                 key.ummp_version,
                 key.rules_sha256,
-                Self::MAX_CACHE_PAYLOAD_BYTES as i64,
+                Self::MAX_CACHE_PAYLOAD_BYTES,
             ],
             |row| row.get::<_, String>(0),
         );
@@ -237,7 +238,7 @@ impl KnowledgeBase {
     /// Store a complete result atomically. Oversized payloads are deliberately not cached.
     pub fn cache_put<T: Serialize>(&self, key: &CacheKey, value: &T) -> Result<bool, DbError> {
         let payload = serde_json::to_string(value)?;
-        if payload.len() > Self::MAX_CACHE_PAYLOAD_BYTES {
+        if payload.len() > Self::MAX_CACHE_PAYLOAD_BYTES_USIZE {
             return Ok(false);
         }
         self.conn.execute(
