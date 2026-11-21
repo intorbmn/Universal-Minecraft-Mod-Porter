@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
-use ummp_core::app::credentials::{AiKeyStore, AiProviderKind, resolve_ai_key_from_store};
+use ummp_core::app::credentials::{
+    AiKeyStore, AiProviderKind, resolve_ai_key_from_store, validate_openai_base_url,
+};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
@@ -238,6 +240,9 @@ pub fn ai_key_save(
     base_url: Option<&str>,
 ) -> Result<AiKeySaved, UiError> {
     let provider = ai_provider(provider)?;
+    if provider == AiProviderKind::Openai {
+        validate_openai_base_url(base_url).map_err(UiError::from)?;
+    }
     let secret = Secret::new(key);
     let warning = store.set(provider, &secret).map_err(UiError::from)?;
     if provider == AiProviderKind::Openai {
@@ -462,6 +467,24 @@ mod tests {
         let json = serde_json::to_string(&status).unwrap();
         assert!(!json.contains("sk-ant-test-0000000000000000"));
         assert!(!json.contains("credentials.json"));
+    }
+
+    #[test]
+    fn invalid_openai_base_url_does_not_save_the_api_key() {
+        let dir = tempdir().unwrap();
+        let keys = FileKeyStore::in_dir(dir.path());
+
+        let error = ai_key_save(
+            &keys,
+            "openai",
+            "sk-openai-test-0000000000000000",
+            Some("file:///tmp/invalid"),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.kind, "input");
+        assert!(keys.get(AiProviderKind::Openai).unwrap().is_none());
+        assert!(keys.openai_base_url().unwrap().is_none());
     }
 
     #[test]
