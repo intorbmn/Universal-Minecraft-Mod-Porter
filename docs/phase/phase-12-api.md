@@ -265,5 +265,5 @@ remain outside `core`.
 - Added bearer-token persistence, Unix mode 0600, constant-time digest comparison, localhost default, explicit remote-bind acknowledgement, 1 MiB body limit, disabled CORS, canonical allowed-root checks and symlink resolution.
 - SSE uses a bounded event replay buffer so a client that connects immediately after job creation does not miss initial job events. Events retain the desktop event payload format and per-job order.
 - Added `allowed_roots` to the strict `ummp.toml` config contract; absent configuration defaults to the user's home directory.
-- Added ADR 0016, `docs/API.md`, `docs/openapi.json`, and initial API integration tests for auth, path containment, request size and OpenAPI route coverage.
+- Added ADR 0016, `docs/API.md`, `docs/openapi.json`, and real-TCP integration tests on ephemeral ports for auth, path containment, read-only planning, review refusal, job/SSE ordering, cancellation, request size and OpenAPI route coverage; added tracing-capture coverage for token non-disclosure.
 - Manual security review: no route exposes credentials; all request paths are checked before reaching `AppServices`; writes use existing service methods and the reviewed migration gate; synchronous work is isolated with `spawn_blocking`. Full automated verification is pending CI.
