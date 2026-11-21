@@ -3,7 +3,7 @@ name = "ummp-server"
 version = "0.1.0"
 edition = "2021"
 description = "Local REST API for Universal Minecraft Mod Porter"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 axum = { version = "0.7", features = ["json"] }

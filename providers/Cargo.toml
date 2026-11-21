@@ -3,7 +3,7 @@ name = "ummp-ai-providers"
 version = "0.1.0"
 edition = "2021"
 description = "HTTP AI providers (Anthropic, OpenAI-compatible) for UMMP"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 ummp-core = { path = "../core" }

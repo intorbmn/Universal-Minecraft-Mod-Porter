@@ -24,6 +24,14 @@ Make UMMP safe, fast and installable for real users:
 - an update check;
 - a release candidate with complete user docs.
 
+## 1a. Decided by the user (2026-11-21)
+- **Users must not need Rust to use MCP.** Ship prebuilt `ummp` CLI binaries on GitHub
+  Releases (Windows x64 zip with `ummp.exe`, plus Linux/macOS archives). A user downloads
+  one file and runs `claude mcp add ummp -- <path>\ummp.exe mcp`. Bundling the CLI in the
+  desktop installer and package managers (winget/scoop/brew) are not chosen for now.
+- Acceptance: a fresh Windows machine without Rust downloads the release zip, adds it to
+  Claude Code, and `claude mcp list` shows `ummp` connected. Document this in the README.
+
 ## 2. Questions for the user (defaults in brackets)
 1. Platforms for release binaries? [Windows x64 (MSI + zip), Linux x64 (tar.gz), macOS
    arm64 (tar.gz, unsigned)]

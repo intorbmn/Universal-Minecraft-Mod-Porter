@@ -26,3 +26,4 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0016](0016-local-rest-api.md) | Local REST API and async boundary | Accepted |
 
 | [0017](0017-mcp-stdio-server.md) | MCP server over stdio | Accepted |
+| [0018](0018-project-license.md) | Project license: Apache-2.0 core, separate proprietary Pro | Accepted |

@@ -3,6 +3,34 @@
 Items deferred from finished phases. Each line says what is missing and why it was left.
 Move an item into a phase file when it is picked up.
 
+## Monetization (user decision, 2026-11-21) — after all phases are finished
+- [ ] **Voluntary support with early access.** GitHub Sponsors / Ko-fi / Patreon; supporters
+  get pre-release builds early.
+- [ ] **Open source core + paid Pro edition.** Decide which features are Pro (candidates:
+  batch modpack porting, continuously updated version rule sets, built-in AI without a
+  user key) and how Pro is licensed/delivered.
+- [ ] **Pick the project license first** (it constrains the Pro model: permissive MIT/Apache
+  vs AGPL or dual licensing). Record it in an ADR before the first public release.
+- [ ] Check the Minecraft EULA / Mojang commercial guidelines and mod licenses before charging:
+  sell the tool only, never ported mods or Mojang code. Not legal advice; the user verifies.
+
+## From the Windows app test (user, 2026-11-21) — after all phases are finished
+The user's order: finish every planned phase first, then pick these up.
+- [ ] **JAR input.** The app and CLI do not take a `.jar` as a port input: JARs only get a
+  metadata-only analysis and closed JARs are never ported (KNOWN_LIMITATIONS). Decide what
+  "support .jar" means (accept and analyze in the app, or decompile/remap) in an ADR first.
+- [ ] **Downgrade.** Porting to an older Minecraft version is not supported. Add it as a
+  migration direction with its own rules and tests.
+- [ ] **More target versions.** Convert to many other Minecraft versions, not only the
+  current pairs; chain steps when no direct rule set exists.
+- [ ] **Heavy test mod.** Need a large real mod source (many files, long port) so a job runs
+  long enough to test cancel by hand; cancel was not tested because jobs ended too fast.
+  Keep it outside the repo (untrusted input, real names); a synthetic large fixture can
+  be generated for CI.
+- [ ] **More AI providers.** Settings offers only Anthropic and OpenAI(-compatible). Add other
+  providers (for example Gemini, OpenRouter, Ollama/local) behind the `providers/` crate.
+  Entering a key works (confirmed by the user).
+
 ## Phase 12 — CLI, API & Integration (planned)
 - [ ] **Final AI key storage.** Phase 12.0 saves AI API keys to `credentials.json` behind
   the `AiKeyStore` trait, as an interim solution (user, 2026-11-20: "lưu vào file chỉ là
