@@ -1,6 +1,7 @@
 //! Phase 12 CLI contract tests against the real binary.
 
-use std::process::{Command, Output};
+use std::io::Write;
+use std::process::{Command, Output, Stdio};
 
 fn ummp(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_ummp"))
@@ -517,4 +518,47 @@ fn local_build_failure_uses_exit_code_four_and_json_result() {
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "build");
     assert!(value["result"].is_object());
+}
+
+
+#[test]
+fn invalid_openai_base_url_does_not_save_cli_key() {
+    let data = tempfile::tempdir().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "ai-key",
+            "set",
+            "--provider",
+            "openai",
+            "--base-url",
+            "file:///tmp/invalid",
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"sk-openai-test-0000000000000000\\n")
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["error"]["kind"], "invalid_input");
+    let credentials = data.path().join("credentials.json");
+    assert!(
+        !credentials.exists(),
+        "invalid base URL must not persist the API key"
+    );
 }
