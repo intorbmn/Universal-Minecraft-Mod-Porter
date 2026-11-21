@@ -266,6 +266,36 @@ async fn cancel_works() {
     .expect("job was not cancelled");
 }
 
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn rejects_symlink_escape() {
+    use std::os::unix::fs::symlink;
+
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let link = root.path().join("escape");
+    symlink(outside.path(), &link).unwrap();
+    let server = start_server(root.path()).await;
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/analyze", server.base),
+    )
+    .send_string(&serde_json::json!({"path": link}).to_string());
+    assert_eq!(status(response), 403);
+}
+
+#[test]
+fn core_remains_free_of_tokio() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("../core/Cargo.toml");
+    let text = std::fs::read_to_string(manifest).unwrap();
+    assert!(
+        !text.lines().any(|line| line.trim_start().starts_with("tokio")),
+        "Tokio belongs only in the presentation server crate"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn body_too_large_is_413() {
     let root = tempfile::tempdir().unwrap();
