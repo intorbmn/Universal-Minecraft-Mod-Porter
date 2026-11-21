@@ -3,8 +3,8 @@
 use super::{Pack, PackEntry, PackError};
 use crate::analyzer::{inspect_jar, ModAnalysis};
 use crate::cache::{rules_sha256, CacheKey, CacheKind};
-use crate::knowledge::KnowledgeBase;
 use crate::filesystem::LocalFileSystem;
+use crate::knowledge::KnowledgeBase;
 use crate::scan::{scan_path, Finding, Severity};
 use std::io::Read;
 use std::path::Path;
@@ -192,7 +192,9 @@ pub fn analyze_pack_cached(
     let mut misses = Vec::new();
     for &index in &todo {
         let entry = &pack.entries[index];
-        let Some(jar) = entry.local.as_deref() else { continue };
+        let Some(jar) = entry.local.as_deref() else {
+            continue;
+        };
         let Ok(bytes) = std::fs::read(jar) else {
             misses.push(index);
             continue;
@@ -204,7 +206,10 @@ pub fn analyze_pack_cached(
         let analysis_key = CacheKey::new(CacheKind::Analysis, &bytes, analysis_rules);
         let scan_rules = rules_sha256(
             "static-scan-engine-v1",
-            [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
+            [(
+                "scan_rules.toml",
+                include_bytes!("../scan_rules.toml").as_slice(),
+            )],
         );
         let scan_key = CacheKey::new(CacheKind::Scan, &bytes, scan_rules);
 
@@ -263,8 +268,12 @@ pub fn analyze_pack_cached(
         if result.warning.is_some() || result.mod_info.is_none() {
             continue;
         }
-        let Some(jar) = pack.entries[*index].local.as_deref() else { continue };
-        let Ok(bytes) = std::fs::read(jar) else { continue };
+        let Some(jar) = pack.entries[*index].local.as_deref() else {
+            continue;
+        };
+        let Ok(bytes) = std::fs::read(jar) else {
+            continue;
+        };
         let analysis_key = CacheKey::new(
             CacheKind::Analysis,
             &bytes,
@@ -278,7 +287,10 @@ pub fn analyze_pack_cached(
             &bytes,
             rules_sha256(
                 "static-scan-engine-v1",
-                [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
+                [(
+                "scan_rules.toml",
+                include_bytes!("../scan_rules.toml").as_slice(),
+            )],
             ),
         );
         if let Some(mod_info) = &result.mod_info {
@@ -347,8 +359,7 @@ mod cache_tests {
 
     #[test]
     fn second_analyze_hits_cache_and_is_identical() {
-        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../tests/fixtures/fabric-a.jar");
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/fabric-a.jar");
         let work = tempdir().unwrap();
         let jar = work.path().join("fabric-a.jar");
         std::fs::copy(source, &jar).unwrap();
@@ -387,11 +398,20 @@ mod cache_tests {
             &bytes,
             rules_sha256(
                 "static-scan-engine-v1",
-                [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
+                [(
+                "scan_rules.toml",
+                include_bytes!("../scan_rules.toml").as_slice(),
+            )],
             ),
         );
-        assert!(kb.cache_get::<CachedJarAnalysis>(&analysis_key).unwrap().is_some());
-        assert!(kb.cache_get::<crate::scan::ScanReport>(&scan_key).unwrap().is_some());
+        assert!(kb
+            .cache_get::<CachedJarAnalysis>(&analysis_key)
+            .unwrap()
+            .is_some());
+        assert!(kb
+            .cache_get::<crate::scan::ScanReport>(&scan_key)
+            .unwrap()
+            .is_some());
 
         let expected = serde_json::to_value(&first.entries[0]).unwrap();
 
