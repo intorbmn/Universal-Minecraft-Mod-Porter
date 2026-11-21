@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, phase-11-ui, phase-12-api]
+    branches: [main, master, phase-11-ui, phase-12-api, phase-12b-rest]
   pull_request:
     branches: [main, master]
 
