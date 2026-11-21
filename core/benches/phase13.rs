@@ -1,14 +1,19 @@
 //! Phase 13A reproducible microbenchmarks.
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 use ummp_core::analyzer::{inspect_jar, AnalyzerEngine};
+use ummp_core::build::local::copy_project;
+use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
+use ummp_core::knowledge::KnowledgeBase;
+use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
 use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
 use ummp_core::modpack::{import, ImportOptions};
+use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::scan::scan_path;
 
 fn fixture_root() -> PathBuf {
@@ -91,6 +96,53 @@ fn bench_pack_inspect_300(c: &mut Criterion) {
     });
 }
 
+fn bench_plan_dry_run_port(c: &mut Criterion) {
+    let source = fixture_root().join("forge-src-1.16");
+    c.bench_function("port/plan_and_dry_run_forge_1_16", |b| {
+        b.iter_batched(
+            || {
+                let temp = tempdir().expect("port workspace");
+                let project_root = temp.path().join("project");
+                copy_project(&source, &project_root).expect("copy source fixture");
+                let kb = KnowledgeBase::open(&temp.path().join("knowledge.db"))
+                    .expect("open benchmark knowledge base");
+                let project = DefaultProjectManager
+                    .open(&project_root)
+                    .expect("open benchmark project");
+                let snapshots = temp.path().join("snapshots");
+                (temp, kb, project, snapshots)
+            },
+            |(_temp, kb, project, snapshots)| {
+                let plan = MigrationPlanner::plan(
+                    &kb,
+                    &MigrationRequest {
+                        source_minecraft: "1.16.5".into(),
+                        target_minecraft: "1.20.1".into(),
+                        target_loader: "forge".into(),
+                        min_confidence: 0.5,
+                        source_loader: Some("forge".into()),
+                    },
+                )
+                .expect("plan fixture port");
+                let report = MigrationEngine::default()
+                    .run(
+                        &plan,
+                        &project,
+                        &mut CheckpointStore::new(),
+                        &RunOptions {
+                            dry_run: true,
+                            snapshot_root: &snapshots,
+                            session_id: uuid::Uuid::new_v4(),
+                        },
+                    )
+                    .expect("dry-run fixture port");
+                black_box(report.files_scanned)
+            },
+            BatchSize::SmallInput,
+        )
+    });
+}
+
 fn bench_scan_5mb(c: &mut Criterion) {
     let (_dir, jar) = five_mb_jar();
     let mut group = c.benchmark_group("scan");
@@ -107,6 +159,7 @@ criterion_group!(
     bench_analyze_300,
     bench_scan_300,
     bench_pack_inspect_300,
+    bench_plan_dry_run_port,
     bench_scan_5mb
 );
 criterion_main!(phase13);
