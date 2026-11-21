@@ -129,7 +129,7 @@ Each entry names the module and the phase expected to address it.
   process running as the same user can read the key. This is temporary and must not be
   described as encrypted or equivalent to an OS keyring. The final storage backend remains
   a user decision (ADR 0015).
-- Phase 12.D GitHub Action is implemented and smoke-tested. Phase 12.E plugin support is implemented; final CI verification is pending. Plugins run as the current OS user: scrubbed environment and process-tree timeout do not provide an OS sandbox, so a malicious executable can still access files and processes permitted to that user.
+- Phase 12.D GitHub Action is implemented and smoke-tested. Phase 12.E plugin support is verified by CI #697. Plugins still run as the current OS user and are not OS-sandboxed. Plugins run as the current OS user: scrubbed environment and process-tree timeout do not provide an OS sandbox, so a malicious executable can still access files and processes permitted to that user.
 
 - **REST API is local and single-user only.** Remote binding is an explicit opt-in and is not protected by TLS; do not expose it to untrusted networks. There are no AI routes, token-rotation command, or multi-user authorization model. Phase 12.B.
 - **REST job events are bounded in-memory replay.** Events older than the server's 4096-event buffer are not replayed to late subscribers; persisted job state remains available through `GET /v1/jobs/{id}`. Phase 12.B.
