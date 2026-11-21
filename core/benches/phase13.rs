@@ -1,5 +1,7 @@
 //! Phase 13A reproducible microbenchmarks.
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{
+    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion,
+};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -11,7 +13,9 @@ use ummp_core::build::local::copy_project;
 use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
-use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RenameRule, RunOptions};
+use ummp_core::migration::{
+    MigrationEngine, MigrationPlanner, MigrationRequest, RenameRule, RunOptions,
+};
 use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
 use ummp_core::modpack::import;
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
