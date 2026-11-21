@@ -85,7 +85,8 @@ fn result<T: Serialize>(value: Result<T, AppError>) -> Result<CallToolResult, Er
                 .map_err(|_| ErrorData::internal_error("could not serialize tool result", None))?;
             Ok(CallToolResult::structured(value))
         }
-        Err(error) => Ok(CallToolResult::error(vec![ContentBlock::text(\n            error.to_string(),\n        )])),
+        Err(error) => Ok(CallToolResult::error(vec![ContentBlock::text(
+            error.to_string(),\n        )])),
     }
 }
 
@@ -178,7 +179,9 @@ struct RollbackArgs {
 
 #[tool_router]
 impl McpServer {
-    #[tool(\n        description = "Analyze a Minecraft mod project or JAR. Read-only; path must be inside allowed_roots."\n    )]
+    #[tool(
+        description = "Analyze a Minecraft mod project or JAR. Read-only; path must be inside allowed_roots."
+    )]
     fn ummp_analyze(
         &self,
         Parameters(PathArgs { path }): Parameters<PathArgs>,
@@ -187,7 +190,9 @@ impl McpServer {
         result(path.and_then(|path| self.services.analyze(&path)))
     }
 
-    #[tool(\n        description = "Scan a mod project or JAR for malware-risk indicators. Read-only; path must be inside allowed_roots."\n    )]
+    #[tool(
+        description = "Scan a mod project or JAR for malware-risk indicators. Read-only; path must be inside allowed_roots."
+    )]
     fn ummp_scan(
         &self,
         Parameters(PathArgs { path }): Parameters<PathArgs>,
@@ -196,7 +201,9 @@ impl McpServer {
         result(path.and_then(|path| self.services.scan(&path)))
     }
 
-    #[tool(\n        description = "Create a read-only migration plan. Returns a summary and at most 40 diff lines per file; does not write files."\n    )]
+    #[tool(
+        description = "Create a read-only migration plan. Returns a summary and at most 40 diff lines per file; does not write files."
+    )]
     fn ummp_plan(
         &self,
         Parameters(PlanArgs { path, to, loader }): Parameters<PlanArgs>,
@@ -228,10 +235,18 @@ impl McpServer {
         result(value)
     }
 
-    #[tool(\n        description = "Port a mod. With approve=false (default), returns a read-only plan. Set approve=true only after the human explicitly approves; then a job is started."\n    )]
+    #[tool(
+        description = "Port a mod. With approve=false (default), returns a read-only plan. Set approve=true only after the human explicitly approves; then a job is started."
+    )]
     fn ummp_port(
         &self,
-        Parameters(PortArgs {\n            path,\n            to,\n            loader,\n            output,\n            zip,\n            approve,\n        }): Parameters<PortArgs>,
+        Parameters(PortArgs {
+            path,
+            to,
+            loader,
+            output,
+            zip,
+            approve,\n        }): Parameters<PortArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let input = self.path(&path);
         if !approve {
@@ -266,7 +281,9 @@ impl McpServer {
         }))
     }
 
-    #[tool(\n        description = "Build and test a mod project. GitHub Actions is the default backend. Local execution is refused unless AppServices rates the project Low risk."\n    )]
+    #[tool(
+        description = "Build and test a mod project. GitHub Actions is the default backend. Local execution is refused unless AppServices rates the project Low risk."
+    )]
     fn ummp_build(
         &self,
         Parameters(BuildArgs { path, backend }): Parameters<BuildArgs>,
@@ -305,7 +322,9 @@ impl McpServer {
         }))
     }
 
-    #[tool(\n        description = "Get the current state, progress, recent logs and result of a UMMP job."\n    )]
+    #[tool(
+        description = "Get the current state, progress, recent logs and result of a UMMP job."
+    )]
     fn ummp_job(
         &self,
         Parameters(JobArgs { id }): Parameters<JobArgs>,
@@ -315,7 +334,9 @@ impl McpServer {
         result(self.services.job(id))
     }
 
-    #[tool(\n        description = "Request cancellation of a running UMMP job."\n    )]
+    #[tool(
+        description = "Request cancellation of a running UMMP job."
+    )]
     fn ummp_cancel(
         &self,
         Parameters(JobArgs { id }): Parameters<JobArgs>,
@@ -330,10 +351,16 @@ impl McpServer {
         }))
     }
 
-    #[tool(\n        description = "Restore a project checkpoint. Requires confirm=true after the human explicitly approves the rollback."\n    )]
+    #[tool(
+        description = "Restore a project checkpoint. Requires confirm=true after the human explicitly approves the rollback."
+    )]
     fn ummp_rollback(
         &self,
-        Parameters(RollbackArgs { project, checkpoint, confirm }): Parameters<RollbackArgs>,
+        Parameters(RollbackArgs {
+            project,
+            checkpoint,
+            confirm,
+        }): Parameters<RollbackArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         if !confirm {
             return Ok(CallToolResult::error(vec![ContentBlock::text(
@@ -398,7 +425,8 @@ impl ServerHandler for McpServer {
         Ok(ReadResourceResult::new(vec![ResourceContents::text(
             report_markdown(&job),
             &request.uri,
-        )]).into())
+        )])
+        .into())
     }
 }
 
