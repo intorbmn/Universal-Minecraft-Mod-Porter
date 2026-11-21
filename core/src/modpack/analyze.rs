@@ -180,7 +180,10 @@ pub fn analyze_pack_cached(
     } else {
         opts.threads
     };
-    let todo: Vec<usize> = pack.entries.iter().enumerate()
+    let todo: Vec<usize> = pack
+        .entries
+        .iter()
+        .enumerate()
         .filter(|(_, entry)| entry.local.is_some() && entry.kind == super::EntryKind::Mod)
         .map(|(index, _)| index)
         .collect();
@@ -205,19 +208,25 @@ pub fn analyze_pack_cached(
         );
         let scan_key = CacheKey::new(CacheKind::Scan, &bytes, scan_rules);
 
-        let cached_analysis = kb.cache_get::<CachedJarAnalysis>(&analysis_key).ok().flatten()
+        let cached_analysis = kb
+            .cache_get::<CachedJarAnalysis>(&analysis_key)
+            .ok()
+            .flatten()
             .filter(|value| !value.mod_info.metadata.mod_id.trim().is_empty());
         let cached_scan = kb.cache_get::<crate::scan::ScanReport>(&scan_key).ok().flatten();
         if let (Some(mut cached_analysis), Some(scan)) = (cached_analysis, cached_scan) {
             // The serialized result is content-based, but this path is location-specific.
             cached_analysis.mod_info.jar_path = Some(jar.to_path_buf());
-            results.push((index, EntryResult {
-                mod_info: Some(cached_analysis.mod_info),
-                risk: scan.risk(),
-                findings: scan.findings,
-                technologies: cached_analysis.technologies,
-                warning: None,
-            }));
+            results.push((
+                index,
+                EntryResult {
+                    mod_info: Some(cached_analysis.mod_info),
+                    risk: scan.risk(),
+                    findings: scan.findings,
+                    technologies: cached_analysis.technologies,
+                    warning: None,
+                },
+            ));
         } else {
             misses.push(index);
         }
@@ -227,13 +236,19 @@ pub fn analyze_pack_cached(
     let entries = &pack.entries;
     let computed: Vec<(usize, EntryResult)> = std::thread::scope(|scope| {
         #[allow(clippy::needless_collect)]
-        let handles: Vec<_> = misses.chunks(chunk).map(|indices| {
-            scope.spawn(move || {
-                indices.iter()
-                    .filter_map(|&index| analyze_entry(&entries[index]).map(|result| (index, result)))
-                    .collect::<Vec<_>>()
+        let handles: Vec<_> = misses
+            .chunks(chunk)
+            .map(|indices| {
+                scope.spawn(move || {
+                    indices
+                        .iter()
+                        .filter_map(|&index| {
+                            analyze_entry(&entries[index]).map(|result| (index, result))
+                        })
+                        .collect::<Vec<_>>()
+                })
             })
-        }).collect();
+            .collect();
         handles.into_iter().flat_map(|handle| handle.join().unwrap_or_default()).collect()
     });
 
@@ -247,7 +262,7 @@ pub fn analyze_pack_cached(
         let analysis_key = CacheKey::new(
             CacheKind::Analysis,
             &bytes,
-            rules_sha256("jar-descriptor-parser-v1", [("descriptor-parser", b"v1".as_slice())]),
+            rules_sha256("jar-descriptor-and-adapters-v1", [("descriptor-parser", b"v1".as_slice())]),
         );
         let scan_key = CacheKey::new(
             CacheKind::Scan,
@@ -258,14 +273,20 @@ pub fn analyze_pack_cached(
             ),
         );
         if let Some(mod_info) = &result.mod_info {
-            let _ = kb.cache_put(&analysis_key, &CachedJarAnalysis {
-                mod_info: mod_info.clone(),
-                technologies: result.technologies.clone(),
-            });
+            let _ = kb.cache_put(
+                &analysis_key,
+                &CachedJarAnalysis {
+                    mod_info: mod_info.clone(),
+                    technologies: result.technologies.clone(),
+                },
+            );
         }
-        let _ = kb.cache_put(&scan_key, &crate::scan::ScanReport {
-            findings: result.findings.clone(),
-        });
+        let _ = kb.cache_put(
+            &scan_key,
+            &crate::scan::ScanReport {
+                findings: result.findings.clone(),
+            },
+        );
     }
     results.extend(computed);
     results.sort_by_key(|(index, _)| *index);
