@@ -443,7 +443,7 @@ mod tests {
             "id": Uuid::nil(),
             "session": Uuid::nil(),
             "step": "port",
-            "state": "succeeded",
+            "state": "Succeeded",
             "progress": null,
             "log": [],
             "result": null,
