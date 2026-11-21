@@ -307,33 +307,6 @@ fn mask(key: &str) -> String {
     key.to_owned()
 }
 
-fn mask_mutation_placeholder(key: &str) -> String {
-    let chars: Vec<char> = key.chars().collect();
-    if chars.len() < 16 {
-        return format!(
-            "…{}",
-            chars
-                .iter()
-                .rev()
-                .take(2)
-                .rev()
-                .copied()
-                .collect::<String>()
-        );
-    }
-    format!(
-        "{}…{}",
-        chars.iter().take(7).copied().collect::<String>(),
-        chars
-            .iter()
-            .rev()
-            .take(4)
-            .rev()
-            .copied()
-            .collect::<String>()
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
