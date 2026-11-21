@@ -49,6 +49,15 @@ fn json_shape_rejects_string_where_number_is_expected() {
 }
 
 #[test]
+#[should_panic(expected = "JSON shape mismatch")]
+fn json_shape_rejects_wrong_array_item_type() {
+    assert_json_shape(
+        &serde_json::json!([null]),
+        &serde_json::json!([{"field": ""}]),
+    );
+}
+
+#[test]
 fn explicit_toml_config_is_loaded() {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
