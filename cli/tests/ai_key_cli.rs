@@ -131,6 +131,9 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
                 Err(_) => return false,
             }
         };
+        if stream.set_read_timeout(Some(Duration::from_secs(5))).is_err() {
+            return false;
+        }
         let mut reader = BufReader::new(stream.try_clone().unwrap());
         let mut content_length = 0;
         loop {
