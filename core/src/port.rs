@@ -71,10 +71,9 @@ fn extract(zip: &Path, dir: &Path) -> Result<(), PortError> {
     let mut archive = zip::ZipArchive::new(std::fs::File::open(zip)?)?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let name = entry.name().to_string();
+        let name = entry.name()?.into_owned();
         let safe = entry
             .enclosed_name()
-            .map(Path::to_path_buf)
             .and_then(|rel| resolve_within(dir, &rel).ok())
             .ok_or_else(|| PortError::Input(format!("unsafe path in zip: {name}")))?;
         if entry.is_dir() {
