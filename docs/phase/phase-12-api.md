@@ -237,3 +237,22 @@ remain outside `core`.
   and unmerged. It covers 12.0 + 12.A only.
 - **Gate:** do not begin 12.B/12.C until the user reviews and merges PR #14. Never merge
   automatically, rebase, force-push or rewrite existing history.
+
+## 12.A latest verification — 2026-11-21
+
+- Current branch head: `98bb45065a91af8de3c3f8040884d6f8b51334bb`.
+- CI run [#524](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44892712607)
+  passed on this exact head: both `build-test-lint` and `desktop` completed successfully.
+- The final credential-prompt mutation was restored in commit `d369f09`; the restored
+  implementation passed CI #522. The follow-up documentation commit records the complete
+  starred mutation evidence above and does not change runtime code.
+- Automated 12.A implementation and verification are complete: command-specific JSON golden
+  fixtures, exit-code mapping, config precedence, shell completion generation, and
+  AppServices routing are covered by tests.
+- Remaining acceptance is manual and requires the user's machine:
+  1. Verify completion suggestions in interactive Zsh, Fish and PowerShell sessions.
+  2. Save a key in Desktop and confirm CLI status shows the same mask; then save through CLI
+     and confirm Desktop shows the same mask. Use synthetic keys if preferred; do not send
+     an AI request.
+- PR #14 remains open and unmerged. Phase 12.B/12.C stay gated until the user reviews and
+  merges PR #14. No merge, rebase, force-push or history rewrite was performed.
