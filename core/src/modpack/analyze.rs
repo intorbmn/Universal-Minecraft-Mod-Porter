@@ -2,6 +2,8 @@
 
 use super::{Pack, PackEntry, PackError};
 use crate::analyzer::{inspect_jar, ModAnalysis};
+use crate::cache::{rules_sha256, CacheKey, CacheKind};
+use crate::knowledge::KnowledgeBase;
 use crate::filesystem::LocalFileSystem;
 use crate::scan::{scan_path, Finding, Severity};
 use std::io::Read;
@@ -158,6 +160,91 @@ pub fn analyze_pack(pack: &mut Pack, opts: &AnalyzeOptions) -> Result<(), PackEr
         e.technologies = r.technologies;
     }
     Ok(())
+}
+
+/// Cached per-JAR analysis used by pack migration. Cache I/O is best-effort:
+/// a cache failure never prevents a fresh analysis from completing.
+pub fn analyze_pack_cached(
+    pack: &mut Pack,
+    _opts: &AnalyzeOptions,
+    kb: &KnowledgeBase,
+) -> Result<(), PackError> {
+    for entry in &mut pack.entries {
+        if entry.local.is_none() || entry.kind != super::EntryKind::Mod {
+            continue;
+        }
+        let jar = entry.local.as_ref().expect("checked above");
+        let Ok(bytes) = std::fs::read(jar) else {
+            let Some(result) = analyze_entry(entry) else { continue };
+            apply_entry_result(entry, result, &mut pack.warnings);
+            continue;
+        };
+
+        let analysis_rules = rules_sha256("jar-descriptor-parser-v1", []);
+        let analysis_key = CacheKey::new(CacheKind::Analysis, &bytes, analysis_rules);
+        let cached_analysis = kb.cache_get::<ModAnalysis>(&analysis_key).ok().flatten()
+            .filter(|value| !value.metadata.mod_id.trim().is_empty());
+        let mod_info = if let Some(value) = cached_analysis {
+            Some(value)
+        } else {
+            match inspect_jar(jar, &LocalFileSystem) {
+                Ok(value) => {
+                    let _ = kb.cache_put(&analysis_key, &value);
+                    Some(value)
+                }
+                Err(_) => None,
+            }
+        };
+
+        let scan_rules = rules_sha256(
+            "static-scan-engine-v1",
+            [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
+        );
+        let scan_key = CacheKey::new(CacheKind::Scan, &bytes, scan_rules);
+        let cached_scan = kb.cache_get::<crate::scan::ScanReport>(&scan_key).ok().flatten();
+        let scan = if let Some(value) = cached_scan {
+            Some(value)
+        } else {
+            match scan_path(jar) {
+                Ok(value) => {
+                    let _ = kb.cache_put(&scan_key, &value);
+                    Some(value)
+                }
+                Err(_) => None,
+            }
+        };
+
+        let mut result = EntryResult {
+            mod_info,
+            risk: None,
+            findings: Vec::new(),
+            technologies: technologies(jar),
+            warning: None,
+        };
+        if let Some(value) = scan {
+            result.risk = value.risk();
+            result.findings = value.findings;
+        }
+        if result.mod_info.is_none() {
+            result.warning = Some(format!("{}: descriptor unreadable", entry.path));
+        }
+        if result.risk.is_none() && result.findings.is_empty() && scan.is_none() {
+            let warning = format!("{}: scan failed", entry.path);
+            result.warning = Some(result.warning.map_or(warning.clone(), |prior| format!("{prior}; {warning}")));
+        }
+        apply_entry_result(entry, result, &mut pack.warnings);
+    }
+    Ok(())
+}
+
+fn apply_entry_result(entry: &mut PackEntry, result: EntryResult, warnings: &mut Vec<String>) {
+    if let Some(warning) = result.warning {
+        warnings.push(warning);
+    }
+    entry.mod_info = result.mod_info;
+    entry.risk = result.risk;
+    entry.findings = result.findings;
+    entry.technologies = result.technologies;
 }
 
 /// The risk gate: a High finding in any JAR stops the run unless the user passed `--allow-risk`.
