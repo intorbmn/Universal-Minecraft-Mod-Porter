@@ -812,18 +812,29 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
 
     match command {
         Commands::AiKey { cmd } => run_ai_key(cmd, json_mode)?,
-        Commands::Serve { listen, port, i_understand_remote } => {
+        Commands::Serve {
+            listen,
+            port,
+            i_understand_remote,
+        } => {
             if json_mode {
-                return Err(CliFailure::new(ExitCode::InvalidInput, "--json cannot be combined with the long-running REST server").into());
+                return Err(CliFailure::new(
+                    ExitCode::InvalidInput,
+                    "--json cannot be combined with the long-running REST server",
+                )
+                .into());
             }
             let services = Arc::new(app_services(&config)?);
-            ummp_server::serve(services, ummp_server::ServerConfig {
-                data_dir: config::data_dir(),
-                allowed_roots: config.allowed_roots(),
-                listen,
-                port,
-                allow_remote: i_understand_remote,
-            })?;
+            ummp_server::serve(
+                services,
+                ummp_server::ServerConfig {
+                    data_dir: config::data_dir(),
+                    allowed_roots: config.allowed_roots(),
+                    listen,
+                    port,
+                    allow_remote: i_understand_remote,
+                },
+            )?;
         }
         Commands::Completions { shell } => {
             if json_mode {
