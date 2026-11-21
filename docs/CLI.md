@@ -70,11 +70,18 @@ ummp --json scan ./my-mod
 ummp analyze ./my-mod --json
 ```
 
-`analyze` and `scan` return their application `*View` result objects. `adapters`,
-`remap-jar`, `port`, `build`, and `rollback` return structured command-specific results.
-Long-running `port` and `build` operations run as `AppServices` jobs; their logs go to stderr
-in JSON mode. Remaining commands are still being migrated and may return an envelope
-containing only `exit_code`.
+Every executable subcommand except `completions` returns a versioned success or
+error envelope. Command-specific result payloads are:
+
+- `analyze` and `scan`: serializable application views.
+- `migrate`: a plan view; with `--apply`, the reviewed plan and completed job result.
+- `port` and `build`: application-job results (port can include its optional build result).
+- `pack inspect`, `pack migrate`, and `pack export`: structured pack results.
+- `ai-assist` and `ai-debug`: AI session reports.
+- `ai-key`, `adapters`, `remap-jar`, and `rollback`: command-specific result objects.
+
+Long-running application jobs forward human-readable logs to stderr in JSON mode. Invalid
+input and runtime failures use the same versioned error envelope.
 
 ```json
 {"schema":1,"error":{"kind":"invalid_input","message":"..."}}

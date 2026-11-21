@@ -26,12 +26,12 @@ remain outside `core`.
 
 | Milestone | Status | Notes |
 |---|---|---|
-| 12.0 AI credentials | IN PROGRESS | Core file store, desktop commands/UI and CLI key commands are implemented. CI passes; manual acceptance and security review remain. |
-| 12.A CLI polish | IN PROGRESS | Global `--json`, config and exit-code foundations exist; analyze/scan use `AppServices`. Remaining command routing, JSON coverage and acceptance tests remain. |
-| 12.B REST API | NOT STARTED | Planned in a separate `server/` workspace member; localhost + bearer token. |
-| 12.C MCP server | NOT STARTED | stdio transport; every write must use safe application services and explicit approval. |
-| 12.D GitHub Action | NOT STARTED | Composite action; build from source until Phase 13 release binaries exist. |
-| 12.E Plugin interface | NOT STARTED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
+| 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
+| 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
+| 12.B REST API | NOT STARTED; GATED | Separate `server/` workspace member; localhost + bearer token. Start only after PR 1 is reviewed and merged. |
+| 12.C MCP server | NOT STARTED; GATED | stdio transport; every write must use safe application services and explicit approval. |
+| 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
+| 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
 
 ## D2 / P1 design record
 
@@ -68,10 +68,11 @@ remain outside `core`.
 
 ## Outstanding 12.A acceptance
 
-1. Add golden fixtures for the remaining command-specific result objects.
-2. Verify shell completion installation/behavior in real bash, zsh, fish and PowerShell sessions, beyond checking generated scripts.
-3. Complete the real-machine desktop↔CLI credential-sharing acceptance before closing 12.0.
-4. Keep build, tests, Clippy and rustfmt green; complete PR review before starting 12.B.
+1. Finish golden fixtures for every command-specific JSON result shape; current tests pin the envelope and representative command results.
+2. Verify completion installation/behavior in real bash, zsh, fish and PowerShell sessions.
+3. Have the user confirm on their machine that a key saved in desktop appears as masked status in CLI, and vice versa.
+4. Run and record mutation checks for the starred credential, leak, JSON and exit-code tests.
+5. Review and merge PR 1 before starting 12.B or 12.C.
 
 ## 12.A JSON coverage follow-up
 
@@ -161,3 +162,25 @@ remain outside `core`.
 - Added an integration test proving CLI provider flags override `UMMP_AI_PROVIDER` and
   TOML, while the environment overrides TOML when no flag is supplied.
 - Added a local Gradle failure test for exit code 4 and the versioned JSON result envelope.
+
+
+## PR 1 verification update — 2026-11-21
+
+- The shared credentials implementation includes atomic file replacement, private Unix
+  permissions, key masking, environment-first resolution, schema validation, idempotent
+  deletion, OpenAI base-URL validation and legacy keyring migration.
+- Added regressions proving failed writes preserve the previous credential file and
+  unsupported schema versions fail without exposing the version value.
+- CLI integration coverage now verifies stdin key entry, rejection of command-line key
+  arguments, provider-specific deletion, and file-backed key resolution by `ai-debug`
+  through a local HTTP mock. The mock is isolated from external networking and writes its
+  snapshots only into the test's temporary directory.
+- CI run [#288](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44867212630)
+  on commit `9660301`: `build-test-lint` and `desktop` both passed, including Rust
+  build/tests/Clippy/rustfmt and desktop npm checks, Vitest, Playwright, Tauri build/tests,
+  Clippy and formatting.
+- PR 1 is the 12.0 + 12.A review batch. PR 2 (12.B + 12.C) and PR 3 (12.D + 12.E) remain
+  gated on the preceding PR being reviewed and merged by the user.
+- Outstanding manual acceptance: real desktop↔CLI credential sharing, actual shell
+  completion behavior, and mutation-check evidence for starred tests. Do not mark Phase 12
+  complete until these and the later PR batches satisfy the guide's definition of done.
