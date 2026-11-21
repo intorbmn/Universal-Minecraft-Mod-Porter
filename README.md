@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress on `phase-12-api`. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. PR #14 (12.0 + 12.A) is merged; Phase 12.B REST is under implementation on `phase-12b-rest`. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -24,6 +24,7 @@ Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress on
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
+| [API.md](docs/API.md) | Local REST API, authentication and routes |
 | [phase-11-ui.md](docs/phase/phase-11-ui.md) | Phase 11 implementation and verification record |
 | [ui/README.md](ui/README.md) | Desktop app setup and developer workflow |
 | [guides/](docs/guides/README.md) | Step-by-step guides for the remaining phases (10–14) |
@@ -101,10 +102,11 @@ ummp pack export path/to/instance --to-format mrpack
 # exit codes: 0 done, 2 refused (High-risk JAR; review it, then --allow-risk), 3 done, mods left to you
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 ummp completions bash # also: zsh, fish, powershell
+ummp serve # local REST API at 127.0.0.1:7432
 # OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
 ```
 `ummp.toml` supports `output_root`, `kb`, `sandbox_repo`, `ai_provider` and
-`openai_base_url`; precedence is CLI flags > `UMMP_*` environment > TOML > built-ins.
+`openai_base_url`, and optional REST `allowed_roots`; precedence is CLI flags > `UMMP_*` environment > TOML > built-ins.
 AI keys are stored in the interim shared credential file via `ummp ai-key set`, not TOML.
 See [docs/CLI.md](docs/CLI.md).
 
