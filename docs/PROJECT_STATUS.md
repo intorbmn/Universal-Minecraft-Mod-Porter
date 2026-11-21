@@ -27,7 +27,7 @@ locally on branch `phase-10-modpack`.
 
 ## Current milestone
 Phase 12 — CLI, API & Integration. PR 1 (12.0 shared AI credentials + 12.A CLI contract)
-is implemented and CI-green, ready to open for review. Real-machine credential sharing,
+is implemented, CI-green and open as PR #14 for review. Real-machine credential sharing,
 real shell-completion behavior and mutation-check evidence remain acceptance gates.
 The approved delivery sequence is PR 1 (12.0 + 12.A), PR 2 (12.B + 12.C), and PR 3
 (12.D + 12.E); each PR must be reviewed and merged by the user before starting the next.

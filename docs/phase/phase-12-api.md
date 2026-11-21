@@ -184,3 +184,5 @@ remain outside `core`.
 - Outstanding manual acceptance: real desktop↔CLI credential sharing, actual shell
   completion behavior, and mutation-check evidence for starred tests. Do not mark Phase 12
   complete until these and the later PR batches satisfy the guide's definition of done.
+
+- Opened [PR #14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) for review on 2026-11-21. It is mergeable and remains unmerged; wait for the user's review and merge before starting PR 2.
