@@ -145,6 +145,8 @@ pub fn run_with_input(
 ) -> io::Result<(ProcStatus, Vec<u8>)> {
     use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 
+    enum ReaderDone { Stdout, Stderr }
+
     let mut cmd = Command::new(&spec.program);
     cmd.args(&spec.args).current_dir(&spec.cwd).env_clear()
         .envs(spec.env.iter().map(|(k, v)| (k, v)))
@@ -154,44 +156,71 @@ pub fn run_with_input(
     let mut child = cmd.spawn()?;
 
     let overflow = Arc::new(AtomicBool::new(false));
+    let (done_tx, done_rx) = mpsc::channel();
     let stdout = child.stdout.take().expect("piped stdout");
-    let flag = Arc::clone(&overflow);
-    let reader = std::thread::spawn(move || {
+    let stdout_flag = Arc::clone(&overflow);
+    let stdout_tx = done_tx.clone();
+    let stdout_reader = std::thread::spawn(move || {
         let mut bytes = Vec::new();
         stdout.take(max_stdout_bytes as u64 + 1).read_to_end(&mut bytes)?;
-        if bytes.len() > max_stdout_bytes { flag.store(true, Ordering::SeqCst); }
+        if bytes.len() > max_stdout_bytes { stdout_flag.store(true, Ordering::SeqCst); }
+        let _ = stdout_tx.send(ReaderDone::Stdout);
         Ok::<_, io::Error>(bytes)
     });
     let stderr = child.stderr.take().expect("piped stderr");
-    let stderr_reader = std::thread::spawn(move || { let mut stderr = stderr; io::copy(&mut stderr, &mut io::sink()) });
+    let stderr_tx = done_tx.clone();
+    let stderr_reader = std::thread::spawn(move || {
+        let mut stderr = stderr;
+        let result = io::copy(&mut stderr, &mut io::sink()).map(|_| ());
+        let _ = stderr_tx.send(ReaderDone::Stderr);
+        result
+    });
+    drop(done_tx);
+
     let mut stdin = child.stdin.take().expect("piped stdin");
     let request = input.to_vec();
     let writer = std::thread::spawn(move || stdin.write_all(&request));
 
     let deadline = Instant::now() + spec.timeout;
-    let mut status = None;
+    let mut exit_status = None;
+    let mut stdout_done = false;
+    let mut stderr_done = false;
+    let mut timed_out = false;
     loop {
-        if overflow.load(Ordering::SeqCst) { kill_tree(&mut child); break; }
-        if let Some(exit) = child.try_wait()? {
-            status = Some(ProcStatus::Exited(exit.code().unwrap_or(-1)));
+        if overflow.load(Ordering::SeqCst) {
+            kill_tree(&mut child);
             break;
         }
+        if exit_status.is_none() {
+            if let Some(exit) = child.try_wait()? {
+                exit_status = Some(ProcStatus::Exited(exit.code().unwrap_or(-1)));
+            }
+        }
+        if exit_status.is_some() && stdout_done && stderr_done { break; }
         if Instant::now() >= deadline {
             kill_tree(&mut child);
-            status = Some(ProcStatus::TimedOut);
+            timed_out = true;
             break;
         }
-        std::thread::sleep(Duration::from_millis(10));
+        match done_rx.recv_timeout(Duration::from_millis(10)) {
+            Ok(ReaderDone::Stdout) => stdout_done = true,
+            Ok(ReaderDone::Stderr) => stderr_done = true,
+            Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => {}
+        }
     }
-    let output = reader.join().map_err(|_| io::Error::other("stdout reader panicked"))??;
-    stderr_reader.join().map_err(|_| io::Error::other("stderr reader panicked"))??;
+
+    let output = stdout_reader.join()
+        .map_err(|_| io::Error::other("stdout reader panicked"))??;
+    stderr_reader.join()
+        .map_err(|_| io::Error::other("stderr reader panicked"))??;
     if let Err(error) = writer.join().map_err(|_| io::Error::other("stdin writer panicked"))? {
         if error.kind() != io::ErrorKind::BrokenPipe { return Err(error); }
     }
     if overflow.load(Ordering::SeqCst) || output.len() > max_stdout_bytes {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "child stdout limit exceeded"));
     }
-    Ok((status.unwrap_or(ProcStatus::TimedOut), output))
+    let status = if timed_out { ProcStatus::TimedOut } else { exit_status.unwrap_or(ProcStatus::TimedOut) };
+    Ok((status, output))
 }
 
 /// Kills the child and everything it started. Errors are ignored: the processes may
