@@ -2,6 +2,31 @@
 
 Read [README.md](README.md) first. Rough history: `docs/drafts/phase-13-production.md`.
 
+## Status update (2026-11-21, Phase 12 completed)
+Read this block first; it wins where the text below differs.
+- **Starting point:** `master` after PR #21. Phase 12 is COMPLETED (REST, MCP, GitHub Action,
+  out-of-process plugins). The next ADR number is **0020** (0018 = Apache-2.0 license,
+  0019 = plugin protocol). Do not start until the user says so.
+- **Already decided** (§1a): prebuilt `ummp` CLI on GitHub Releases so MCP users need no
+  Rust. The repo is Apache-2.0 (ADR 0018); release archives must include `LICENSE`.
+- **Inputs from the Phase 12 work that this phase must handle:**
+  - `Cargo.lock` is in `.gitignore` but tracked and stale (lacks `server/` deps). Releases
+    and `cargo install --locked` (used by `action.yml`) need a current, committed lock:
+    remove it from `.gitignore` and commit the regenerated file in the first PR.
+  - The desktop installer is unsigned and does not ship `ummp.exe`; record SmartScreen in
+    KNOWN_LIMITATIONS unless the user provides a certificate.
+  - Security audit scope must include the new attack surface: REST (`server/`), MCP gates,
+    `action.yml`, and plugin process handling (`core/src/plugins.rs`: env scrub, timeout,
+    output cap, path validation). Plugins are not OS-sandboxed; decide whether the audit
+    requires more.
+  - Fuzz targets: descriptor parsers, JAR/class reader, plugin JSON Lines responses,
+    MCP/REST request bodies.
+  - A large synthetic fixture is needed for benchmarks; it also gives a long job for the
+    manual cancel test (BACKLOG "Heavy test mod").
+- **Not in this phase** (BACKLOG, after all phases): `.jar` port input, downgrade, more
+  target versions, more AI providers, monetization/Pro. Final AI key storage also stays
+  in BACKLOG unless the user brings it in.
+
 ## 0. Skills
 - **Always:** the README §3 set.
 - **Phase-specific:**

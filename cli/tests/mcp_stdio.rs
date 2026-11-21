@@ -124,6 +124,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         }),
     );
     assert!(initialized.get("result").is_some());
+    assert_eq!(initialized["result"]["serverInfo"]["name"], "ummp");
     send(
         &mut child,
         &serde_json::json!({

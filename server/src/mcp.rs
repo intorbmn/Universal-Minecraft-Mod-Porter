@@ -390,6 +390,10 @@ impl ServerHandler for McpServer {
                 .enable_resources()
                 .build(),
         )
+        .with_server_info(rmcp::model::Implementation::new(
+            "ummp",
+            env!("CARGO_PKG_VERSION"),
+        ))
         .with_instructions(
             "UMMP local MCP server. Paths are restricted to allowed_roots. Porting requires approve=true and rollback requires confirm=true.",
         )

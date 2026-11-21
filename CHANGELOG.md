@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- MCP server now reports its name as `ummp` (was the library default `rmcp`) in `initialize`.
+
 ### Changed
 - Desktop AI assist tab: the AI provider (Anthropic / OpenAI-compatible) can be switched on the tab itself; the choice is saved to settings before the key form changes, and a failed save keeps the previous provider.
 
