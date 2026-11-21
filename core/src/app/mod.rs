@@ -660,7 +660,8 @@ impl AppServices {
     /// Returns [`AppError::Input`] when the project cannot be opened or has no checkpoint,
     /// and [`AppError::Checkpoint`] when the restore itself fails.
     pub fn rollback(&self, project: &Path, checkpoint: Option<Uuid>) -> Result<(), AppError> {
-        self.rollback_with_snapshots(project, checkpoint, None).map(|_| ())
+        self.rollback_with_snapshots(project, checkpoint, None)
+            .map(|_| ())
     }
 
     /// Restores a checkpoint from the supplied snapshot directory, or the project default.
@@ -680,10 +681,12 @@ impl AppServices {
         let store = load_store(&snap_dir)?;
         let id = match checkpoint {
             Some(id) => id,
-            None => store
-                .latest()
-                .ok_or_else(|| AppError::Input("no checkpoints found for this project".into()))?
-                .id,
+            None => {
+                store
+                    .latest()
+                    .ok_or_else(|| AppError::Input("no checkpoints found for this project".into()))?
+                    .id
+            },
         };
         store.restore(id, &project.root)?;
         Ok(id)

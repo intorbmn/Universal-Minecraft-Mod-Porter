@@ -19,18 +19,16 @@ use ummp_core::adapter::AdapterRegistry;
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
-use ummp_core::app::{AppServices, BuildJobRequest, PortRequest};
 use ummp_core::app::credentials::{
     default_data_dir, resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore,
 };
-use ummp_core::app::helpers::{
-    detected_loader, open_kb, pack_format, side, NoIndex,
-};
+use ummp_core::app::helpers::{detected_loader, open_kb, pack_format, side, NoIndex};
 use ummp_core::app::snapshots::{default_snapshots, load_store, save_store};
-use ummp_core::jobs::JobState;
+use ummp_core::app::{AppServices, BuildJobRequest, PortRequest};
 use ummp_core::build::local::default_workdir;
 use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
+use ummp_core::jobs::JobState;
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
 use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
@@ -252,11 +250,9 @@ fn wait_for_job(
                 .into());
             }
             JobState::Cancelled | JobState::Skipped => {
-                return Err(CliFailure::new(
-                    ExitCode::Error,
-                    "application job did not complete",
-                )
-                .into());
+                return Err(
+                    CliFailure::new(ExitCode::Error, "application job did not complete").into(),
+                );
             }
             JobState::Pending | JobState::Running => {
                 std::thread::sleep(std::time::Duration::from_millis(250));

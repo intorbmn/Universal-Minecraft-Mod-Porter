@@ -198,14 +198,19 @@ fn adapters_json_has_stable_versioned_result() {
     }
 }
 
-
 #[test]
 fn port_json_missing_input_uses_invalid_input_envelope() {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
     let missing = dir.path().join("missing-mod");
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
-        .args(["--json", "port", missing.to_str().unwrap(), "--to", "1.21.1"])
+        .args([
+            "--json",
+            "port",
+            missing.to_str().unwrap(),
+            "--to",
+            "1.21.1",
+        ])
         .env("UMMP_DATA_DIR", data.path())
         .output()
         .unwrap();
