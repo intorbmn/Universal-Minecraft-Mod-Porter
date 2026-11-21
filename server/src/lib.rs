@@ -313,10 +313,7 @@ fn canonical_candidate(path: &FsPath) -> Result<PathBuf, ApiError> {
 }
 
 /// Shared canonical path policy used by REST and MCP adapters.
-pub(crate) fn resolve_allowed_path(
-    path: &FsPath,
-    roots: &[PathBuf],
-) -> Result<PathBuf, String> {
+pub(crate) fn resolve_allowed_path(path: &FsPath, roots: &[PathBuf]) -> Result<PathBuf, String> {
     let resolved = canonical_candidate(path)
         .map_err(|_| "path cannot be resolved or escapes its canonical parent".to_owned())?;
     if roots.iter().any(|root| path_is_within(&resolved, root)) {
