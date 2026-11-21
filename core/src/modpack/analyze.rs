@@ -15,6 +15,12 @@ pub struct AnalyzeOptions {
     pub threads: usize,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedJarAnalysis {
+    mod_info: ModAnalysis,
+    technologies: Vec<String>,
+}
+
 struct EntryResult {
     mod_info: Option<ModAnalysis>,
     risk: Option<Severity>,
@@ -189,7 +195,7 @@ pub fn analyze_pack_cached(
             continue;
         };
         let analysis_rules = rules_sha256(
-            "jar-descriptor-parser-v1",
+            "jar-descriptor-and-adapters-v1",
             [("descriptor-parser", b"v1".as_slice())],
         );
         let analysis_key = CacheKey::new(CacheKind::Analysis, &bytes, analysis_rules);
@@ -199,17 +205,17 @@ pub fn analyze_pack_cached(
         );
         let scan_key = CacheKey::new(CacheKind::Scan, &bytes, scan_rules);
 
-        let cached_analysis = kb.cache_get::<ModAnalysis>(&analysis_key).ok().flatten()
-            .filter(|value| !value.metadata.mod_id.trim().is_empty());
+        let cached_analysis = kb.cache_get::<CachedJarAnalysis>(&analysis_key).ok().flatten()
+            .filter(|value| !value.mod_info.metadata.mod_id.trim().is_empty());
         let cached_scan = kb.cache_get::<crate::scan::ScanReport>(&scan_key).ok().flatten();
-        if let (Some(mut mod_info), Some(scan)) = (cached_analysis, cached_scan) {
+        if let (Some(mut cached_analysis), Some(scan)) = (cached_analysis, cached_scan) {
             // The serialized result is content-based, but this path is location-specific.
-            mod_info.jar_path = Some(jar.to_path_buf());
+            cached_analysis.mod_info.jar_path = Some(jar.to_path_buf());
             results.push((index, EntryResult {
-                mod_info: Some(mod_info),
+                mod_info: Some(cached_analysis.mod_info),
                 risk: scan.risk(),
                 findings: scan.findings,
-                technologies: technologies(jar),
+                technologies: cached_analysis.technologies,
                 warning: None,
             }));
         } else {
@@ -252,7 +258,10 @@ pub fn analyze_pack_cached(
             ),
         );
         if let Some(mod_info) = &result.mod_info {
-            let _ = kb.cache_put(&analysis_key, mod_info);
+            let _ = kb.cache_put(&analysis_key, &CachedJarAnalysis {
+                mod_info: mod_info.clone(),
+                technologies: result.technologies.clone(),
+            });
         }
         let _ = kb.cache_put(&scan_key, &crate::scan::ScanReport {
             findings: result.findings.clone(),
