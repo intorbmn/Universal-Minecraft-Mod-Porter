@@ -5,7 +5,7 @@ mod config;
 mod exit;
 mod output;
 
-use args::{AiArgs, AiKeyCmd, BuildArgs, Cli, Commands, PackCmd};
+use args::{AiArgs, AiKeyCmd, BuildArgs, Cli, Commands, PackCmd, PluginsCmd};
 use config::CliConfig;
 use exit::{CliFailure, ExitCode};
 use std::fmt::Write as _;
@@ -37,6 +37,7 @@ use ummp_core::modpack::graph::PackGraph;
 use ummp_core::modpack::plan::{ModIndex, Side};
 use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
 use ummp_core::modpack::{import_with, ImportOptions};
+use ummp_core::plugins::PluginManager;
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use uuid::Uuid;
 
@@ -771,6 +772,7 @@ const fn command_name(command: &Commands) -> &'static str {
         Commands::AiKey { .. } => "ai-key",
         Commands::Completions { .. } => "completions",
         Commands::Mcp => "mcp",
+        Commands::Plugins { .. } => "plugins",
         Commands::Serve { .. } => "serve",
         Commands::Analyze { .. } => "analyze",
         Commands::Migrate { .. } => "migrate",
@@ -794,7 +796,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
     } = cli;
     let config = if matches!(
         &command,
-        Commands::Completions { .. } | Commands::AiKey { .. }
+        Commands::Completions { .. } | Commands::AiKey { .. } | Commands::Plugins { .. }
     ) {
         CliConfig::default()
     } else {
@@ -815,6 +817,37 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
 
     match command {
         Commands::AiKey { cmd } => run_ai_key(cmd, json_mode)?,
+        Commands::Plugins { cmd } => {
+            let manager = PluginManager::new(PluginManager::default_dir()?);
+            match cmd {
+                PluginsCmd::List => {
+                    let plugins = manager.list()?;
+                    if json_mode {
+                        output::set_result(serde_json::json!({"plugins": plugins}));
+                    } else if plugins.is_empty() {
+                        println!("No plugins installed.");
+                    } else {
+                        for plugin in plugins {
+                            println!(
+                                "{} {} ({:?}, API {})",
+                                plugin.name, plugin.version, plugin.kind, plugin.ummp_api
+                            );
+                        }
+                    }
+                }
+                PluginsCmd::Check { dir } => {
+                    let plugin = manager.check(&dir)?;
+                    if json_mode {
+                        output::set_result(serde_json::json!({"valid": true, "plugin": plugin}));
+                    } else {
+                        println!(
+                            "Plugin {} {}: OK (API {})",
+                            plugin.name, plugin.version, plugin.ummp_api
+                        );
+                    }
+                }
+            }
+        }
         Commands::Mcp => {
             if json_mode {
                 return Err(CliFailure::new(

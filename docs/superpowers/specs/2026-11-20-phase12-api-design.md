@@ -256,3 +256,22 @@ The user resumed Phase 12.B after PR #14 was merged. The following 12.B choices 
 - **Security:** localhost by default, remote bind requires explicit acknowledgement, bearer token file mode 0600 on Unix, constant-time comparison of token digests, 1 MiB body cap, CORS off, and no AI routes.
 
 These decisions are recorded in ADR 0016. MCP and later Phase 12 decisions remain out of scope for this 12.B implementation.
+
+
+### 5.5.1 12.D implementation decisions
+
+- **Toolchain:** pin the Action to the same Rust version as `rust-toolchain.toml` (currently 1.97.0), with Clippy and rustfmt components. Keep this value synchronized when the repository pin changes.
+- **Cargo cache:** cache the Cargo registry, Git index and target directory. Use an OS + Rust-version key with a restore prefix; install the `ummp` executable into a run-specific temporary root so a cached older binary cannot shadow the current source.
+- **Lockfile constraint:** the tracked root `Cargo.lock` predates the `server/` workspace dependencies. Do not regenerate or commit it as part of 12.D. The Action regenerates a lockfile only inside its isolated checkout, then installs with `cargo install --path cli --locked`. This locks each individual run but dependency resolution can change between runs; revisit when the user decides whether the repository lockfile should be updated or untracked.
+- **Risk policy:** `scan` performs one scan; `analyze`, `port` and `build` first run a scan and stop when the selected `fail-on-risk` threshold is reached. Thresholds are `high` (default), `medium`, and `none`.
+- **Report contract:** `report-path` identifies a directory containing `result.json` plus any generated Markdown report. The directory is uploaded as one artifact.
+
+
+### 5.6 12.E plugin protocol decisions
+
+- **Discovery:** installed plugins are immediate child directories of `<data_dir>/plugins/`, each containing `ummp-plugin.toml`. `ummp plugins list` lists manifests; `ummp plugins check <dir>` validates the manifest, executable, API version and `hello` response.
+- **Protocol:** each invocation sends one JSON object terminated by LF and expects exactly one JSON response line. Requests are `hello`, `findings` and `edits`; project file contents are sent over stdin. Secret-like files are excluded.
+- **Execution:** child process, 30-second timeout, process-tree kill, allow-listed environment, 8 MiB stdout cap. Stderr is drained separately and is not protocol data.
+- **Edit validation:** each returned path must name an existing file supplied in the request, resolve within the canonical project root, and not end in `.jar` or `.class`. The returned `original` must exactly match current disk content. UMMP applies the resulting EditSet through MigrationEngine's checkpointed apply path.
+- **Trust limitation:** no portable OS sandbox is added. A malicious executable still has the current user's filesystem/process permissions; install only trusted executables. This is recorded as a limitation, not described as sandboxing.
+- **ADR numbering:** ADR 0018 is already accepted for the project license; plugin protocol uses ADR 0019.

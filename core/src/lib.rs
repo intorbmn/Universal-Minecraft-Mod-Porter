@@ -22,6 +22,7 @@ pub mod migration;
 pub mod mixin;
 pub mod modpack;
 pub mod persistence;
+pub mod plugins;
 pub mod port;
 pub mod project;
 pub mod resources;

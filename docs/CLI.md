@@ -137,3 +137,29 @@ options; `migrate --snapshots` selects the checkpoint directory used by the job.
 JSON results for `migrate` contain the versioned `PlanView`; applied migrations include
 the completed job result alongside the reviewed plan. `pack migrate` returns the pack
 job result and retains exit code 2 for a High-risk refusal and 3 for manual items.
+
+
+## GitHub Action (Phase 12.D)
+
+Use the composite action to run UMMP in another repository's workflow:
+
+```yaml
+- name: Scan mod
+  id: ummp
+  uses: intorbmn/Universal-Minecraft-Mod-Porter@master
+  with:
+    command: scan
+    path: ./my-mod
+    fail-on-risk: high
+```
+
+Supported commands are `analyze`, `scan`, `port` and `build`. The `port`
+command also requires `to` and optionally accepts `loader`. Risk policy is
+`high` (default), `medium` (fail on Medium or High), or `none`. For commands
+other than `scan`, the action runs a risk scan first and skips the requested command
+when the selected threshold is reached.
+
+The action exposes `steps.ummp.outputs.exit-code` and
+`steps.ummp.outputs.report-path`. It writes a concise entry to
+`$GITHUB_STEP_SUMMARY` and uploads the result/report directory as an artifact.
+Pin the action to a reviewed commit SHA for reproducible workflows.

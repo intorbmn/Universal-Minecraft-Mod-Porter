@@ -37,7 +37,7 @@ CI has two independent jobs: the root Rust workspace and the desktop workspace (
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
   milestone, report it, and wait for the user to review.
-- Every significant decision gets an ADR in `docs/decisions/` (next number: 0019).
+- Every significant decision gets an ADR in `docs/decisions/` (next number: 0020).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
 - Edits are applied only by `MigrationEngine` after a checkpoint (ADR 0005/0006). This
@@ -76,11 +76,12 @@ skip the practice.
 ## Layout
 | Path | Contents |
 |---|---|
-| `core/src/` | Domain and engine modules: project/filesystem/metadata/session/events/checkpoint/jobs/persistence, analyzer, knowledge, migration, descriptors, build scripts/resources/Mixins/bytecode, AI, build/scan, technology adapters, loader conversion, port and modpack engines |
+| `core/src/` | Domain and engine modules: project/filesystem/metadata/session/events/checkpoint/jobs/persistence, analyzer, knowledge, migration, descriptors, build scripts/resources/Mixins/bytecode, AI, build/scan, technology adapters, loader conversion, out-of-process plugins, port and modpack engines |
 | `core/src/app/` | Shared `AppServices` facade, command helpers, session/job views, port/migrate/build/pack/AI job runners, settings, risk, checkpoint orchestration and shared AI credential store |
 | `ui/` | Tauri 2 + Svelte 5 + TypeScript desktop shell; `src/lib/api.ts` is the only frontend invoke boundary; screens, i18n, golden-backed unit/E2E tests; `src-tauri/` is a separate Cargo workspace with thin commands and OS keyring |
 | `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8, `adapters.rs`, `loader.rs`, `port.rs` for Phase 9, `modpack.rs` for Phase 10, `app.rs` for AppServices/golden views; `cli/tests/{pack_cli.rs,phase12_cli.rs,mcp_stdio.rs}` exercise the real CLI and MCP stdio process) |
 | `cli/src/` | CLI entry point plus `args.rs`, `config.rs`, `exit.rs`, and `output.rs`; shared AI key commands and provider resolution |
+| `action.yml` | Repository-root GitHub Composite Action; contract is tested by `cli/tests/action_contract.rs` |
 | `providers/` | HTTP AI providers (Anthropic, OpenAI-compatible); the only crate that talks to model APIs |
 | `server/` | Axum + Tokio REST adapter and official `rmcp` stdio MCP adapter; all domain work is delegated to `AppServices`, with shared canonical path policy |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |
