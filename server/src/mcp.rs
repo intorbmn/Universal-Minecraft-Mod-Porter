@@ -4,11 +4,13 @@ use rmcp::{
     handler::server::wrapper::Parameters,
     model::{
         CallToolResult, ContentBlock, ListResourceTemplatesResult, ReadResourceRequestParams,
-        ReadResourceResponse, ReadResourceResult, ResourceContents, ResourceTemplate, ServerCapabilities, ServerConfig,
+        ReadResourceResponse, ReadResourceResult, ResourceContents, ResourceTemplate,
+        ServerCapabilities, ServerConfig,
     },
-    tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler, ServiceExt,
     service::RequestContext,
+    tool, tool_handler, tool_router,
     transport::stdio,
+    ErrorData, RoleServer, ServerHandler, ServiceExt,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -83,7 +85,7 @@ fn result<T: Serialize>(value: Result<T, AppError>) -> Result<CallToolResult, Er
                 .map_err(|_| ErrorData::internal_error("could not serialize tool result", None))?;
             Ok(CallToolResult::structured(value))
         }
-        Err(error) => Ok(CallToolResult::error(vec![ContentBlock::text(error.to_string())])),
+        Err(error) => Ok(CallToolResult::error(vec![ContentBlock::text(\n            error.to_string(),\n        )])),
     }
 }
 
@@ -176,7 +178,7 @@ struct RollbackArgs {
 
 #[tool_router]
 impl McpServer {
-    #[tool(description = "Analyze a Minecraft mod project or JAR. Read-only; path must be inside allowed_roots.")]
+    #[tool(\n        description = "Analyze a Minecraft mod project or JAR. Read-only; path must be inside allowed_roots."\n    )]
     fn ummp_analyze(
         &self,
         Parameters(PathArgs { path }): Parameters<PathArgs>,
@@ -185,7 +187,7 @@ impl McpServer {
         result(path.and_then(|path| self.services.analyze(&path)))
     }
 
-    #[tool(description = "Scan a mod project or JAR for malware-risk indicators. Read-only; path must be inside allowed_roots.")]
+    #[tool(\n        description = "Scan a mod project or JAR for malware-risk indicators. Read-only; path must be inside allowed_roots."\n    )]
     fn ummp_scan(
         &self,
         Parameters(PathArgs { path }): Parameters<PathArgs>,
@@ -194,7 +196,7 @@ impl McpServer {
         result(path.and_then(|path| self.services.scan(&path)))
     }
 
-    #[tool(description = "Create a read-only migration plan. Returns a summary and at most 40 diff lines per file; does not write files.")]
+    #[tool(\n        description = "Create a read-only migration plan. Returns a summary and at most 40 diff lines per file; does not write files."\n    )]
     fn ummp_plan(
         &self,
         Parameters(PlanArgs { path, to, loader }): Parameters<PlanArgs>,
@@ -226,10 +228,10 @@ impl McpServer {
         result(value)
     }
 
-    #[tool(description = "Port a mod. With approve=false (default), returns a read-only plan. Set approve=true only after the human explicitly approves; then a job is started.")]
+    #[tool(\n        description = "Port a mod. With approve=false (default), returns a read-only plan. Set approve=true only after the human explicitly approves; then a job is started."\n    )]
     fn ummp_port(
         &self,
-        Parameters(PortArgs { path, to, loader, output, zip, approve }): Parameters<PortArgs>,
+        Parameters(PortArgs {\n            path,\n            to,\n            loader,\n            output,\n            zip,\n            approve,\n        }): Parameters<PortArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let input = self.path(&path);
         if !approve {
@@ -244,9 +246,7 @@ impl McpServer {
             })));
         }
         let request = input.and_then(|input| {
-            let output = output
-                .map(|path| self.path(&path))
-                .transpose()?;
+            let output = output.map(|path| self.path(&path)).transpose()?;
             Ok(PortRequest {
                 input,
                 output,
@@ -266,7 +266,7 @@ impl McpServer {
         }))
     }
 
-    #[tool(description = "Build and test a mod project. GitHub Actions is the default backend. Local execution is refused unless AppServices rates the project Low risk.")]
+    #[tool(\n        description = "Build and test a mod project. GitHub Actions is the default backend. Local execution is refused unless AppServices rates the project Low risk."\n    )]
     fn ummp_build(
         &self,
         Parameters(BuildArgs { path, backend }): Parameters<BuildArgs>,
@@ -305,7 +305,7 @@ impl McpServer {
         }))
     }
 
-    #[tool(description = "Get the current state, progress, recent logs and result of a UMMP job.")]
+    #[tool(\n        description = "Get the current state, progress, recent logs and result of a UMMP job."\n    )]
     fn ummp_job(
         &self,
         Parameters(JobArgs { id }): Parameters<JobArgs>,
@@ -315,20 +315,22 @@ impl McpServer {
         result(self.services.job(id))
     }
 
-    #[tool(description = "Request cancellation of a running UMMP job.")]
+    #[tool(\n        description = "Request cancellation of a running UMMP job."\n    )]
     fn ummp_cancel(
         &self,
         Parameters(JobArgs { id }): Parameters<JobArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let id = Uuid::parse_str(&id)
             .map_err(|_| ErrorData::invalid_params("id must be a valid UUID", None))?;
-        result(self.services.cancel(id).map(|()| serde_json::json!({
-            "job": id,
-            "cancel_requested": true
-        })))
+        result(self.services.cancel(id).map(|()| {
+            serde_json::json!({
+                "job": id,
+                "cancel_requested": true
+            })
+        }))
     }
 
-    #[tool(description = "Restore a project checkpoint. Requires confirm=true after the human explicitly approves the rollback.")]
+    #[tool(\n        description = "Restore a project checkpoint. Requires confirm=true after the human explicitly approves the rollback."\n    )]
     fn ummp_rollback(
         &self,
         Parameters(RollbackArgs { project, checkpoint, confirm }): Parameters<RollbackArgs>,
@@ -340,9 +342,10 @@ impl McpServer {
         }
         let project = self.path(&project);
         let checkpoint = checkpoint
-            .map(|id| Uuid::parse_str(&id).map_err(|_| {
-                ErrorData::invalid_params("checkpoint must be a valid UUID", None)
-            }))
+            .map(|id| {
+                Uuid::parse_str(&id)
+                    .map_err(|_| ErrorData::invalid_params("checkpoint must be a valid UUID", None))
+            })
             .transpose()?;
         result(project.and_then(|project| {
             self.services
