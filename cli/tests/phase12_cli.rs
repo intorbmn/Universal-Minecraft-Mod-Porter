@@ -12,15 +12,13 @@ fn ummp(args: &[&str]) -> Output {
 fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
     match (actual, expected) {
         (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
-            if !expected.is_empty() {
-                let mut actual_keys = actual.keys().collect::<Vec<_>>();
-                let mut expected_keys = expected.keys().collect::<Vec<_>>();
-                actual_keys.sort();
-                expected_keys.sort();
-                assert_eq!(actual_keys, expected_keys);
-                for (key, value) in expected {
-                    assert_json_shape(&actual[key], value);
-                }
+            let mut actual_keys = actual.keys().collect::<Vec<_>>();
+            let mut expected_keys = expected.keys().collect::<Vec<_>>();
+            actual_keys.sort();
+            expected_keys.sort();
+            assert_eq!(actual_keys, expected_keys);
+            for (key, value) in expected {
+                assert_json_shape(&actual[key], value);
             }
         }
         (serde_json::Value::Array(actual), serde_json::Value::Array(expected)) => {
