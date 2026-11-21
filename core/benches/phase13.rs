@@ -1,16 +1,17 @@
 //! Phase 13A reproducible microbenchmarks.
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 use ummp_core::analyzer::{inspect_jar, AnalyzerEngine};
+use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::build::local::copy_project;
 use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
-use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
+use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RenameRule, RunOptions};
 use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
 use ummp_core::modpack::{import, ImportOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
@@ -143,6 +144,69 @@ fn bench_plan_dry_run_port(c: &mut Criterion) {
     });
 }
 
+fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
+    let source = fixture_root().join("fabric-classes.jar");
+    let mut archive = zip::ZipArchive::new(fs::File::open(source).expect("open class fixture"))
+        .expect("read class fixture");
+    let mut class_name = None;
+    let mut class_bytes = Vec::new();
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index).expect("read fixture entry");
+        if entry.name().ends_with(".class") {
+            class_name = Some(entry.name().to_string());
+            entry.read_to_end(&mut class_bytes).expect("read class bytes");
+            break;
+        }
+    }
+    let class_name = class_name.expect("fixture contains a class");
+    let from = class_name.trim_end_matches(".class").replace('/', ".");
+    let simple = from.rsplit('.').next().expect("class name");
+    let rule = RenameRule {
+        from,
+        to: format!("benchmark.ported.{simple}"),
+        kind: "class".into(),
+        confidence: 1.0,
+        version: "1.20.1".into(),
+    };
+    let stages = vec![ClassMap::from_rules(&[rule])];
+
+    let dir = tempdir().expect("remap fixture directory");
+    let input = dir.path().join("five-mib.jar");
+    let mut jar = zip::ZipWriter::new(fs::File::create(&input).expect("create remap fixture"));
+    let options = zip::write::FileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    jar.start_file(&class_name, options).expect("write class entry");
+    jar.write_all(&class_bytes).expect("write class bytes");
+    jar.start_file("assets/benchmark/payload.bin", options)
+        .expect("write payload entry");
+    jar.write_all(&vec![b'x'; 5 * 1024 * 1024])
+        .expect("write 5 MiB payload");
+    jar.finish().expect("finish remap fixture");
+    (dir, input, stages)
+}
+
+fn bench_remap_5mb(c: &mut Criterion) {
+    let (_fixture_dir, input, stages) = remap_fixture_5mb();
+    let mut group = c.benchmark_group("remap");
+    group.throughput(criterion::Throughput::Bytes(5 * 1024 * 1024));
+    group.bench_function("jar_5_mib", |b| {
+        b.iter_batched(
+            || tempdir().expect("remap output directory"),
+            |output| {
+                let result = remap_jar(
+                    &input,
+                    &output.path().join("remapped.jar"),
+                    &stages,
+                )
+                .expect("remap benchmark JAR");
+                black_box(result.classes_changed)
+            },
+            BatchSize::SmallInput,
+        )
+    });
+    group.finish();
+}
+
 fn bench_scan_5mb(c: &mut Criterion) {
     let (_dir, jar) = five_mb_jar();
     let mut group = c.benchmark_group("scan");
@@ -160,6 +224,7 @@ criterion_group!(
     bench_scan_300,
     bench_pack_inspect_300,
     bench_plan_dry_run_port,
+    bench_remap_5mb,
     bench_scan_5mb
 );
 criterion_main!(phase13);
