@@ -93,7 +93,7 @@ fn delete_removes_only_the_selected_provider() {
 
 #[test]
 fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
-    use std::io::Read;
+    use std::io::{BufRead, BufReader, Read};
     use std::net::TcpListener;
     use std::time::{Duration, Instant};
 
