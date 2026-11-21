@@ -13,7 +13,7 @@ use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RenameRule, RunOptions};
 use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
-use ummp_core::modpack::{import, ImportOptions};
+use ummp_core::modpack::import;
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::scan::scan_path;
 
