@@ -32,7 +32,7 @@ use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::jobs::JobState;
 use ummp_core::knowledge::KnowledgeBase;
 use ummp_core::migration::{MigrationEngine, MigrationPlanner, MigrationRequest, RunOptions};
-use ummp_core::modpack::analyze::{analyze_pack, AnalyzeOptions};
+use ummp_core::modpack::analyze::{analyze_pack_cached, AnalyzeOptions};
 use ummp_core::modpack::graph::PackGraph;
 use ummp_core::modpack::plan::{ModIndex, Side};
 use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
@@ -423,7 +423,8 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
                     ..ImportOptions::default()
                 },
             )?;
-            analyze_pack(&mut p, &AnalyzeOptions { threads: 4 })?;
+            let kb = open_configured_kb(None, None, config)?;
+            analyze_pack_cached(&mut p, &AnalyzeOptions { threads: 4 }, &kb)?;
             let g = PackGraph::build(&p.entries);
             if output::is_json_mode() {
                 output::set_result(serde_json::json!({
