@@ -120,6 +120,7 @@ impl PluginManager {
     }
 }
 
+#[derive(Debug)]
 struct PluginAdapter {
     info: PluginInfo,
     program: PathBuf,
@@ -327,6 +328,12 @@ fn sensitive(path: &Path) -> bool {
                 || part.contains("token")
                 || part == ".npmrc"
                 || part == "settings.xml"
+                || part == "gradle.properties"
+                || part == "local.properties"
+                || part == ".netrc"
+                || part == ".pypirc"
+                || part == ".git-credentials"
+                || part.contains("keystore")
         })
 }
 
