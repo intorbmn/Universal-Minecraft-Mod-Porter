@@ -167,3 +167,31 @@ fn scan_json_has_stable_versioned_envelope() {
     assert_eq!(actual["command"], "scan");
     assert!(actual["result"].is_object());
 }
+
+
+#[test]
+fn adapters_json_has_stable_versioned_result() {
+    let data = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "adapters"])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "adapters");
+    let result = value["result"].as_object().unwrap();
+    assert_eq!(result.keys().map(String::as_str).collect::<Vec<_>>(), ["adapters"]);
+    let adapters = result["adapters"].as_array().unwrap();
+    assert!(!adapters.is_empty());
+    for adapter in adapters {
+        assert!(adapter["id"].is_string());
+        assert!(adapter["level"].is_string());
+    }
+}
