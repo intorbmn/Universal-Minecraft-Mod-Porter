@@ -347,10 +347,8 @@ fn ai_debug_missing_key_is_a_json_refusal() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["error"]["kind"], "refused");
-    assert!(
-        value["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("ai-key set")
-    );
+    assert!(value["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("ai-key set"));
 }
