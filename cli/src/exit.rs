@@ -50,7 +50,7 @@ mod tests {
     use super::ExitCode;
 
     #[test]
-    fn exit_codes_are_stable() {
+    fn exit_codes_match_table() {
         assert_eq!(ExitCode::Ok.value(), 0);
         assert_eq!(ExitCode::Error.value(), 1);
         assert_eq!(ExitCode::Refused.value(), 2);
