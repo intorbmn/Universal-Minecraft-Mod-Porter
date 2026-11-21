@@ -1,6 +1,16 @@
 {
   "session_id": "",
-  "analysis": null,
+  "analysis": {
+    "summary": "",
+    "risks": [
+      {
+        "severity": "",
+        "area": "",
+        "detail": ""
+      }
+    ],
+    "files_to_change": [""]
+  },
   "notes": [""],
   "proposed": [""],
   "diffs": [""],
