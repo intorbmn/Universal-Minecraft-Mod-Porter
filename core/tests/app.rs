@@ -1239,8 +1239,10 @@ fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
     let database =
         String::from_utf8_lossy(&std::fs::read(data_dir.join("jobs.db")).unwrap()).into_owned();
     let event_json = serde_json::to_string(&events).unwrap();
-    let job_json = serde_json::to_string(&svc.job(job).unwrap()).unwrap();
-    let logs = svc.job(job).unwrap().log.join("\n");
+    let job_view = svc.job(job).unwrap();
+    assert_eq!(job_view.state, JobState::Succeeded);
+    let job_json = serde_json::to_string(&job_view).unwrap();
+    let logs = job_view.log.join("\n");
 
     for (name, content) in [
         ("settings", settings),
