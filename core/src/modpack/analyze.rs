@@ -170,17 +170,17 @@ pub fn analyze_pack_cached(
     kb: &KnowledgeBase,
 ) -> Result<(), PackError> {
     for entry in &mut pack.entries {
-        if entry.local.is_none() || entry.kind != super::EntryKind::Mod {
+        if entry.kind != super::EntryKind::Mod {
             continue;
         }
-        let jar = entry.local.as_ref().expect("checked above");
+        let Some(jar) = entry.local.as_deref() else { continue };
         let Ok(bytes) = std::fs::read(jar) else {
             let Some(result) = analyze_entry(entry) else { continue };
             apply_entry_result(entry, result, &mut pack.warnings);
             continue;
         };
 
-        let analysis_rules = rules_sha256("jar-descriptor-parser-v1", []);
+        let analysis_rules = rules_sha256("jar-descriptor-parser-v1", [("descriptor-parser", b"v1".as_slice())]);
         let analysis_key = CacheKey::new(CacheKind::Analysis, &bytes, analysis_rules);
         let cached_analysis = kb.cache_get::<ModAnalysis>(&analysis_key).ok().flatten()
             .filter(|value| !value.metadata.mod_id.trim().is_empty());
