@@ -112,8 +112,8 @@
 
 - Base commit `c9da882a41a86ae6449fed0a86b77de79fed3ed1` CI run `44928076309` was confirmed successful.
 - Added Criterion targets for all six guide workloads and `docs/PERFORMANCE.md`. Measurements remain pending: this session has no local Cargo/Rust toolchain, so no numbers are claimed.
-- Added deterministic cache keys, SQLite cache storage, bounded/corrupt-payload handling, and cache integration for pack JAR descriptor/adapter analysis plus static scan results.
-- Added tests for deterministic identity, cache hit parity, content/rule/version invalidation, and corrupt-row rebuild. They have not yet been executed.
+- Added deterministic cache keys, SQLite cache storage, bounded/corrupt-payload handling, and cache integration for both CLI pack inspection and pack migration (JAR descriptors, adapter findings, and static scan results).
+- Added tests for deterministic identity, cache hit parity/population, content/rule/version invalidation, corrupt-row rebuild, and creating the cache table when opening an existing database. They have not yet been executed.
 - Incremental port remains deferred: current JobDb/session state has no per-file hashes or durable successful-run manifest.
 - The current CI workflow's push filter does not include `phase-13a-b-performance-cache`; CI will run on a PR targeting `master`. No PR has been created.
 - Root `Cargo.lock` remains tracked but stale for the new Criterion dependency. Regenerate it with the pinned toolchain before the first PR; do not fabricate lockfile entries.
