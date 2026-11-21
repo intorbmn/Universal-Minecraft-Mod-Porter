@@ -81,6 +81,7 @@ skip the practice.
 | `ui/` | Tauri 2 + Svelte 5 + TypeScript desktop shell; `src/lib/api.ts` is the only frontend invoke boundary; screens, i18n, golden-backed unit/E2E tests; `src-tauri/` is a separate Cargo workspace with thin commands and OS keyring |
 | `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8, `adapters.rs`, `loader.rs`, `port.rs` for Phase 9, `modpack.rs` for Phase 10, `app.rs` for AppServices/golden views; `cli/tests/{pack_cli.rs,phase12_cli.rs,mcp_stdio.rs}` exercise the real CLI and MCP stdio process) |
 | `cli/src/` | CLI entry point plus `args.rs`, `config.rs`, `exit.rs`, and `output.rs`; shared AI key commands and provider resolution |
+| `action.yml` | Repository-root GitHub Composite Action; contract is tested by `cli/tests/action_contract.rs` |
 | `providers/` | HTTP AI providers (Anthropic, OpenAI-compatible); the only crate that talks to model APIs |
 | `server/` | Axum + Tokio REST adapter and official `rmcp` stdio MCP adapter; all domain work is delegated to `AppServices`, with shared canonical path policy |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |
