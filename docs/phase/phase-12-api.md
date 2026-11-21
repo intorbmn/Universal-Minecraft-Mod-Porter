@@ -322,4 +322,4 @@ remain outside `core`.
   steps. Added CLI usage documentation and a CI push trigger for this feature branch.
 - Verification status: implementation is not complete until root/desktop CI is green
   and the required real run in `intorbmn/ummp-build-sandbox` is recorded below.
-- Sandbox run: NOT RUN yet.
+- Sandbox smoke run #3 (`44916756565`) failed after successfully installing UMMP: the sandbox fixture is a Gradle demo rather than a complete mod, so `analyze` returned exit 5; inherited Bash `-e` also stopped the action before it could publish outputs/artifacts. Fixed the action to disable inherited `-e` while capturing command status, and changed the smoke command to `scan`. A successful rerun is pending.
