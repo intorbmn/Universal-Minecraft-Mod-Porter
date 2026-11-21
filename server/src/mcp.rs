@@ -183,7 +183,7 @@ impl McpServer {
     #[tool(
         description = "Analyze a Minecraft mod project or JAR. Read-only; path must be inside allowed_roots."
     )]
-    fn ummp_analyze(
+    fn ummp_analyze_mutated(
         &self,
         Parameters(PathArgs { path }): Parameters<PathArgs>,
     ) -> Result<CallToolResult, ErrorData> {
