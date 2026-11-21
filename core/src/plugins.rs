@@ -264,6 +264,7 @@ mod tests {
     use crate::descriptor::DescriptorTarget;
     use crate::migration::{MigrationEngine, MigrationPlan, MigrationRequest, RunOptions};
     use crate::project::Project;
+    use crate::resources::PackFormats;
     use uuid::Uuid;
 
     #[test]
@@ -294,7 +295,7 @@ mod tests {
     #[cfg(unix)]
     fn fake_plugin(dir: &Path, response: &str) {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::write(dir.join("plugin.sh"), format!("#!/bin/sh\nIFS= read -r request\nprintf '%s\\n' '{}'\n", response)).unwrap();
+        std::fs::write(dir.join("plugin.sh"), format!("#!/bin/sh\nIFS= read -r request\nprintf '%s\\n' '{response}'\n")).unwrap();
         let mut permissions = std::fs::metadata(dir.join("plugin.sh")).unwrap().permissions();
         permissions.set_mode(0o755);
         std::fs::set_permissions(dir.join("plugin.sh"), permissions).unwrap();
@@ -313,7 +314,7 @@ mod tests {
         std::fs::write(project_dir.path().join("src/Main.java"), "class DemoWidget {}").unwrap();
         let project = Project::new(project_dir.path().canonicalize().unwrap());
         let rel = PathBuf::from("src/Main.java");
-        let files = vec![rel.clone()];
+        let files = vec![rel];
         let plan = MigrationPlan {
             request: MigrationRequest {
                 source_minecraft: "1.20.1".into(),
@@ -332,7 +333,7 @@ mod tests {
                 loader_version: None,
             },
             java: None,
-            pack_formats: Default::default(),
+            pack_formats: PackFormats::default(),
             datapack_renames: false,
         };
         let plugin = PluginAdapter::load(plugin_dir.path()).unwrap();
@@ -375,6 +376,29 @@ mod tests {
         let spec = ProcSpec {
             program: "/bin/sh".into(),
             args: vec!["-c".into(), "sleep 5".into()],
+            cwd: dir.path().into(),
+            env: scrubbed_env(),
+            timeout: Duration::from_millis(100),
+        };
+        let (status, _) = run_with_input(&spec, b"{}\n", 1024).unwrap();
+        assert_eq!(status, ProcStatus::TimedOut);
+    }
+
+    #[test]
+    fn rejects_plugin_returned_path_traversal() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("inside.txt"), "safe").unwrap();
+        let files = vec![PathBuf::from("inside.txt")];
+        assert!(PluginAdapter::validate_path(root.path(), Path::new("../../outside"), &files).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kills_descendant_that_keeps_protocol_pipe_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let spec = ProcSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "(sleep 5) & exit 0".into()],
             cwd: dir.path().into(),
             env: scrubbed_env(),
             timeout: Duration::from_millis(100),
