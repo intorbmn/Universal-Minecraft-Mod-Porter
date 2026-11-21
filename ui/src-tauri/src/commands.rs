@@ -482,7 +482,10 @@ mod tests {
         legacy.set_legacy("anthropic_api_key", "old-key-1234567890");
         migrate_legacy_ai_keys(&legacy, &keys);
         assert_eq!(
-            keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
+            keys.get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
             "new-key-1234567890"
         );
         assert_eq!(
