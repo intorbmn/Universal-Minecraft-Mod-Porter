@@ -240,7 +240,9 @@ pub fn resolve_ai_key_from_store(
     provider: AiProviderKind,
     env_value: Option<String>,
 ) -> Result<Option<Secret>, AppError> {
-    let _ = env_value;
+    if let Some(value) = env_value.filter(|value| !value.trim().is_empty()) {
+        return Ok(Some(Secret::new(validate_key(&value)?)));
+    }
     store.get(provider)
 }
 
