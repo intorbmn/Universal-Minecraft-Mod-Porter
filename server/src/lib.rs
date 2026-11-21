@@ -63,28 +63,20 @@ impl Default for ServerConfig {
 }
 
 fn default_data_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("UMMP_DATA_DIR") {
-        return PathBuf::from(path);
+    ummp_core::app::credentials::default_data_dir().unwrap_or_else(|_| {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(".ummp")
+    })
+}
+
+
+fn validate_bind(config: &ServerConfig) -> Result<(), &'static str> {
+    if !config.listen.is_loopback() && !config.allow_remote {
+        Err("remote listening requires --i-understand-remote")
+    } else {
+        Ok(())
     }
-    #[cfg(windows)]
-    if let Some(path) = std::env::var_os("APPDATA") {
-        return PathBuf::from(path).join("io.github.intorbmn.ummp");
-    }
-    #[cfg(target_os = "macos")]
-    if let Some(path) = std::env::var_os("HOME") {
-        return PathBuf::from(path).join("Library/Application Support/io.github.intorbmn.ummp");
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
-        return PathBuf::from(path).join("io.github.intorbmn.ummp");
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    if let Some(path) = std::env::var_os("HOME") {
-        return PathBuf::from(path).join(".local/share/io.github.intorbmn.ummp");
-    }
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(".ummp")
 }
 
 fn log_server_started(address: SocketAddr, _token: &str) {
@@ -93,9 +85,7 @@ fn log_server_started(address: SocketAddr, _token: &str) {
 
 /// Starts the local API and prints its bearer token exactly once for the user to copy.
 pub fn serve(services: Arc<AppServices>, config: ServerConfig) -> Result<(), Box<dyn Error>> {
-    if !config.listen.is_loopback() && !config.allow_remote {
-        return Err("remote listening requires --i-understand-remote".into());
-    }
+    validate_bind(&config).map_err(|error| error.to_owned())?;
     std::fs::create_dir_all(&config.data_dir)?;
     let token = load_or_create_token(&config.data_dir)?;
     println!("UMMP REST bearer token: {token}");
@@ -626,7 +616,8 @@ mod tests {
             listen: "0.0.0.0".parse().unwrap(),
             ..ServerConfig::default()
         };
-        assert!(!config.allow_remote);
+        assert!(validate_bind(&config).is_err());
+        assert!(validate_bind(&ServerConfig { allow_remote: true, ..config }).is_ok());
     }
 
 
