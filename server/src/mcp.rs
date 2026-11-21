@@ -86,7 +86,8 @@ fn result<T: Serialize>(value: Result<T, AppError>) -> Result<CallToolResult, Er
             Ok(CallToolResult::structured(value))
         }
         Err(error) => Ok(CallToolResult::error(vec![ContentBlock::text(
-            error.to_string(),\n        )])),
+            error.to_string(),
+        )])),
     }
 }
 
@@ -246,7 +247,8 @@ impl McpServer {
             loader,
             output,
             zip,
-            approve,\n        }): Parameters<PortArgs>,
+            approve,
+        }): Parameters<PortArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let input = self.path(&path);
         if !approve {
