@@ -550,7 +550,7 @@ fn event_job_id(event: &Event) -> Option<Uuid> {
 
 fn to_sse(event: Event) -> SseEvent {
     let kind = event.kind.clone();
-    SseEvent::default().event(kind).json_data(event).unwrap_or_default()
+    SseEvent::default().event(kind).json_data(event).unwrap_or_else(|_| SseEvent::default())
 }
 
 async fn job_events(
