@@ -510,7 +510,7 @@ fn ai_debug_missing_key_is_a_json_refusal() {
     assert_eq!(
         output.status.code(),
         Some(2),
-        "stdout: {}\\nstderr: {}",
+        "stdout: {}\nstderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -628,7 +628,7 @@ fn local_build_failure_uses_exit_code_four_and_json_result() {
     assert_eq!(
         output.status.code(),
         Some(4),
-        "stdout: {}\\nstderr: {}",
+        "stdout: {}\nstderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
