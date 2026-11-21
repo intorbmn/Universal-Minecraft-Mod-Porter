@@ -189,31 +189,41 @@ remain outside `core`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
-- Current branch head: `f651666f08ff542b50d52d38f6371ecc82464d5e`.
+- Current branch head: `8640cc87df05fe40f7378816c6b966def121b46a`.
 - Open PR: [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14),
   covering 12.0 + 12.A only; it remains open and unmerged.
-- CI [#352](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44873279309)
-  passed both `build-test-lint` and `desktop`, including Rust build/tests/Clippy/rustfmt,
-  Tauri build/tests/Clippy/rustfmt, npm checks, Vitest and Playwright.
-- Desktop setup now obtains its data directory from core `default_data_dir()`, the same
-  resolver used by the CLI. This removes the duplicate Tauri path selection and honors
-  `UMMP_DATA_DIR` consistently.
-- Added golden result-shape fixtures for `ai-key set/status/delete`; tests compare nested
-  object keys, alongside the existing envelope, `scan`, `adapters` and `pack inspect`
-  fixtures. Completion generation checks all four shell registration formats, and a Bash
-  smoke test sources the generated script and verifies registration.
-- Mutation evidence: CI [#345](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44872815526)
-  intentionally failed after changing the JSON envelope command field and the InvalidInput
-  exit code. The expected tests `success_envelope_matches_golden_fixture` and
-  `exit_codes_match_table` both failed. The mutations were reverted; CI #348 passed on the
-  restored implementation.
-- Remaining acceptance before PR 1 is fully closed:
-  1. Add golden fixtures for any remaining supported command-specific success-result shapes.
-  2. Verify completion behavior in real zsh, fish and PowerShell sessions; Bash source/
-     registration is covered by CI, but interactive suggestion behavior still needs a real
-     shell check.
-  3. User confirms on their machine that a desktop-saved key appears as masked CLI status,
-     and a CLI-saved key appears masked in desktop.
-  4. Complete mutation evidence for the starred 12.0 credential/leak tests.
+- Latest restored-code CI [#386](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44875166010)
+  and current-head CI [#390](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44875444029)
+  both passed `build-test-lint` and `desktop`.
+- Desktop setup uses core `default_data_dir()`, the same resolver as CLI, and honors
+  `UMMP_DATA_DIR`.
+- Golden JSON coverage now includes the shared success/error envelopes, nested `scan`
+  result shape, `analyze` view, adapter entries, pack inspect result, migrate PlanView,
+  and `ai-key set/status/delete` result shapes. The CLI tests compare nested object keys;
+  scan, adapter and pack/analyze/migrate tests use isolated temporary data/config folders.
+- Completion generation checks Bash, Zsh, Fish and PowerShell registrations. Bash also
+  sources the generated script and verifies command registration. Interactive suggestions
+  in real shells remain a manual acceptance item.
+- Mutation evidence:
+  - CI [#345](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44872815526):
+    JSON envelope command and InvalidInput exit-code mutations caused their golden/table
+    tests to fail; restored CI #348 passed.
+  - CI [#380](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44874839367):
+    returning the raw credential instead of its mask caused
+    `set_reads_stdin_and_status_only_shows_a_masked_key` to fail.
+  - CI [#382](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44874979017):
+    ignoring the environment override caused
+    `environment_value_overrides_file_without_global_environment_mutation` to fail;
+    skipping legacy keyring deletion caused
+    `legacy_ai_keyring_entry_moves_to_shared_store_once` to fail.
+  - All temporary mutations were restored. CI #386 passed on restored code.
+- Remaining acceptance before PR 1 can be closed:
+  1. Add golden fixtures for remaining success payloads: `port`, `build`, `rollback`,
+     `pack migrate/export`, `remap-jar`, and successful `ai-assist/ai-debug` runs.
+  2. Verify interactive completion behavior in real Zsh, Fish and PowerShell sessions.
+  3. User confirms on their machine that desktop-saved credentials appear as masked CLI
+     status, and CLI-saved credentials appear masked in desktop.
+  4. Mutation-check the remaining starred round-trip and key-leak invariants, especially
+     `file_resolved_ai_key_never_enters_settings_jobs_logs_or_events`.
 - **Gate:** do not begin 12.B/12.C until PR #14 is reviewed and merged by the user. Do not
   merge automatically. Preserve the existing branch history; no rebase or force-push.
