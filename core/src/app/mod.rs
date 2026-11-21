@@ -675,9 +675,8 @@ impl AppServices {
         snapshots: Option<&Path>,
     ) -> Result<Uuid, AppError> {
         let project = DefaultProjectManager.open(project).map_err(input_err)?;
-        let snap_dir = snapshots
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| default_snapshots(&project.root));
+        let snap_dir =
+            snapshots.map_or_else(|| default_snapshots(&project.root), Path::to_path_buf);
         let store = load_store(&snap_dir)?;
         let id = match checkpoint {
             Some(id) => id,
