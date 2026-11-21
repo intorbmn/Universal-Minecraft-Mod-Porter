@@ -228,6 +228,33 @@ fn bash_completion_can_be_sourced_and_registered() {
     assert!(registration.contains("_ummp"), "{registration}");
 }
 #[test]
+fn analyze_json_matches_golden_view_shape() {
+    let data = tempfile::tempdir().unwrap();
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/loader/fabric-src");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "analyze", fixture.to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .current_dir(data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/analyze-result.json"
+    ))
+    .unwrap();
+    assert_eq!(actual["schema"], 1);
+    assert_eq!(actual["command"], "analyze");
+    assert_json_shape(&actual["result"], &golden);
+}
+
+#[test]
 fn scan_json_has_stable_versioned_envelope() {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
