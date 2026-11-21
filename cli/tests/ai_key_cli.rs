@@ -134,7 +134,7 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         let mut request = [0_u8; 8192];
         let _ = stream.read(&mut request);
         stream
-            .write_all(b"HTTP/1.1 401 Unauthorized\\r\\nContent-Length: 0\\r\\nConnection: close\\r\\n\\r\\n")
+            .write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
             .unwrap();
         true
     });
