@@ -189,21 +189,31 @@ remain outside `core`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
-- Current branch head: `17f106e5935d50f034f3df4429ed06865e77021c`
-  (`docs(phase12): link PR1 review checkpoint`).
+- Current branch head: `f651666f08ff542b50d52d38f6371ecc82464d5e`.
 - Open PR: [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14),
-  covering 12.0 + 12.A only; it is open, mergeable and not merged.
-- Latest CI on the current head: [#292](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44867756953)
-  passed both `build-test-lint` and `desktop`. Rust build, tests, Clippy and rustfmt
-  passed; desktop npm checks, Vitest, Playwright, Tauri build/tests, Clippy and rustfmt
-  also passed. CI #291 on the same commit also passed.
-- Earlier failed/cancelled runs in the iteration are superseded by the successful current-head
-  runs; do not treat them as the current CI result.
-- Implementation scope for PR 1 is complete. Acceptance remains pending:
-  1. Complete command-specific golden JSON fixtures and ensure every supported JSON result
-     shape is pinned (the current tests include envelope and representative command checks).
-  2. Verify generated completions in real bash, zsh, fish and PowerShell sessions.
-  3. User confirms desktop-saved credentials are visible as masked CLI status, and vice versa.
-  4. Record mutation-check evidence for the starred tests.
+  covering 12.0 + 12.A only; it remains open and unmerged.
+- CI [#352](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44873279309)
+  passed both `build-test-lint` and `desktop`, including Rust build/tests/Clippy/rustfmt,
+  Tauri build/tests/Clippy/rustfmt, npm checks, Vitest and Playwright.
+- Desktop setup now obtains its data directory from core `default_data_dir()`, the same
+  resolver used by the CLI. This removes the duplicate Tauri path selection and honors
+  `UMMP_DATA_DIR` consistently.
+- Added golden result-shape fixtures for `ai-key set/status/delete`; tests compare nested
+  object keys, alongside the existing envelope, `scan`, `adapters` and `pack inspect`
+  fixtures. Completion generation checks all four shell registration formats, and a Bash
+  smoke test sources the generated script and verifies registration.
+- Mutation evidence: CI [#345](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44872815526)
+  intentionally failed after changing the JSON envelope command field and the InvalidInput
+  exit code. The expected tests `success_envelope_matches_golden_fixture` and
+  `exit_codes_match_table` both failed. The mutations were reverted; CI #348 passed on the
+  restored implementation.
+- Remaining acceptance before PR 1 is fully closed:
+  1. Add golden fixtures for any remaining supported command-specific success-result shapes.
+  2. Verify completion behavior in real zsh, fish and PowerShell sessions; Bash source/
+     registration is covered by CI, but interactive suggestion behavior still needs a real
+     shell check.
+  3. User confirms on their machine that a desktop-saved key appears as masked CLI status,
+     and a CLI-saved key appears masked in desktop.
+  4. Complete mutation evidence for the starred 12.0 credential/leak tests.
 - **Gate:** do not begin 12.B/12.C until PR #14 is reviewed and merged by the user. Do not
   merge automatically. Preserve the existing branch history; no rebase or force-push.
