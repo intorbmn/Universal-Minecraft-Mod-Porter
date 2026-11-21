@@ -31,7 +31,7 @@ remain outside `core`.
 | 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #16 merged; CI #553 green. |
 | 12.C MCP server | IMPLEMENTATION COMPLETE; CI GREEN; MUTATION CHECKED; REAL-CLIENT CHECK PENDING CONSENT | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, strict stdout isolation, and `ummp mcp`. CI #593 green on `80bf512c`; final branch/docs CI #594 green on `b2db8fd5`. |
 | 12.D GitHub Action | VERIFIED | Composite Action, contract tests, CI #626 and sandbox smoke #7 passed. PR #21 remains Draft. |
-| 12.E Plugin interface | IMPLEMENTATION COMPLETE; FINAL CI PENDING | API 1 manifest, JSON Lines runtime, adapter integration, CLI checks, path validation, scrubbed environment, timeout/output limits and security tests. |
+| 12.E Plugin interface | VERIFIED; CI #697 GREEN; MUTATION CHECKED | API 1 manifest, JSON Lines runtime, adapter integration, CLI checks, path validation, scrubbed environment, timeout/output limits and security tests. |
 
 ## D2 / P1 design record
 
