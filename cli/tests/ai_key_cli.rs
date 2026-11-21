@@ -8,6 +8,13 @@ const fn binary() -> &'static str {
 }
 
 fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
+    if let Some(sample) = expected.get("$map_value") {
+        let values = actual.as_object().expect("expected a JSON object map");
+        for value in values.values() {
+            assert_json_shape(value, sample);
+        }
+        return;
+    }
     match (actual, expected) {
         (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
             let mut actual_keys = actual.keys().collect::<Vec<_>>();
@@ -21,13 +28,16 @@ fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
         }
         (serde_json::Value::Array(actual), serde_json::Value::Array(expected)) => {
             if let Some(sample) = expected.first() {
-                assert!(!actual.is_empty());
                 for value in actual {
                     assert_json_shape(value, sample);
                 }
             }
         }
-        _ => {}
+        (serde_json::Value::String(_), serde_json::Value::String(_))
+        | (serde_json::Value::Number(_), serde_json::Value::Number(_))
+        | (serde_json::Value::Bool(_), serde_json::Value::Bool(_))
+        | (serde_json::Value::Null, serde_json::Value::Null) => {}
+        _ => panic!("JSON shape mismatch: actual {actual}, expected schema {expected}"),
     }
 }
 
@@ -200,11 +210,13 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         if reader.read_exact(&mut body).is_err() {
             return false;
         }
-        stream
-            .write_all(
-                b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-            )
-            .unwrap();
+        let response = br#"{"choices":[{"message":{"content":"{\\"edits\\":[],\\"notes\\":[\\"No changes needed\\"]}"}}],"usage":{"prompt_tokens":1,"completion_tokens":1},"model":"test-model"}"#;
+        let headers = format!(
+            "HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\r\\n",
+            response.len()
+        );
+        stream.write_all(headers.as_bytes()).unwrap();
+        stream.write_all(response).unwrap();
         true
     });
 
@@ -244,11 +256,19 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         server.join().unwrap(),
         "AI provider did not use the saved key"
     );
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(!stdout.contains("No openai API key"));
     assert!(!stderr.contains("No openai API key"));
     assert!(!stdout.contains("sk-openai-test-0000000000000000"));
     assert!(!stderr.contains("sk-openai-test-0000000000000000"));
+    let envelope: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "ai-debug");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/ai-debug-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
 }
