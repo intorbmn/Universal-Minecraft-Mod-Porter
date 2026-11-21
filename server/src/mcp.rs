@@ -3,7 +3,7 @@
 use rmcp::{
     handler::server::wrapper::Parameters,
     model::{
-        CallToolResult, Content, ListResourceTemplatesResult, ReadResourceRequestParams,
+        CallToolResult, ContentBlock, ListResourceTemplatesResult, ReadResourceRequestParams,
         ReadResourceResult, ResourceContents, ResourceTemplate, ServerCapabilities, ServerConfig,
     },
     schemars::JsonSchema,
@@ -82,7 +82,7 @@ fn result<T: Serialize>(value: Result<T, AppError>) -> Result<CallToolResult, Er
                 .map_err(|_| ErrorData::internal_error("could not serialize tool result", None))?;
             Ok(CallToolResult::structured(value))
         }
-        Err(error) => Ok(CallToolResult::error(vec![Content::text(error.to_string())])),
+        Err(error) => Ok(CallToolResult::error(vec![ContentBlock::text(error.to_string())])),
     }
 }
 
