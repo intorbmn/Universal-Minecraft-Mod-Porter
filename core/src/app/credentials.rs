@@ -335,6 +335,7 @@ mod tests {
     const ANTHROPIC: &str = "sk-ant-test-0000000000000000";
     const OPENAI: &str = "sk-openai-test-0000000000000000";
 
+    /// ★ Mutation: remove the second provider write or delete the wrong key; preservation must fail.
     #[test]
     fn credentials_round_trip_and_keep_other_provider() {
         let dir = tempfile::tempdir().unwrap();
@@ -365,6 +366,7 @@ mod tests {
         );
     }
 
+    /// ★ Mutation: prefer the file over the environment value; this assertion must fail.
     #[test]
     fn environment_value_overrides_file_without_global_environment_mutation() {
         let dir = tempfile::tempdir().unwrap();
@@ -450,6 +452,51 @@ mod tests {
         let fallback = dir.path().join("fallback");
         let resolved = choose_data_dir(Some(dir.path().to_path_buf()), Some(fallback)).unwrap();
         assert_eq!(resolved, dir.path());
+    }
+
+
+    #[test]
+    fn unsupported_schema_returns_a_clear_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FileKeyStore::in_dir(dir.path());
+        fs::write(store.path(), r#"{"schema":99}"#).unwrap();
+        let error = store.get(AiProviderKind::Anthropic).unwrap_err().to_string();
+        assert!(error.contains("unsupported schema version"));
+        assert!(!error.contains("99"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_write_leaves_previous_credentials_intact() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = FileKeyStore::in_dir(dir.path());
+        store
+            .set(AiProviderKind::Anthropic, &Secret::new(ANTHROPIC))
+            .unwrap();
+
+        // GitHub's Linux runner is unprivileged; skip when invoked as root, which bypasses
+        // directory write permissions and would make this failure injection meaningless.
+        if std::env::var("USER").as_deref() == Ok("root") {
+            return;
+        }
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o500)).unwrap();
+        let result = store.set(
+            AiProviderKind::Anthropic,
+            &Secret::new("sk-ant-new-0000000000000000"),
+        );
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+
+        assert!(result.is_err());
+        assert_eq!(
+            store
+                .get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
+            ANTHROPIC
+        );
     }
 
     #[test]
