@@ -10,7 +10,7 @@ use std::sync::Arc;
 use commands::UiError;
 use secrets::{OsKeyring, SecretStore};
 use tauri::{AppHandle, Emitter, Manager, State};
-use ummp_core::app::credentials::{default_data_dir, AiKeyStore, FileKeyStore};
+use ummp_core::app::credentials::{AiKeyStore, FileKeyStore, default_data_dir};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
