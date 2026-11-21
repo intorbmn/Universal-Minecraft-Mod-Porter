@@ -288,9 +288,9 @@ pub fn analyze_pack_cached(
             rules_sha256(
                 "static-scan-engine-v1",
                 [(
-                "scan_rules.toml",
-                include_bytes!("../scan_rules.toml").as_slice(),
-            )],
+                    "scan_rules.toml",
+                    include_bytes!("../scan_rules.toml").as_slice(),
+                )],
             ),
         );
         if let Some(mod_info) = &result.mod_info {
@@ -399,9 +399,9 @@ mod cache_tests {
             rules_sha256(
                 "static-scan-engine-v1",
                 [(
-                "scan_rules.toml",
-                include_bytes!("../scan_rules.toml").as_slice(),
-            )],
+                    "scan_rules.toml",
+                    include_bytes!("../scan_rules.toml").as_slice(),
+                )],
             ),
         );
         assert!(kb
@@ -422,4 +422,3 @@ mod cache_tests {
         assert!(second.entries[0].mod_info.is_some());
     }
 }
-
