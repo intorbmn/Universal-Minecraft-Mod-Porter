@@ -68,5 +68,5 @@ Every returned path must identify an existing file included in the request, rema
 - 30 seconds per plugin call; the process tree is terminated on timeout.
 - Maximum stdout response: 8 MiB. Stderr is drained but not parsed as protocol.
 - The environment is cleared and rebuilt from the build runner's allow-list. API keys and tokens are not passed.
-- Environment, credential, token, secret and package-manager auth files are excluded from request file contents.
+- Environment files, credential/secret/token configuration, package-manager auth files, SSH/cloud/container/Kubernetes credential directories, and private-key files (`.pem`, `.key`, `.p12`, `.pfx`, `.jks`, `.ppk`, `.keystore`) are excluded from request file contents. Source files such as `TokenManager.java` and `SecretManager.java` remain eligible.
 - The protocol does not expose a file-write API. However, process execution is not an OS sandbox: a malicious plugin can still access files and processes permitted to the current user. Review the executable before installation.
