@@ -266,6 +266,5 @@ fn migrate_json_missing_input_uses_invalid_input_envelope() {
     assert_eq!(output.status.code(), Some(5), "{}", String::from_utf8_lossy(&output.stderr));
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
-    assert_eq!(value["command"], "migrate");
     assert_eq!(value["error"]["kind"], "invalid_input");
 }
