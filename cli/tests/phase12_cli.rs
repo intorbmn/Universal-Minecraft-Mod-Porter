@@ -519,7 +519,6 @@ fn local_build_failure_uses_exit_code_four_and_json_result() {
     assert!(value["result"].is_object());
 }
 
-
 #[test]
 fn invalid_openai_base_url_does_not_save_cli_key() {
     let data = tempfile::tempdir().unwrap();
