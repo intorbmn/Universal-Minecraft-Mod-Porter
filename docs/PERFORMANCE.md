@@ -8,7 +8,7 @@ Phase 13A uses Criterion benchmarks in `core/benches/phase13.rs`.
 - `analyze/300_jars`: analyze a generated 300-JAR corpus.
 - `scan/300_jars`: scan the same 300-JAR workload.
 - `pack/inspect_300_mods`: import and analyze a folder containing 300 JARs.
-- `scan/5_mib`: scan a generated JAR containing a 5 MiB source entry.
+- `port/plan_and_dry_run_forge_1_16`: run the migration planner and migration engine in dry-run mode on the Forge 1.16 source fixture.\n- `remap/jar_5_mib`: remap a generated 5 MiB JAR containing a fixture class and an uncompressed payload.\n- `scan/5_mib`: scan a generated JAR containing a 5 MiB source entry.
 
 The corpus is generated from checked-in fixture JARs at benchmark setup time. Fixture creation and copying are outside the timed sections. No network access or generated binary corpus is required.
 
@@ -38,4 +38,4 @@ Record the following when the benchmark is run on a development machine:
 
 ## Deferred guide workloads
 
-The Phase 13 guide also requests plan + dry-run port of `tests/fixtures/forge-src-1.16` and remapping a 5 MiB JAR. Those are not represented by the current benchmark targets yet; they require dedicated deterministic setup and must be added before Phase 13A is considered complete. The 5 MiB scan workload is not a substitute for the remap workload.
+The benchmark targets cover all six workload categories in the guide. The 5 MiB remap fixture is generated from the checked-in class fixture and an uncompressed deterministic payload. Baseline measurements remain pending until the suite can be run on a development machine.
