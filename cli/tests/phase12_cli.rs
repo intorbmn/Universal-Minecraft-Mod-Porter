@@ -607,6 +607,62 @@ fn cli_and_environment_provider_values_override_toml() {
 
 #[cfg(unix)]
 #[test]
+fn local_build_success_matches_golden_result_shape() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let project = dir.path().join("working-gradle");
+    let workdir = dir.path().join("build-work");
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::write(
+        project.join("settings.gradle"),
+        "rootProject.name = 'working'",
+    )
+    .unwrap();
+    std::fs::write(project.join("build.gradle"), "tasks.register('build')").unwrap();
+    let wrapper = project.join("gradlew");
+    std::fs::write(&wrapper, "#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "build",
+            project.to_str().unwrap(),
+            "--local",
+            "--yes",
+            "--i-accept-risk",
+            "--stages",
+            "build",
+            "--timeout",
+            "10",
+            "--workdir",
+            workdir.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "build");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/build-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
+    assert_eq!(envelope["result"]["passed"], true);
+}
+
+#[cfg(unix)]
+#[test]
 fn local_build_failure_uses_exit_code_four_and_json_result() {
     use std::os::unix::fs::PermissionsExt;
 
