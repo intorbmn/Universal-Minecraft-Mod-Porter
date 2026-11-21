@@ -186,3 +186,24 @@ remain outside `core`.
   complete until these and the later PR batches satisfy the guide's definition of done.
 
 - Opened [PR #14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) for review on 2026-11-21. It is mergeable and remains unmerged; wait for the user's review and merge before starting PR 2.
+
+## Latest PR 1 checkpoint — 2026-11-21
+
+- Current branch head: `17f106e5935d50f034f3df4429ed06865e77021c`
+  (`docs(phase12): link PR1 review checkpoint`).
+- Open PR: [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14),
+  covering 12.0 + 12.A only; it is open, mergeable and not merged.
+- Latest CI on the current head: [#292](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44867756953)
+  passed both `build-test-lint` and `desktop`. Rust build, tests, Clippy and rustfmt
+  passed; desktop npm checks, Vitest, Playwright, Tauri build/tests, Clippy and rustfmt
+  also passed. CI #291 on the same commit also passed.
+- Earlier failed/cancelled runs in the iteration are superseded by the successful current-head
+  runs; do not treat them as the current CI result.
+- Implementation scope for PR 1 is complete. Acceptance remains pending:
+  1. Complete command-specific golden JSON fixtures and ensure every supported JSON result
+     shape is pinned (the current tests include envelope and representative command checks).
+  2. Verify generated completions in real bash, zsh, fish and PowerShell sessions.
+  3. User confirms desktop-saved credentials are visible as masked CLI status, and vice versa.
+  4. Record mutation-check evidence for the starred tests.
+- **Gate:** do not begin 12.B/12.C until PR #14 is reviewed and merged by the user. Do not
+  merge automatically. Preserve the existing branch history; no rebase or force-push.
