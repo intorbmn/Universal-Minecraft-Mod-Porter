@@ -526,15 +526,19 @@ fn ai_debug_missing_key_is_a_json_refusal() {
 #[test]
 fn cli_and_environment_provider_values_override_toml() {
     let dir = tempfile::tempdir().unwrap();
-    let data = tempfile::tempdir().unwrap();
     let config = dir.path().join("ummp.toml");
     let log = dir.path().join("build.log");
-    std::fs::write(&config, "ai_provider = \"anthropic\"").unwrap();
     std::fs::write(&log, "synthetic failure").unwrap();
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../tests/fixtures/loader/fabric-src");
 
-    let run = |cli_provider: Option<&str>| {
+    let run = |config_provider: &str, env_provider: &str, cli_provider: Option<&str>| {
+        std::fs::write(
+            &config,
+            format!("ai_provider = \"{config_provider}\""),
+        )
+        .unwrap();
+        let data = tempfile::tempdir().unwrap();
         let mut args = vec![
             "--config",
             config.to_str().unwrap(),
@@ -556,15 +560,15 @@ fn cli_and_environment_provider_values_override_toml() {
         Command::new(env!("CARGO_BIN_EXE_ummp"))
             .args(args)
             .env("UMMP_DATA_DIR", data.path())
-            .env("UMMP_AI_PROVIDER", "openai")
+            .env("UMMP_AI_PROVIDER", env_provider)
             .env_remove("ANTHROPIC_API_KEY")
             .env_remove("OPENAI_API_KEY")
             .output()
             .unwrap()
     };
 
-    // CLI flag overrides both the environment and TOML.
-    let cli = run(Some("anthropic"));
+    // CLI flag differs from both TOML and the environment.
+    let cli = run("openai", "openai", Some("anthropic"));
     assert_eq!(cli.status.code(), Some(2));
     let cli_error: serde_json::Value = serde_json::from_slice(&cli.stdout).unwrap();
     assert!(cli_error["error"]["message"]
@@ -572,8 +576,8 @@ fn cli_and_environment_provider_values_override_toml() {
         .unwrap()
         .contains("No anthropic API key"));
 
-    // Environment overrides TOML when no explicit CLI value is present.
-    let env = run(None);
+    // Environment differs from TOML when no explicit CLI value is present.
+    let env = run("anthropic", "openai", None);
     assert_eq!(env.status.code(), Some(2));
     let env_error: serde_json::Value = serde_json::from_slice(&env.stdout).unwrap();
     assert!(env_error["error"]["message"]
