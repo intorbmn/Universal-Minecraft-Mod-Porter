@@ -252,7 +252,7 @@ pub fn remap_jar(
             stats.classes_changed += usize::from(class_changed);
             stats.entries_moved += usize::from(new_name != name);
         }
-        writer.start_file(new_name, FileOptions::default().compression_method(method))?;
+        writer.start_file(new_name, SimpleFileOptions::default().compression_method(method))?;
         writer.write_all(&data)?;
     }
     writer.finish()?;
@@ -378,13 +378,13 @@ mod tests {
         let input = dir.path().join("in.jar");
         {
             let mut w = ZipWriter::new(File::create(&input).unwrap());
-            w.start_file("com/example/old/DemoWidget.class", FileOptions::default())
+            w.start_file("com/example/old/DemoWidget.class", SimpleFileOptions::default())
                 .unwrap();
             w.write_all(&demo_class()).unwrap();
-            w.start_file("META-INF/DEMO.SF", FileOptions::default())
+            w.start_file("META-INF/DEMO.SF", SimpleFileOptions::default())
                 .unwrap();
             w.write_all(b"sig").unwrap();
-            w.start_file("assets/demo/lang/en_us.json", FileOptions::default())
+            w.start_file("assets/demo/lang/en_us.json", SimpleFileOptions::default())
                 .unwrap();
             w.write_all(b"{}").unwrap();
             w.finish().unwrap();
