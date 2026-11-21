@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. PRs #14 (12.0 + 12.A), #16 (12.B REST), and #17 (12.C MCP) are merged. Phase 12.D is verified; Phase 12.E plugin implementation is in progress on `phase-12d-action`. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. PRs #14 (12.0 + 12.A), #16 (12.B REST), and #17 (12.C MCP) are merged. Phase 12.D is verified; Phase 12.E implementation is complete and undergoing final CI verification on `phase-12d-action`. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
