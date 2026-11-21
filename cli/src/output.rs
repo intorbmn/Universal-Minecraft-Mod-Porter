@@ -24,45 +24,69 @@ pub fn set_result<T: Serialize>(value: T) {
     RESULT.with(|result| *result.borrow_mut() = serde_json::to_value(value).ok());
 }
 
+fn success_envelope(command: &str, result: Value) -> Value {
+    json!({
+        "schema": 1,
+        "command": command,
+        "result": result,
+    })
+}
+
+fn failure_envelope(kind: &str, message: &str) -> Value {
+    json!({
+        "schema": 1,
+        "error": {
+            "kind": kind,
+            "message": message,
+        }
+    })
+}
+
 pub fn success(command: &str, exit_code: i32) {
     let result = RESULT
         .with(|result| result.borrow_mut().take())
         .unwrap_or_else(|| json!({ "exit_code": exit_code }));
-    println!(
-        "{}",
-        json!({
-            "schema": 1,
-            "command": command,
-            "result": result,
-        })
-    );
+    println!("{}", success_envelope(command, result));
 }
 
 pub fn failure(kind: &str, message: &str) {
-    println!(
-        "{}",
-        json!({
-            "schema": 1,
-            "error": {
-                "kind": kind,
-                "message": message,
-            }
-        })
-    );
+    println!("{}", failure_envelope(kind, message));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn success_envelope_matches_golden_shape() {
+        assert_eq!(
+            success_envelope("scan", json!({"level": "low"})),
+            json!({
+                "schema": 1,
+                "command": "scan",
+                "result": {"level": "low"},
+            })
+        );
+    }
+
+    #[test]
+    fn failure_envelope_matches_golden_shape() {
+        assert_eq!(
+            failure_envelope("invalid_input", "bad path"),
+            json!({
+                "schema": 1,
+                "error": {
+                    "kind": "invalid_input",
+                    "message": "bad path",
+                }
+            })
+        );
+    }
 
     #[test]
     fn success_envelope_has_stable_top_level_keys() {
-        let value = json!({
-            "schema": 1,
-            "command": "scan",
-            "result": {"level": "low"},
-        });
-        let mut keys = value
+        let mut keys = success_envelope("scan", json!({}))
             .as_object()
             .unwrap()
             .keys()
@@ -73,13 +97,14 @@ mod tests {
     }
 
     #[test]
-    fn error_envelope_has_stable_shape() {
-        let value = json!({
-            "schema": 1,
-            "error": {"kind": "invalid_input", "message": "bad path"},
-        });
-        assert_eq!(value["schema"], 1);
-        assert_eq!(value["error"]["kind"], "invalid_input");
-        assert!(value["error"]["message"].is_string());
+    fn failure_envelope_has_stable_top_level_keys() {
+        let mut keys = failure_envelope("error", "failed")
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(keys, vec!["error", "schema"]);
     }
 }
