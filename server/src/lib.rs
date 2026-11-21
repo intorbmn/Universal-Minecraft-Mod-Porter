@@ -607,9 +607,9 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_root_comparison_is_case_insensitive_and_handles_drive_roots() {
-        assert!(path_is_within(FsPath::new(r"C:\\Users\\Alice\\mod"), FsPath::new(r"c:\\users\\alice")));
-        assert!(!path_is_within(FsPath::new(r"C:\\Users\\Alice2"), FsPath::new(r"c:\\users\\alice")));
-        assert!(path_is_within(FsPath::new(r"C:\\mods"), FsPath::new(r"C:\\")));
+        assert!(path_is_within(FsPath::new(r"C:\Users\Alice\mod"), FsPath::new(r"c:\users\alice")));
+        assert!(!path_is_within(FsPath::new(r"C:\Users\Alice2"), FsPath::new(r"c:\\users\\alice")));
+        assert!(path_is_within(FsPath::new(r"C:\mods"), FsPath::new(r"C:\")));
     }
 
     #[test]
