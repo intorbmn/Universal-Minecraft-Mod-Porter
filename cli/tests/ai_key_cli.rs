@@ -131,8 +131,29 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
                 Err(_) => return false,
             }
         };
-        let mut request = [0_u8; 8192];
-        let _ = stream.read(&mut request);
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut content_length = 0;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                return false;
+            }
+            if line == "\r\n" {
+                break;
+            }
+            if let Some((name, value)) = line.split_once(':') {
+                if name.eq_ignore_ascii_case("content-length") {
+                    content_length = value.trim().parse::<usize>().unwrap_or(0);
+                }
+            }
+        }
+        if content_length > 1_000_000 {
+            return false;
+        }
+        let mut body = vec![0; content_length];
+        if reader.read_exact(&mut body).is_err() {
+            return false;
+        }
         stream
             .write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
             .unwrap();
