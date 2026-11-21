@@ -233,10 +233,9 @@ remain outside `core`.
      generation/registration.
   2. Save a key in Desktop, confirm `ummp ai-key status` shows the same masked key; then
      save from CLI and confirm Desktop shows it masked. Do not send a real AI request.
-- PR [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) remains open
-  and unmerged. It covers 12.0 + 12.A only.
-- **Gate:** do not begin 12.B/12.C until the user reviews and merges PR #14. Never merge
-  automatically, rebase, force-push or rewrite existing history.
+- PR [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) was merged at
+  `e86a914e2926060aecc8c65dcfba652f0d11b3a1`; it covers 12.0 + 12.A only.
+- **Gate cleared:** 12.B may proceed. Never merge automatically, rebase, force-push or rewrite existing history.
 
 ## 12.A latest verification — 2026-11-21
 
