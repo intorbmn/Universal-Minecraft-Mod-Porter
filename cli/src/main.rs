@@ -1023,7 +1023,12 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             if json_mode {
                 output::set_result(report);
             } else {
-                println!("Risk: {:?}", report.level.unwrap_or(ummp_core::app::views::RiskLevel::Low));
+                println!(
+                    "Risk: {:?}",
+                    report
+                        .level
+                        .unwrap_or(ummp_core::app::views::RiskLevel::Low)
+                );
                 for finding in &report.findings {
                     println!(
                         "[{:?}] {}: {} ({})",
