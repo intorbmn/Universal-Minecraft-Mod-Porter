@@ -1,7 +1,7 @@
 {
   "source_minecraft": "",
   "target_minecraft": "",
-  "source_loader": null,
+  "source_loader": "fabric",
   "target_loader": "",
   "files": [
     {
