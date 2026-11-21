@@ -213,7 +213,10 @@ pub fn analyze_pack_cached(
             .ok()
             .flatten()
             .filter(|value| !value.mod_info.metadata.mod_id.trim().is_empty());
-        let cached_scan = kb.cache_get::<crate::scan::ScanReport>(&scan_key).ok().flatten();
+        let cached_scan = kb
+            .cache_get::<crate::scan::ScanReport>(&scan_key)
+            .ok()
+            .flatten();
         if let (Some(mut cached_analysis), Some(scan)) = (cached_analysis, cached_scan) {
             // The serialized result is content-based, but this path is location-specific.
             cached_analysis.mod_info.jar_path = Some(jar.to_path_buf());
@@ -249,7 +252,10 @@ pub fn analyze_pack_cached(
                 })
             })
             .collect();
-        handles.into_iter().flat_map(|handle| handle.join().unwrap_or_default()).collect()
+        handles
+            .into_iter()
+            .flat_map(|handle| handle.join().unwrap_or_default())
+            .collect()
     });
 
     // Persist only complete successful results. Cache failures are intentionally non-fatal.
@@ -262,7 +268,10 @@ pub fn analyze_pack_cached(
         let analysis_key = CacheKey::new(
             CacheKind::Analysis,
             &bytes,
-            rules_sha256("jar-descriptor-and-adapters-v1", [("descriptor-parser", b"v1".as_slice())]),
+            rules_sha256(
+                "jar-descriptor-and-adapters-v1",
+                [("descriptor-parser", b"v1".as_slice())],
+            ),
         );
         let scan_key = CacheKey::new(
             CacheKind::Scan,
