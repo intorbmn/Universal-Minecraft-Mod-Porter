@@ -38,7 +38,8 @@ fn plugin_commands_list_and_check() {
     let check = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args(["--json", "plugins", "check", plugin.to_str().unwrap()])
         .env("UMMP_DATA_DIR", data.path())
-        .output().unwrap();
+        .output()
+        .unwrap();
     assert!(
         check.status.success(),
         "{}",

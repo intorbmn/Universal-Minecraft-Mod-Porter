@@ -106,7 +106,9 @@ impl PluginManager {
     }
 
     pub fn adapters(&self) -> Result<Vec<Box<dyn TechAdapter>>, PluginError> {
-        if !self.root.exists() { return Ok(Vec::new()); }
+        if !self.root.exists() {
+            return Ok(Vec::new());
+        }
         let mut out: Vec<Box<dyn TechAdapter>> = Vec::new();
         for entry in std::fs::read_dir(&self.root)? {
             let entry = entry?;
