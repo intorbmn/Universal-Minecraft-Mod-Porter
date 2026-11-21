@@ -126,7 +126,9 @@ pub enum Commands {
         #[arg(long)]
         i_understand_remote: bool,
     },
-    /// Start the local MCP server over stdio for an MCP-compatible assistant.\n    Mcp,\n    /// Detect loader, Minecraft/Java versions, dependencies and build system.
+    /// Start the local MCP server over stdio for an MCP-compatible assistant.
+    Mcp,
+    /// Detect loader, Minecraft/Java versions, dependencies and build system.
     Analyze {
         /// Project root path (source tree or a folder of JARs).
         path: PathBuf,
