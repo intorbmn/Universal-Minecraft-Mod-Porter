@@ -317,7 +317,7 @@ fn ai_debug_missing_key_is_a_json_refusal() {
     let log = dir.path().join("build.log");
     std::fs::write(&log, "synthetic build failure").unwrap();
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/loader/fabric-src");
+        .join("../tests/fixtures/loader/fabric-src");
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args([
             "--json",
