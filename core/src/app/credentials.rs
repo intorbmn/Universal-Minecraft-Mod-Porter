@@ -139,18 +139,9 @@ impl CredentialsFile {
     }
 
     pub fn set_openai_base_url(&self, value: Option<&str>) -> Result<(), AppError> {
-        let value = value.map(str::trim).filter(|value| !value.is_empty());
-        if value.is_some_and(|url| {
-            !(url.starts_with("http://") || url.starts_with("https://"))
-                || url.chars().any(char::is_control)
-        }) {
-            return Err(AppError::Input(
-                "OpenAI base URL must use http:// or https:// and contain no control characters"
-                    .into(),
-            ));
-        }
+        let value = validate_openai_base_url(value)?;
         let mut file = self.read()?;
-        file.openai_base_url = value.map(str::to_owned);
+        file.openai_base_url = value;
         self.write(&file)
     }
 
@@ -288,6 +279,21 @@ fn choose_data_dir(
     override_dir
         .or(fallback)
         .ok_or_else(|| AppError::Input("could not determine the UMMP data directory".into()))
+}
+
+/// Validates and normalizes an optional OpenAI-compatible endpoint without writing it.
+pub fn validate_openai_base_url(value: Option<&str>) -> Result<Option<String>, AppError> {
+    let value = value.map(str::trim).filter(|value| !value.is_empty());
+    if value.is_some_and(|url| {
+        !(url.starts_with("http://") || url.starts_with("https://"))
+            || url.chars().any(char::is_control)
+    }) {
+        return Err(AppError::Input(
+            "OpenAI base URL must use http:// or https:// and contain no control characters"
+                .into(),
+        ));
+    }
+    Ok(value.map(str::to_owned))
 }
 
 fn validate_key(key: &str) -> Result<String, AppError> {
