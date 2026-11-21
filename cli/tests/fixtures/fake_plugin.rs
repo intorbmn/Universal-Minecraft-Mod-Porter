@@ -14,11 +14,12 @@ fn main() {
     stdin.lock().read_line(&mut request).unwrap();
 
     if request.contains("\"method\":\"hello\"") {
-        println!(r#"{"id":"demo","ummp_api":1}"#);
+        println!("{}", r#"{"id":"demo","ummp_api":1}"#);
     } else if request.contains("\"method\":\"findings\"") {
         println!("[]");
     } else if request.contains("\"method\":\"edits\"") {
         println!(
+            "{}",
             r#"[{"path":"src/Main.java","original":"class DemoWidget {}","updated":"class DemoGadget {}"}]"#
         );
     } else if request.contains("\"method\":\"env\"") {
