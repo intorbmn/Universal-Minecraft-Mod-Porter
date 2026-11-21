@@ -248,7 +248,10 @@ allowed_roots = ["D:/Minecraft/mods"]
             config.openai_base_url.as_deref(),
             Some("http://localhost:11434/v1")
         );
-        assert_eq!(config.allowed_roots, Some(vec![PathBuf::from("D:/Minecraft/mods")]));
+        assert_eq!(
+            config.allowed_roots,
+            Some(vec![PathBuf::from("D:/Minecraft/mods")])
+        );
     }
 
     #[test]
