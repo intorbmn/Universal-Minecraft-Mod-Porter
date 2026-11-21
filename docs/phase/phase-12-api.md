@@ -189,41 +189,42 @@ remain outside `core`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
-- Implementation head verified: `8640cc87df05fe40f7378816c6b966def121b46a`; this checkpoint is recorded in commit `00c41378d059babdf03c59357a9f79357da440a9`.
-- Open PR: [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14),
-  covering 12.0 + 12.A only; it remains open and unmerged.
-- Latest restored-code CI [#386](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44875166010)
-  and current-head CI [#390](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44875444029)
-  both passed `build-test-lint` and `desktop`.
-- Desktop setup uses core `default_data_dir()`, the same resolver as CLI, and honors
-  `UMMP_DATA_DIR`.
-- Golden JSON coverage now includes the shared success/error envelopes, nested `scan`
-  result shape, `analyze` view, adapter entries, pack inspect result, migrate PlanView,
-  and `ai-key set/status/delete` result shapes. The CLI tests compare nested object keys;
-  scan, adapter and pack/analyze/migrate tests use isolated temporary data/config folders.
-- Completion generation checks Bash, Zsh, Fish and PowerShell registrations. Bash also
-  sources the generated script and verifies command registration. Interactive suggestions
-  in real shells remain a manual acceptance item.
+- Verified implementation head: `f58c51aa7c4f40b56139521eea6d6461373a8d3f`.
+- CI [#496](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44890708329)
+  passed both `build-test-lint` and `desktop`, including Rust tests, Clippy, formatting,
+  Tauri build/tests, npm checks, Vitest and Playwright.
+- CI correction history:
+  - #482 exposed a status-fixture mismatch: the status test included both providers while
+    the golden assertion described one. The test now scopes status to Anthropic.
+  - #488 exposed the missing successful `ai-assist` result coverage.
+  - #490 confirmed the AI-assist analysis result is distinct from AI-debug. Added a dedicated
+    `ai-assist-result.json` fixture and a local mock-provider test covering both AI-assist
+    agent requests. #492 then caught only rustfmt differences; those were fixed before #496.
+- Golden JSON coverage now includes:
+  - shared success/error envelopes, scan, analyze, migrate plan, port, build success/failure,
+    rollback, adapters and remap-jar;
+  - pack inspect, pack migrate and pack export;
+  - AI key set/status/delete, successful ai-debug and successful ai-assist.
+  Object key sets are checked recursively, including nested arrays and maps.
+- Desktop setup and CLI use core `default_data_dir()`; the resolver honors
+  `UMMP_DATA_DIR` so both surfaces target the same credentials directory.
+- Completion tests generate Bash, Zsh, Fish and PowerShell scripts and check their registration
+  markers. Bash also sources its script and checks command registration. Interactive completion
+  in real Zsh/Fish/PowerShell sessions remains a manual acceptance item.
 - Mutation evidence:
-  - CI [#345](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44872815526):
-    JSON envelope command and InvalidInput exit-code mutations caused their golden/table
-    tests to fail; restored CI #348 passed.
-  - CI [#380](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44874839367):
-    returning the raw credential instead of its mask caused
-    `set_reads_stdin_and_status_only_shows_a_masked_key` to fail.
-  - CI [#382](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44874979017):
-    ignoring the environment override caused
-    `environment_value_overrides_file_without_global_environment_mutation` to fail;
-    skipping legacy keyring deletion caused
-    `legacy_ai_keyring_entry_moves_to_shared_store_once` to fail.
-  - All temporary mutations were restored. CI #386 passed on restored code.
-- Remaining acceptance before PR 1 can be closed:
-  1. Add golden fixtures for remaining success payloads: `port`, `build`, `rollback`,
-     `pack migrate/export`, `remap-jar`, and successful `ai-assist/ai-debug` runs.
-  2. Verify interactive completion behavior in real Zsh, Fish and PowerShell sessions.
-  3. User confirms on their machine that desktop-saved credentials appear as masked CLI
-     status, and CLI-saved credentials appear masked in desktop.
-  4. Mutation-check the remaining starred round-trip and key-leak invariants, especially
-     `file_resolved_ai_key_never_enters_settings_jobs_logs_or_events`.
-- **Gate:** do not begin 12.B/12.C until PR #14 is reviewed and merged by the user. Do not
-  merge automatically. Preserve the existing branch history; no rebase or force-push.
+  - CI #345: mutating the JSON command field and InvalidInput exit code caused their golden
+    and exit-table tests to fail; restored CI #348 passed.
+  - CI #380: exposing the raw credential instead of its mask caused the CLI masking test to fail.
+  - CI #382: removing environment precedence and skipping legacy keyring deletion caused their
+    respective regression tests to fail; restored CI #386 passed.
+  - Remaining starred 12.0 mutation evidence to complete: credential round-trip preservation
+    and the app-level key-leak invariant. Do not mark the 12.0 acceptance fully closed yet.
+- Remaining manual acceptance before PR 1 can be closed:
+  1. In real Zsh, Fish and PowerShell sessions, verify completion suggestions, not only script
+     generation/registration.
+  2. Save a key in Desktop, confirm `ummp ai-key status` shows the same masked key; then
+     save from CLI and confirm Desktop shows it masked. Do not send a real AI request.
+- PR [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) remains open
+  and unmerged. It covers 12.0 + 12.A only.
+- **Gate:** do not begin 12.B/12.C until the user reviews and merges PR #14. Never merge
+  automatically, rebase, force-push or rewrite existing history.
