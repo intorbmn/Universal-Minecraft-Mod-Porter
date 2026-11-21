@@ -488,7 +488,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
                         loader_version,
                         formats: format,
                         min_confidence,
-                        kb,
+                        kb: kb.or_else(|| config.kb.clone()),
                         mappings,
                     },
                     index,
