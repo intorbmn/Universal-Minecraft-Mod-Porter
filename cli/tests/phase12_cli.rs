@@ -298,6 +298,10 @@ fn adapters_json_has_stable_versioned_result() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "adapters");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/adapters-result.json"
+    ))
+    .unwrap();
     assert_json_shape(&value["result"], &golden);
     let adapters = value["result"]["adapters"].as_array().unwrap();
     assert!(!adapters.is_empty());
