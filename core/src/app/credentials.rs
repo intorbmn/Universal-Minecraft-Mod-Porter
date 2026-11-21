@@ -571,7 +571,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn failed_write_leaves_previous_credentials_intact() {
-        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
