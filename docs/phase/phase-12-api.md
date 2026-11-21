@@ -1,10 +1,10 @@
 # Phase 12 — CLI, API & Integration
 
 **Status:** IN PROGRESS  
-**Branch:** `phase-12b-rest` (based on PR #14 merge commit)  
+**Branch:** `phase-12c-mcp` (based on PR #16 merge commit)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); MCP 0017 and plugins 0018 are planned  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); [0017 — MCP stdio server](../decisions/0017-mcp-stdio-server.md); plugin ADR 0018 is planned  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -28,8 +28,8 @@ remain outside `core`.
 |---|---|---|
 | 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
-| 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
-| 12.C MCP server | NOT STARTED; GATED | stdio transport; every write must use safe application services and explicit approval. |
+| 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #16 merged; CI #553 green. |
+| 12.C MCP server | IMPLEMENTATION COMPLETE; CI GREEN; MUTATION CHECKED; REAL-CLIENT CHECK PENDING CONSENT | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, strict stdout isolation, and `ummp mcp`. CI #593 green on `80bf512c`; final branch/docs CI #594 green on `b2db8fd5`. |
 | 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
 
@@ -281,3 +281,27 @@ remain outside `core`.
 
 - Security review of `server/` was done by hand (no security-review skill in this session): token is 244 random bits, file mode 0600, constant-time digest compare; loopback by default, remote bind needs `--i-understand-remote`; every request path is canonicalised and checked against `allowed_roots` (symlink-escape test present); 1 MiB body limit; CORS off; writes only through `AppServices`; the token is printed once to stdout and never logged (`token_never_logged`). Residual risks: a time-of-check/time-of-use gap between path check and use, and the token printed to the terminal. Both go to KNOWN_LIMITATIONS.
 - Existing tests also cover `port_job_completes_and_sse_events_are_ordered`, `cancel_works`, `rejects_symlink_escape`, `core_remains_free_of_tokio` and `token_file_is_private`.
+
+
+## 12.C design checkpoint — 2026-11-21
+
+- PR #16 (12.B REST) merged at `c1d08b44aa8d21363a4dfd3e76c30633e5528f12`; CI for the final 12.B implementation passed (run #553).
+- Created `phase-12c-mcp` from the merged `master`.
+- Chose `server/src/mcp.rs` to share the REST crate, runtime and path policy.
+- Checked official `rmcp 3.10.0`: its declared MSRV is Rust 1.88, compatible with the repository's pinned Rust 1.97.0. Stdio/server transport is supported.
+- Added ADR 0017 and the 12.C design addendum. Implementation and verification are next; 12.C is not marked complete.
+
+
+## 12.C implementation checkpoint — 2026-11-21
+
+- Added `server/src/mcp.rs` using official `rmcp = 3.10.0` stdio transport. Exposes `ummp_analyze`, `ummp_scan`, `ummp_plan`, `ummp_port`, `ummp_build`, `ummp_job`, `ummp_cancel`, and `ummp_rollback`.
+- Added the `ummp://report/{job}` Markdown resource template. Job state and reports are sourced from `AppServices` only.
+- Reused the REST crate's canonical candidate resolution, root canonicalization and path containment helpers for MCP path checks.
+- Port is read-only unless `approve=true`; rollback requires `confirm=true`; local build requests are gated by `AppServices::check_build_risk` and require Low risk. GitHub is the default build backend.
+- Added `ummp mcp`, MCP client/setup documentation, README and CLI references, and CI push trigger for `phase-12c-mcp`.
+- Added `cli/tests/mcp_stdio.rs`: launches the real `ummp mcp` binary and verifies initialize, tools/list, all eight tools, report resource discovery/read, plan-only behavior, approved port output, and that a synthetic API key never appears in tool/resource responses.
+- Added regression coverage for an unapproved port whose optional output path escapes `allowed_roots`; MCP now validates the output path even when it is only previewing.
+- Explicitly routes CLI tracing to stderr; stdout remains JSON-RPC only.
+- CI run #593 on `80bf512c`: both `build-test-lint` and `desktop` passed, including tests, Clippy and formatting.
+- Mutation check: renamed the `ummp_analyze` handler to `ummp_analyze_mutated`; the stdio integration test went RED with “tools/list omitted ummp_analyze” (CI #592). Restored the handler; CI #593 is green.
+- The real Claude Code client smoke test is NOT RUN: it requires the user's consent and an available local Claude Code installation.

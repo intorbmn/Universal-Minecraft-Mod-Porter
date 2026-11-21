@@ -3,7 +3,7 @@
 UMMP's CLI is intended for interactive use, scripts and CI. The contract is versioned so
 external callers can detect incompatible output changes.
 
-## Local REST API (Phase 12.B)
+## MCP server (Phase 12.C)\n\nStart the stdio MCP server for a compatible assistant with `ummp mcp`. The process uses the same `ummp.toml` and `allowed_roots` boundary as REST; stdout is protocol-only. Configure the MCP client to launch `ummp` with `mcp` as its argument. Porting is plan-only unless `approve=true`, rollback requires `confirm=true`, and local builds require Low risk. See [MCP.md](MCP.md) for tools, resource URI and client configuration. The long-running server cannot be combined with `--json`.\n\n## Local REST API (Phase 12.B)
 
 Start the localhost API with `ummp serve --port 7432`. The bearer token is printed once and stored in the shared data directory as `server-token`. See [API.md](API.md) for routes, authentication, path rules and remote-bind acknowledgement.
 
