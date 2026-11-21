@@ -460,7 +460,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
         fs::write(store.path(), r#"{"schema":99}"#).unwrap();
-        let error = store.get(AiProviderKind::Anthropic).unwrap_err().to_string();
+        let error = store
+            .get(AiProviderKind::Anthropic)
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("unsupported schema version"));
         assert!(!error.contains("99"));
     }

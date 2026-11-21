@@ -91,7 +91,6 @@ fn delete_removes_only_the_selected_provider() {
     assert_eq!(value["result"]["providers"][0]["saved"], false);
 }
 
-
 #[test]
 fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     let dir = tempfile::tempdir().unwrap();
