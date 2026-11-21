@@ -295,7 +295,9 @@ async fn openapi_lists_every_route() {
     )
     .call()
     .unwrap();
-    let spec: serde_json::Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let openapi = response.into_string().unwrap();
+    assert!(!openapi.contains(TOKEN), "server token leaked in OpenAPI response");
+    let spec: serde_json::Value = serde_json::from_str(&openapi).unwrap();
     let paths = spec["paths"].as_object().unwrap();
     let expected = [
         "/v1/health",
