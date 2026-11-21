@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 12.B (in progress): local Axum REST API scaffold, `ummp serve`, localhost binding, bearer-token authentication, allowed-root path validation, job SSE, OpenAPI contract and request-size limits.
 - Phase 12.0: shared interim file-backed AI credentials for desktop and CLI, environment-first provider resolution, one-time migration of legacy AI keys from the OS keyring, masked credential management in the AI screen/Settings, and `ummp ai-key set|status|delete`.
 - Phase 12.A: stable CLI exit codes, shell completions, strict `ummp.toml` configuration precedence, global schema-1 JSON envelopes, AppServices routing for migration/port/build/pack/rollback, and structured results for pack and AI commands. See ADR 0015, `docs/CLI.md`, and `docs/phase/phase-12-api.md`.
 
