@@ -12,7 +12,7 @@ serde_yaml = "0.9"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
-rusqlite = { version = "0.39", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 zip = "9.0.5"
 similar = "2"
 toml = "0.8"
