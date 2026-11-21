@@ -1,7 +1,7 @@
 //! Child-process runner: scrubbed environment, merged output log, timeout that kills the
 //! whole process tree, and an optional "watch for a line, then send input" hook.
 
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -132,6 +132,66 @@ pub fn run(spec: &ProcSpec, log: &Path, watch: Option<&Watch>) -> io::Result<Pro
     }
     let status = child.wait()?;
     Ok(ProcStatus::Exited(status.code().unwrap_or(-1)))
+}
+
+/// Runs a bounded JSON-lines exchange with separate stdout and stderr pipes.
+///
+/// # Errors
+/// Returns an I/O error when spawning, reading, or exceeding the output limit.
+pub fn run_with_input(
+    spec: &ProcSpec,
+    input: &[u8],
+    max_stdout_bytes: usize,
+) -> io::Result<(ProcStatus, Vec<u8>)> {
+    use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+
+    let mut cmd = Command::new(&spec.program);
+    cmd.args(&spec.args).current_dir(&spec.cwd).env_clear()
+        .envs(spec.env.iter().map(|(k, v)| (k, v)))
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+    let mut child = cmd.spawn()?;
+
+    let overflow = Arc::new(AtomicBool::new(false));
+    let stdout = child.stdout.take().expect("piped stdout");
+    let flag = Arc::clone(&overflow);
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.take(max_stdout_bytes as u64 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() > max_stdout_bytes { flag.store(true, Ordering::SeqCst); }
+        Ok::<_, io::Error>(bytes)
+    });
+    let stderr = child.stderr.take().expect("piped stderr");
+    let stderr_reader = std::thread::spawn(move || io::copy(&mut &stderr[..], &mut io::sink()));
+    let mut stdin = child.stdin.take().expect("piped stdin");
+    let request = input.to_vec();
+    let writer = std::thread::spawn(move || stdin.write_all(&request));
+
+    let deadline = Instant::now() + spec.timeout;
+    let mut status = None;
+    loop {
+        if overflow.load(Ordering::SeqCst) { kill_tree(&mut child); break; }
+        if let Some(exit) = child.try_wait()? {
+            status = Some(ProcStatus::Exited(exit.code().unwrap_or(-1)));
+            break;
+        }
+        if Instant::now() >= deadline {
+            kill_tree(&mut child);
+            status = Some(ProcStatus::TimedOut);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = reader.join().map_err(|_| io::Error::other("stdout reader panicked"))??;
+    stderr_reader.join().map_err(|_| io::Error::other("stderr reader panicked"))??;
+    if let Err(error) = writer.join().map_err(|_| io::Error::other("stdin writer panicked"))? {
+        if error.kind() != io::ErrorKind::BrokenPipe { return Err(error); }
+    }
+    if overflow.load(Ordering::SeqCst) || output.len() > max_stdout_bytes {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "child stdout limit exceeded"));
+    }
+    Ok((status.unwrap_or(ProcStatus::TimedOut), output))
 }
 
 /// Kills the child and everything it started. Errors are ignored: the processes may

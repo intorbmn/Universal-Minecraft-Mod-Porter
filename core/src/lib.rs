@@ -24,6 +24,7 @@ pub mod modpack;
 pub mod persistence;
 pub mod port;
 pub mod project;
+pub mod plugins;
 pub mod resources;
 pub mod scan;
 pub mod session;

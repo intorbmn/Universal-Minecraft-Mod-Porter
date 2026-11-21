@@ -115,6 +115,11 @@ impl Default for AdapterRegistry {
         adapters.extend(rules::RuleAdapter::all());
         adapters.push(Box::new(native::NativeAdapter));
         adapters.push(Box::new(loader::LoaderConverter::default()));
+        if let Ok(dir) = crate::plugins::PluginManager::default_dir() {
+            if let Ok(plugins) = crate::plugins::PluginManager::new(dir).adapters() {
+                adapters.extend(plugins);
+            }
+        }
         Self { adapters }
     }
 }
