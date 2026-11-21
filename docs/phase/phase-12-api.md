@@ -189,10 +189,11 @@ remain outside `core`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
-- Verified implementation head: `f58c51aa7c4f40b56139521eea6d6461373a8d3f`.
-- CI [#496](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44890708329)
+- Verified implementation head: `d369f09dc37515e498f22c03962a74d28d45f406`.
+- CI [#522](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44892515155)
   passed both `build-test-lint` and `desktop`, including Rust tests, Clippy, formatting,
-  Tauri build/tests, npm checks, Vitest and Playwright.
+  Tauri build/tests, npm checks, Vitest and Playwright. CI #496 and #510 also passed on
+  their respective restored implementation checkpoints.
 - CI correction history:
   - #482 exposed a status-fixture mismatch: the status test included both providers while
     the golden assertion described one. The test now scopes status to Anthropic.
@@ -222,9 +223,11 @@ remain outside `core`.
     test to fail; restored CI #506 passed.
   - CI #508: exposing `Secret` through `Debug` caused
     `secret_prints_stars_in_debug_and_display` to fail; restored CI #510 passed.
-  - The file-resolved key integration test continues to assert no raw key in settings,
-    jobs database, job view, job logs, events, or provider prompts. Its full leak-path fault
-    injection remains unverified; do not claim every starred 12.0 mutation is complete yet.
+  - CI #520: fault-injecting the file-resolved key into the provider prompt caused
+    `file_resolved_ai_key_never_enters_settings_jobs_logs_or_events` to fail, including the
+    successful-job assertion. The mutation was restored; CI #522 passed both jobs. All starred
+    12.0 mutation checks and the 12.A JSON/exit-code mutation checks now have red/restore-green
+    evidence.
 - Remaining manual acceptance before PR 1 can be closed:
   1. In real Zsh, Fish and PowerShell sessions, verify completion suggestions, not only script
      generation/registration.
