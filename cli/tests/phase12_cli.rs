@@ -345,6 +345,21 @@ fn pack_inspect_json_returns_a_structured_pack_result() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "pack");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/pack-inspect-result.json"
+    ))
+    .unwrap();
+    let keys = |value: &serde_json::Value| {
+        let mut keys = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys
+    };
+    assert_eq!(keys(&value["result"]), keys(&golden));
     assert_eq!(value["result"]["pack"]["format"], "folder");
     assert!(value["result"]["pack"]["entries"].is_array());
     assert!(value["result"]["issues"].is_array());
