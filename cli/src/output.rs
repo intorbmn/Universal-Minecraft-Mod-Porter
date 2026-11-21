@@ -24,7 +24,7 @@ pub fn set_result<T: Serialize>(value: T) {
     RESULT.with(|result| *result.borrow_mut() = serde_json::to_value(value).ok());
 }
 
-fn success_envelope(command: &str, result: Value) -> Value {
+fn success_envelope(command: &str, result: &Value) -> Value {
     json!({
         "schema": 1,
         "command": command,
@@ -46,7 +46,7 @@ pub fn success(command: &str, exit_code: i32) {
     let result = RESULT
         .with(|result| result.borrow_mut().take())
         .unwrap_or_else(|| json!({ "exit_code": exit_code }));
-    println!("{}", success_envelope(command, result));
+    println!("{}", success_envelope(command, &result));
 }
 
 pub fn failure(kind: &str, message: &str) {
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn success_envelope_matches_golden_shape() {
         assert_eq!(
-            success_envelope("scan", json!({"level": "low"})),
+            success_envelope("scan", &json!({"level": "low"})),
             json!({
                 "schema": 1,
                 "command": "scan",
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn success_envelope_has_stable_top_level_keys() {
-        let mut keys = success_envelope("scan", json!({}))
+        let mut keys = success_envelope("scan", &json!({}))
             .as_object()
             .unwrap()
             .keys()
