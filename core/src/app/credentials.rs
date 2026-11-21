@@ -304,7 +304,30 @@ fn validate_key(key: &str) -> Result<String, AppError> {
 }
 
 fn mask(key: &str) -> String {
-    key.to_owned()
+    let chars: Vec<char> = key.chars().collect();
+    if chars.len() < 16 {
+        return format!(
+            "…{}",
+            chars
+                .iter()
+                .rev()
+                .take(2)
+                .rev()
+                .copied()
+                .collect::<String>()
+        );
+    }
+    format!(
+        "{}…{}",
+        chars.iter().take(7).copied().collect::<String>(),
+        chars
+            .iter()
+            .rev()
+            .take(4)
+            .rev()
+            .copied()
+            .collect::<String>()
+    )
 }
 
 #[cfg(test)]
