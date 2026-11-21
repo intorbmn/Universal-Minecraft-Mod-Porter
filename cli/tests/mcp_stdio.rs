@@ -283,7 +283,10 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         if output.join("UMMP_REPORT.md").is_file() {
             break;
         }
-        assert!(Instant::now() < deadline, "approved port job did not write its output");
+        assert!(
+            Instant::now() < deadline,
+            "approved port job did not write its output"
+        );
         thread::sleep(Duration::from_millis(100));
     }
 
