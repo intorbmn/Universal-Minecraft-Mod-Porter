@@ -1,7 +1,7 @@
 //! The pack pipeline end to end: import, analyse, plan, port, export, report.
 //! `ummp pack migrate` is a thin wrapper around [`migrate_pack`].
 
-use super::analyze::{analyze_pack, gate, AnalyzeOptions};
+use super::analyze::{analyze_pack_cached, gate, AnalyzeOptions};
 use super::config::{copy_overrides, migrate_config, PackRules};
 use super::formats::{
     build_output, write_curseforge, write_folder, write_mrpack, write_prism, OutPack,
@@ -252,11 +252,12 @@ pub fn migrate_pack(
             ..ImportOptions::default()
         },
     )?;
-    analyze_pack(
+    analyze_pack_cached(
         &mut pack,
         &AnalyzeOptions {
             threads: opts.threads,
         },
+        kb,
     )?;
     let graph = PackGraph::build(&pack.entries);
 
