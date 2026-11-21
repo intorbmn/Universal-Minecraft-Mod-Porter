@@ -1041,8 +1041,14 @@ mod tests {
             ..key
         };
         let changed_content = CacheKey::new(CacheKind::Analysis, b"other bytes", "rules-a".into());
-        assert!(kb.cache_get::<Vec<String>>(&changed_rules).unwrap().is_none());
-        assert!(kb.cache_get::<Vec<String>>(&changed_content).unwrap().is_none());
+        assert!(kb
+            .cache_get::<Vec<String>>(&changed_rules)
+            .unwrap()
+            .is_none());
+        assert!(kb
+            .cache_get::<Vec<String>>(&changed_content)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -1050,12 +1056,16 @@ mod tests {
         use crate::cache::{CacheKey, CacheKind};
         let (_dir, kb) = setup_kb();
         let key = CacheKey::new(CacheKind::Analysis, b"jar bytes", "rules".into());
-        kb.cache_put(&key, &serde_json::json!({"value": 1})).unwrap();
+        kb.cache_put(&key, &serde_json::json!({"value": 1}))
+            .unwrap();
         let old_version = CacheKey {
             ummp_version: "0.0.0".into(),
             ..key
         };
-        assert!(kb.cache_get::<serde_json::Value>(&old_version).unwrap().is_none());
+        assert!(kb
+            .cache_get::<serde_json::Value>(&old_version)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -1069,7 +1079,9 @@ mod tests {
             params![key.kind.as_str(), key.content_sha256, key.ummp_version, key.rules_sha256],
         ).unwrap();
         assert!(kb.cache_get::<serde_json::Value>(&key).unwrap().is_none());
-        assert!(kb.cache_put(&key, &serde_json::json!({"rebuilt": true})).unwrap());
+        assert!(kb
+            .cache_put(&key, &serde_json::json!({"rebuilt": true}))
+            .unwrap());
         let value: Option<serde_json::Value> = kb.cache_get(&key).unwrap();
         assert_eq!(value, Some(serde_json::json!({"rebuilt": true})));
     }
