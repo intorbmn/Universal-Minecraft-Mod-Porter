@@ -4,7 +4,7 @@
 **Branch:** `phase-12d-action` (PR #21 draft; based on current `master`)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); [0017 — MCP stdio server](../decisions/0017-mcp-stdio-server.md); plugin ADR 0018 is planned  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); [0017 — MCP stdio server](../decisions/0017-mcp-stdio-server.md); [0019 — out-of-process plugin protocol](../decisions/0019-plugin-protocol.md)  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -31,7 +31,7 @@ remain outside `core`.
 | 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #16 merged; CI #553 green. |
 | 12.C MCP server | IMPLEMENTATION COMPLETE; CI GREEN; MUTATION CHECKED; REAL-CLIENT CHECK PENDING CONSENT | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, strict stdout isolation, and `ummp mcp`. CI #593 green on `80bf512c`; final branch/docs CI #594 green on `b2db8fd5`. |
 | 12.D GitHub Action | VERIFIED | Composite Action, contract tests, CI #626 and sandbox smoke #7 passed. PR #21 remains Draft. |
-| 12.E Plugin interface | IMPLEMENTATION IN PROGRESS | Manifest, JSON Lines process boundary, plugin adapter integration, CLI checks and security tests are being added. |
+| 12.E Plugin interface | IMPLEMENTATION COMPLETE; FINAL CI PENDING | API 1 manifest, JSON Lines runtime, adapter integration, CLI checks, path validation, scrubbed environment, timeout/output limits and security tests. |
 
 ## D2 / P1 design record
 
