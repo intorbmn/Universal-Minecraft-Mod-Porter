@@ -210,7 +210,7 @@ impl CredentialsFile {
         builder.prefix(".credentials-");
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
             builder.permissions(std::fs::Permissions::from_mode(0o600));
         }
         let mut temporary = builder.tempfile_in(parent)?;
