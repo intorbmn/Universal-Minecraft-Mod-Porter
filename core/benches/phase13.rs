@@ -2,7 +2,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 use ummp_core::analyzer::{inspect_jar, AnalyzerEngine};
@@ -96,7 +96,7 @@ fn bench_scan_5mb(c: &mut Criterion) {
     let mut group = c.benchmark_group("scan");
     group.throughput(criterion::Throughput::Bytes(5 * 1024 * 1024));
     group.bench_with_input(BenchmarkId::new("jar_entry", "5_mib"), &jar, |b, path| {
-        b.iter(|| scan_path(black_box(Path::new(path))).expect("scan 5 MiB JAR"))
+        b.iter(|| scan_path(black_box(path.as_path())).expect("scan 5 MiB JAR"))
     });
     group.finish();
 }
