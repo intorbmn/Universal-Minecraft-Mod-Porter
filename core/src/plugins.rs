@@ -321,18 +321,14 @@ fn sensitive(path: &Path) -> bool {
         .filter_map(|c| c.as_os_str().to_str())
         .any(|part| {
             let part = part.to_ascii_lowercase();
-            let private_key = [
-                ".pem", ".key", ".p12", ".pfx", ".jks", ".ppk", ".keystore",
-            ]
+            let private_key = [".pem", ".key", ".p12", ".pfx", ".jks", ".ppk", ".keystore"]
             .iter()
             .any(|suffix| part.ends_with(suffix))
                 || matches!(
                     part.as_str(),
                     "id_rsa" | "id_ed25519" | "id_ecdsa" | "id_dsa"
                 );
-            let secret_config = [
-                "credential", "secret", "token", "auth",
-            ]
+            let secret_config = ["credential", "secret", "token", "auth"]
             .iter()
             .any(|word| part.contains(word))
                 && [
