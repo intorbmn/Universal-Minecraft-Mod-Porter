@@ -344,18 +344,13 @@ fn path_is_within(path: &FsPath, root: &FsPath) -> bool {
 }
 
 fn allowed_path(state: &ApiState, path: &FsPath) -> Result<PathBuf, ApiError> {
-    let resolved = canonical_candidate(path)?;
-    if state
-        .roots
-        .iter()
-        .any(|root| path_is_within(&resolved, root))
-    {
-        Ok(resolved)
-    } else {
-        Err(ApiError::forbidden(
-            "path is outside configured allowed_roots",
-        ))
-    }
+    resolve_allowed_path(path, &state.roots).map_err(|message| {
+        if message == "path is outside configured allowed_roots" {
+            ApiError::forbidden(message)
+        } else {
+            ApiError::bad_request(message)
+        }
+    })
 }
 
 fn optional_path(state: &ApiState, path: Option<PathBuf>) -> Result<Option<PathBuf>, ApiError> {
