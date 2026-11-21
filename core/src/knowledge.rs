@@ -1011,7 +1011,7 @@ mod tests {
     }
 
     #[test]
-    fn cache_round_trip_and_key_invalidation() {
+    fn rule_change_invalidates_cache() {
         use crate::cache::{CacheKey, CacheKind};
         let (_dir, kb) = setup_kb();
         let key = CacheKey::new(CacheKind::Analysis, b"jar bytes", "rules-a".into());
@@ -1022,6 +1022,16 @@ mod tests {
         let changed_content = CacheKey::new(CacheKind::Analysis, b"other bytes", "rules-a".into());
         assert!(kb.cache_get::<Vec<String>>(&changed_rules).unwrap().is_none());
         assert!(kb.cache_get::<Vec<String>>(&changed_content).unwrap().is_none());
+    }
+
+    #[test]
+    fn ummp_version_change_invalidates_cache() {
+        use crate::cache::{CacheKey, CacheKind};
+        let (_dir, kb) = setup_kb();
+        let key = CacheKey::new(CacheKind::Analysis, b"jar bytes", "rules".into());
+        kb.cache_put(&key, &serde_json::json!({"value": 1})).unwrap();
+        let old_version = CacheKey { ummp_version: "0.0.0".into(), ..key.clone() };
+        assert!(kb.cache_get::<serde_json::Value>(&old_version).unwrap().is_none());
     }
 
     #[test]
