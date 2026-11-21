@@ -406,6 +406,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn mcp_rejects_paths_outside_canonical_allowed_roots() {
+        let allowed = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let services = Arc::new(
+            AppServices::open(ummp_core::app::Settings::new(data.path().to_path_buf())).unwrap(),
+        );
+        let server = McpServer::new(services, vec![allowed.path().to_path_buf()]);
+
+        assert!(server.path(allowed.path()).is_ok());
+        assert!(server.path(outside.path()).is_err());
+    }
+
+    #[test]
+    fn rollback_without_confirmation_is_refused_before_path_access() {
+        let data = tempfile::tempdir().unwrap();
+        let services = Arc::new(
+            AppServices::open(ummp_core::app::Settings::new(data.path().to_path_buf())).unwrap(),
+        );
+        let server = McpServer::new(services, Vec::new());
+        let response = server
+            .ummp_rollback(Parameters(RollbackArgs {
+                project: PathBuf::from("not-accessed"),
+                checkpoint: None,
+                confirm: false,
+            }))
+            .unwrap();
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value["isError"], true);
+    }
+
+    #[test]
     fn report_contains_job_identity_and_state() {
         let value = serde_json::json!({
             "id": Uuid::nil(),
@@ -424,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn report_does_not_include_any_application_settings_or_credentials() {
+    fn report_contains_only_job_view_data() {
         let value = serde_json::json!({
             "id": Uuid::nil(),
             "session": Uuid::nil(),
