@@ -189,7 +189,7 @@ remain outside `core`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
-- Current branch head: `8640cc87df05fe40f7378816c6b966def121b46a`.
+- Implementation head verified: `8640cc87df05fe40f7378816c6b966def121b46a`; this checkpoint is recorded in commit `00c41378d059babdf03c59357a9f79357da440a9`.
 - Open PR: [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14),
   covering 12.0 + 12.A only; it remains open and unmerged.
 - Latest restored-code CI [#386](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44875166010)
