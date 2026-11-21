@@ -1,10 +1,10 @@
 # Phase 12 — CLI, API & Integration
 
 **Status:** IN PROGRESS  
-**Branch:** `phase-12b-rest` (based on PR #14 merge commit)  
+**Branch:** `phase-12c-mcp` (based on PR #16 merge commit)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); MCP 0017 and plugins 0018 are planned  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); [0017 — MCP stdio server](../decisions/0017-mcp-stdio-server.md); plugin ADR 0018 is planned  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -28,8 +28,8 @@ remain outside `core`.
 |---|---|---|
 | 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
-| 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
-| 12.C MCP server | IMPLEMENTED; CI VERIFICATION PENDING | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, and `ummp mcp`. |
+| 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #16 merged; CI #553 green. |
+| 12.C MCP server | IMPLEMENTATION COMPLETE; CI GREEN; MUTATION CHECKED; REAL-CLIENT CHECK PENDING CONSENT | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, strict stdout isolation, and `ummp mcp`. CI #593 green on `80bf512c`. |
 | 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
 
@@ -299,5 +299,9 @@ remain outside `core`.
 - Reused the REST crate's canonical candidate resolution, root canonicalization and path containment helpers for MCP path checks.
 - Port is read-only unless `approve=true`; rollback requires `confirm=true`; local build requests are gated by `AppServices::check_build_risk` and require Low risk. GitHub is the default build backend.
 - Added `ummp mcp`, MCP client/setup documentation, README and CLI references, and CI push trigger for `phase-12c-mcp`.
-- Tests added for report formatting and credential/settings non-disclosure. End-to-end stdio initialize/tools/resource, approval and path-boundary tests still need CI verification and follow-up hardening.
-- No PR opened yet. Do not mark 12.C complete until CI passes and the stdio integration checks are covered.
+- Added `cli/tests/mcp_stdio.rs`: launches the real `ummp mcp` binary and verifies initialize, tools/list, all eight tools, report resource discovery/read, plan-only behavior, approved port output, and that a synthetic API key never appears in tool/resource responses.
+- Added regression coverage for an unapproved port whose optional output path escapes `allowed_roots`; MCP now validates the output path even when it is only previewing.
+- Explicitly routes CLI tracing to stderr; stdout remains JSON-RPC only.
+- CI run #593 on `80bf512c`: both `build-test-lint` and `desktop` passed, including tests, Clippy and formatting.
+- Mutation check: renamed the `ummp_analyze` handler to `ummp_analyze_mutated`; the stdio integration test went RED with “tools/list omitted ummp_analyze” (CI #592). Restored the handler; CI #593 is green.
+- The real Claude Code client smoke test is NOT RUN: it requires the user's consent and an available local Claude Code installation.

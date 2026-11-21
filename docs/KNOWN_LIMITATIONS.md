@@ -129,7 +129,7 @@ Each entry names the module and the phase expected to address it.
   process running as the same user can read the key. This is temporary and must not be
   described as encrypted or equivalent to an OS keyring. The final storage backend remains
   a user decision (ADR 0015).
-- REST, MCP, GitHub Action and out-of-process plugin milestones are not implemented yet.
+- Phase 12.D GitHub Action and Phase 12.E out-of-process plugin interface are not implemented yet.
 
 - **REST API is local and single-user only.** Remote binding is an explicit opt-in and is not protected by TLS; do not expose it to untrusted networks. There are no AI routes, token-rotation command, or multi-user authorization model. Phase 12.B.
 - **REST job events are bounded in-memory replay.** Events older than the server's 4096-event buffer are not replayed to late subscribers; persisted job state remains available through `GET /v1/jobs/{id}`. Phase 12.B.
@@ -144,3 +144,4 @@ Phases 13-14 (production readiness, community) have no code yet.
 - The caller is responsible for obtaining human approval before invoking `ummp_port` with `approve=true` or `ummp_rollback` with `confirm=true`; stdio itself cannot prove that a human reviewed the action.
 - Job reports expose the persisted job result and recent log tail only; they are not a full archival report store.
 - Local builds are permitted only when the application risk check allows Low risk, but build scripts still run with the user's OS permissions. Prefer GitHub Actions.
+- MCP uses the same canonical path validation as REST and therefore shares its time-of-check/time-of-use gap. No real Claude Code client smoke test has been recorded yet; see `docs/MCP.md`.
