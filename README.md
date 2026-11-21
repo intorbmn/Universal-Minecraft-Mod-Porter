@@ -103,7 +103,12 @@ ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.m
 ummp completions bash # also: zsh, fish, powershell
 # OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
 ```
-`ummp.toml` can set `output_dir`, `sandbox_repo` and `provider`; CLI flags override `UMMP_*` environment values and config. See [docs/CLI.md](docs/CLI.md).\n\n`--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
+`ummp.toml` supports `output_root`, `kb`, `sandbox_repo`, `ai_provider` and
+`openai_base_url`; precedence is CLI flags > `UMMP_*` environment > TOML > built-ins.
+AI keys are stored in the interim shared credential file via `ummp ai-key set`, not TOML.
+See [docs/CLI.md](docs/CLI.md).
+
+`--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
 (the knowledge-base export format); `--kb` takes a knowledge-base SQLite file instead.
 Checkpoints go to `<project>.ummp-snapshots/` next to the project unless `--snapshots` is set.
 

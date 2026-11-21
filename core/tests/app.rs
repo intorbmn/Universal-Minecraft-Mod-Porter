@@ -1171,7 +1171,6 @@ fn view_shapes_match_golden_json() {
     );
 }
 
-
 // A provider holds the resolved secret just as a real HTTP provider does.
 struct KeyedScripted {
     key: Secret,
@@ -1192,7 +1191,7 @@ impl AiProvider for KeyedScripted {
 
 #[test]
 fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
-    use ummp_core::app::credentials::{resolve_ai_key, AiProviderKind, FileKeyStore};
+    use ummp_core::app::credentials::{resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore};
 
     let dir = tempdir().unwrap();
     let data_dir = dir.path().join("data");
@@ -1245,7 +1244,7 @@ fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
         .into_owned();
     let event_json = serde_json::to_string(&events).unwrap();
     let job_json = serde_json::to_string(&svc.job(job).unwrap()).unwrap();
-    let logs = svc.job(job).unwrap().log.join("\\n");
+    let logs = svc.job(job).unwrap().log.join("\n");
 
     for (name, content) in [
         ("settings", settings),
@@ -1254,9 +1253,6 @@ fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
         ("job view", job_json),
         ("job logs", logs),
     ] {
-        assert!(
-            !content.contains(raw_key),
-            "raw AI key leaked into {name}"
-        );
+        assert!(!content.contains(raw_key), "raw AI key leaked into {name}");
     }
 }
