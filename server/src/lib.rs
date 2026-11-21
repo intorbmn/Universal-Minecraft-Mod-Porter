@@ -313,7 +313,8 @@ fn path_is_within(path: &FsPath, root: &FsPath) -> bool {
     {
         let path = path.to_string_lossy().replace('\\', "/").to_lowercase();
         let root = root.to_string_lossy().replace('\\', "/").to_lowercase();
-        path == root || path.strip_prefix(&root).is_some_and(|tail| tail.starts_with('/'))
+        let root = root.trim_end_matches('/');
+        path == root || path.strip_prefix(root).is_some_and(|tail| tail.starts_with('/'))
     }
     #[cfg(not(windows))]
     {
@@ -601,6 +602,15 @@ async fn openapi() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_root_comparison_is_case_insensitive_and_handles_drive_roots() {
+        assert!(path_is_within(FsPath::new(r"C:\\Users\\Alice\\mod"), FsPath::new(r"c:\\users\\alice")));
+        assert!(!path_is_within(FsPath::new(r"C:\\Users\\Alice2"), FsPath::new(r"c:\\users\\alice")));
+        assert!(path_is_within(FsPath::new(r"C:\\mods"), FsPath::new(r"C:\\")));
+    }
 
     #[test]
     fn token_comparison_is_constant_time_for_fixed_length_hashes() {
