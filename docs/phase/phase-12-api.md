@@ -26,8 +26,8 @@ remain outside `core`.
 
 | Milestone | Status | Notes |
 |---|---|---|
-| 12.0 AI credentials | IN PROGRESS | Core file store, desktop commands/UI and CLI key commands added; automated verification and remaining acceptance checks pending. |
-| 12.A CLI polish | IN PROGRESS | Stable exit-code type, clap completions, TOML config loading and precedence helpers; JSON envelope for analyze/scan. Global JSON and complete command coverage/tests remain. |
+| 12.0 AI credentials | IN PROGRESS | Core file store, desktop commands/UI and CLI key commands are implemented. CI passes; manual acceptance and security review remain. |
+| 12.A CLI polish | IN PROGRESS | Global `--json`, config and exit-code foundations exist; analyze/scan use `AppServices`. Remaining command routing, JSON coverage and acceptance tests remain. |
 | 12.B REST API | NOT STARTED | Planned in a separate `server/` workspace member; localhost + bearer token. |
 | 12.C MCP server | NOT STARTED | stdio transport; every write must use safe application services and explicit approval. |
 | 12.D GitHub Action | NOT STARTED | Composite action; build from source until Phase 13 release binaries exist. |
@@ -64,17 +64,15 @@ remain outside `core`.
   rejection without value leakage, while retaining existing exit/completion/JSON tests.
 - Updated `docs/CLI.md` to match the shared data directory, supported fields, environment
   variables and `--config` behavior.
-- These new tests have **not yet been executed** in a local checkout. The latest branch
-  commit currently has no reported status checks; no build, test, Clippy or rustfmt success
-  is claimed.
+- CI run [#44852188873](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44852188873) on `b5e66e8`: both `build-test-lint` and `desktop` passed, including Rust build/tests/Clippy/rustfmt and desktop checks/Vitest/Playwright. This verifies the branch state through that commit; it does not by itself close the remaining manual acceptance items.
 
 ## Outstanding 12.A acceptance
 
-1. Make `--json` a global flag and provide structured JSON for every command, with logs on stderr.
+1. Provide structured JSON result views for every command, with logs on stderr.
 2. Ensure runtime input errors, safety refusals and build failures map consistently to codes 5, 2 and 4.
-3. Add golden tests for stable JSON keys and test config-file defaults overridden by flags.
+3. Extend golden coverage to command result views and test config-file defaults overridden by flags.
 4. Verify bash, zsh, fish and PowerShell completions in CI.
-5. Run build, tests, Clippy and rustfmt on the branch; fix every failure before closing 12.A.
+5. Keep build, tests, Clippy and rustfmt green after each change; complete manual acceptance before closing 12.A.
 
 ## Decisions and open work
 
@@ -86,7 +84,7 @@ remain outside `core`.
 
 ## 12.A follow-up — AppServices routing
 
-- CI run [#44849585900](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44849585900) on `e8a83ee`: root build, tests, Clippy and rustfmt passed. Desktop web checks, Vitest and Playwright passed; desktop Rust build was still running at the time of this update.
+- CI run [#44852188873](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44852188873) on `b5e66e8`: both jobs completed successfully. Root and desktop build, tests, Clippy and formatting checks passed; desktop web checks, Vitest and Playwright passed.
 - Fixed the desktop OpenAI provider call to borrow the configured base URL; commit `e8a83ee`.
 - Routed both human-readable and JSON `analyze` and `scan` commands through `AppServices`, removing their direct CLI calls to the analyzer/scanner. Human output now renders the corresponding serializable app views.
 - Commit: `c394737f` (`refactor(cli): route analyze and scan through app services`).
