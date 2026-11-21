@@ -3,7 +3,7 @@ name = "ummp"
 version = "0.1.0"
 edition = "2021"
 description = "Universal Minecraft Mod Porter — CLI"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 ummp-core = { path = "../core" }

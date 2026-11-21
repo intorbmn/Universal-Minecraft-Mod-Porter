@@ -115,3 +115,6 @@ See [docs/CLI.md](docs/CLI.md).
 Checkpoints go to `<project>.ummp-snapshots/` next to the project unless `--snapshots` is set.
 
 See [ROADMAP.md](docs/ROADMAP.md) for the development plan.
+## License
+
+Apache-2.0 (see [LICENSE](LICENSE) and ADR 0018). UMMP grants no rights to Minecraft, Mojang code, or the mods you port.
