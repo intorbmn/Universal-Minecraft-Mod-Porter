@@ -168,6 +168,7 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     let address = listener.local_addr().unwrap();
     listener.set_nonblocking(true).unwrap();
     let server = std::thread::spawn(move || {
+        for _ in 0..2 {
         let deadline = Instant::now() + Duration::from_secs(5);
         let (mut stream, _) = loop {
             match listener.accept() {
@@ -217,9 +218,9 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         );
         stream.write_all(headers.as_bytes()).unwrap();
         stream.write_all(response).unwrap();
+        }
         true
     });
-
     let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../tests/fixtures/loader/fabric-src");
     let log = dir.path().join("build.log");
@@ -252,10 +253,6 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         .output()
         .unwrap();
 
-    assert!(
-        server.join().unwrap(),
-        "AI provider did not use the saved key"
-    );
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -263,6 +260,47 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     assert!(!stderr.contains("No openai API key"));
     assert!(!stdout.contains("sk-openai-test-0000000000000000"));
     assert!(!stderr.contains("sk-openai-test-0000000000000000"));
+    let mappings = dir.path().join("mappings.json");
+    std::fs::write(&mappings, "[]").unwrap();
+    let assist = Command::new(binary())
+        .args([
+            "--json",
+            "ai-assist",
+            project.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+            "--mappings",
+            mappings.to_str().unwrap(),
+            "--provider",
+            "openai",
+            "--base-url",
+            &base_url,
+            "--snapshots",
+            snapshots.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", dir.path())
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("OPENAI_API_KEY")
+        .output()
+        .unwrap();
+    assert_eq!(assist.status.code(), Some(0), "{}", String::from_utf8_lossy(&assist.stderr));
+    let assist_text = String::from_utf8_lossy(&assist.stdout);
+    assert!(!assist_text.contains("sk-openai-test-0000000000000000"));
+    let assist_envelope: serde_json::Value = serde_json::from_str(&assist_text).unwrap();
+    assert_eq!(assist_envelope["schema"], 1);
+    assert_eq!(assist_envelope["command"], "ai-assist");
+    let assist_golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/ai-assist-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&assist_envelope["result"], &assist_golden);
+
+    assert!(server.join().unwrap(), "AI provider did not receive both requests");
+
     let envelope: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(envelope["schema"], 1);
     assert_eq!(envelope["command"], "ai-debug");
