@@ -10,7 +10,7 @@ use std::sync::Arc;
 use commands::UiError;
 use secrets::{OsKeyring, SecretStore};
 use tauri::{AppHandle, Emitter, Manager, State};
-use ummp_core::app::credentials::{AiKeyStore, FileKeyStore};
+use ummp_core::app::credentials::{default_data_dir, AiKeyStore, FileKeyStore};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
@@ -245,7 +245,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let dir = app.path().app_data_dir()?;
+            let dir = default_data_dir()?;
             let svc = Arc::new(AppServices::open(Settings::new(dir.clone()))?);
             let legacy = Arc::new(OsKeyring);
             let keys = Arc::new(FileKeyStore::in_dir(&dir));
