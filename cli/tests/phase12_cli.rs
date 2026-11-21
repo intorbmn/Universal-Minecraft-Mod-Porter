@@ -185,7 +185,7 @@ fn bash_completion_registers_and_suggests_subcommands() {
     let completion = Command::new("bash")
         .arg("-c")
         .arg(
-            r#"source "$1"; complete -p ummp >/dev/null || exit 10; COMP_WORDS=(ummp ""); COMP_CWORD=1; _ummp; printf '%s\\n' "${COMPREPLY[@]}""#,
+            r#"source "$1"; complete -p ummp >/dev/null || exit 10; COMP_WORDS=(ummp ""); COMP_CWORD=1; _ummp; printf '%s\n' "${COMPREPLY[@]}""#,
         )
         .arg("ummp-completion")
         .arg(&script)
