@@ -768,7 +768,7 @@ const fn command_name(command: &Commands) -> &'static str {
     match command {
         Commands::AiKey { .. } => "ai-key",
         Commands::Completions { .. } => "completions",
-        Commands::Serve { .. } => "serve",
+        Commands::Mcp => "mcp",\n        Commands::Serve { .. } => "serve",
         Commands::Analyze { .. } => "analyze",
         Commands::Migrate { .. } => "migrate",
         Commands::RemapJar { .. } => "remap-jar",
