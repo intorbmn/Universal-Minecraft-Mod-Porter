@@ -143,14 +143,24 @@ pub fn run_with_input(
     input: &[u8],
     max_stdout_bytes: usize,
 ) -> io::Result<(ProcStatus, Vec<u8>)> {
-    use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
 
-    enum ReaderDone { Stdout, Stderr }
+    enum ReaderDone {
+        Stdout,
+        Stderr,
+    }
 
     let mut cmd = Command::new(&spec.program);
-    cmd.args(&spec.args).current_dir(&spec.cwd).env_clear()
+    cmd.args(&spec.args)
+        .current_dir(&spec.cwd)
+        .env_clear()
         .envs(spec.env.iter().map(|(k, v)| (k, v)))
-        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
     let mut child = cmd.spawn()?;
@@ -162,8 +172,12 @@ pub fn run_with_input(
     let stdout_tx = done_tx.clone();
     let stdout_reader = std::thread::spawn(move || {
         let mut bytes = Vec::new();
-        stdout.take(max_stdout_bytes as u64 + 1).read_to_end(&mut bytes)?;
-        if bytes.len() > max_stdout_bytes { stdout_flag.store(true, Ordering::SeqCst); }
+        stdout
+            .take(max_stdout_bytes as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > max_stdout_bytes {
+            stdout_flag.store(true, Ordering::SeqCst);
+        }
         let _ = stdout_tx.send(ReaderDone::Stdout);
         Ok::<_, io::Error>(bytes)
     });
@@ -196,7 +210,9 @@ pub fn run_with_input(
                 exit_status = Some(ProcStatus::Exited(exit.code().unwrap_or(-1)));
             }
         }
-        if exit_status.is_some() && stdout_done && stderr_done { break; }
+        if exit_status.is_some() && stdout_done && stderr_done {
+            break;
+        }
         if Instant::now() >= deadline {
             kill_tree(&mut child);
             timed_out = true;
@@ -209,17 +225,31 @@ pub fn run_with_input(
         }
     }
 
-    let output = stdout_reader.join()
+    let output = stdout_reader
+        .join()
         .map_err(|_| io::Error::other("stdout reader panicked"))??;
-    stderr_reader.join()
+    stderr_reader
+        .join()
         .map_err(|_| io::Error::other("stderr reader panicked"))??;
-    if let Err(error) = writer.join().map_err(|_| io::Error::other("stdin writer panicked"))? {
-        if error.kind() != io::ErrorKind::BrokenPipe { return Err(error); }
+    if let Err(error) = writer
+        .join()
+        .map_err(|_| io::Error::other("stdin writer panicked"))?
+    {
+        if error.kind() != io::ErrorKind::BrokenPipe {
+            return Err(error);
+        }
     }
     if overflow.load(Ordering::SeqCst) || output.len() > max_stdout_bytes {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "child stdout limit exceeded"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "child stdout limit exceeded",
+        ));
     }
-    let status = if timed_out { ProcStatus::TimedOut } else { exit_status.unwrap_or(ProcStatus::TimedOut) };
+    let status = if timed_out {
+        ProcStatus::TimedOut
+    } else {
+        exit_status.unwrap_or(ProcStatus::TimedOut)
+    };
     Ok((status, output))
 }
 
