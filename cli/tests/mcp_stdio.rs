@@ -163,7 +163,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         4,
         "ummp_scan",
-        serde_json::json!({ "path": input }),
+        &serde_json::json!({ "path": input }),
     );
     assert_no_secret(&scan, FAKE_KEY);
 
@@ -204,7 +204,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         7,
         "ummp_port",
-        serde_json::json!({
+        &serde_json::json!({
             "path": input,
             "to": "1.21.1",
             "loader": "fabric",
@@ -262,7 +262,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         12,
         "resources/templates/list",
-        serde_json::json!({}),
+        &serde_json::json!({}),
     );
     assert_eq!(
         templates["result"]["resourceTemplates"][0]["uriTemplate"],
@@ -277,7 +277,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
             &mut stdout,
             13,
             "ummp_job",
-            serde_json::json!({ "id": job_id }),
+            &serde_json::json!({ "id": job_id }),
         );
         assert_no_secret(&status, FAKE_KEY);
         if output.join("UMMP_REPORT.md").is_file() {
