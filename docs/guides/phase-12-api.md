@@ -15,6 +15,38 @@ Status when this guide was written:
   `ui/src-tauri`).
 - Rough history of this phase: `docs/drafts/phase-12-api.md`.
 
+### Status update (after PR 1 = 12.0 + 12.A, PR #14)
+Read this block first. Where it differs from the text below, this block wins.
+- **Done, CI green on both jobs at `d1e21fd`:** 12.0 shared AI key store
+  (`core/src/app/credentials.rs`, `AiKeyStore` trait, `FileKeyStore`, `default_data_dir()`,
+  `UMMP_DATA_DIR`) and 12.A (`cli/src/{args,config,exit,output}.rs`, `docs/CLI.md`,
+  golden JSON in `tests/fixtures/golden/cli/`, 315 root tests). PR 1 is not merged yet.
+  **Do not start 12.B until the user has merged PR 1**; then branch from `master`.
+- **Contracts that 12.B–12.E must reuse, not reinvent:**
+  - Exit codes: 0 ok, 1 general, 2 safety refusal, 3 done with manual items, 4 build
+    failed, 5 invalid input (`cli/src/exit.rs`). REST maps them to HTTP statuses; write
+    the table in the REST ADR (suggested: 2 → 403, 5 → 400, 4 → 200 with a failed job,
+    1 → 500).
+  - JSON envelope `schema: 1` with a result or an error (`cli/src/output.rs`). REST and MCP
+    tool results reuse the same `result` shapes, so one golden file serves all three.
+  - Config precedence: CLI flag > environment > `ummp.toml` > default. `allowed_roots`
+    (new, for 12.B/12.C) becomes a strict TOML field in `cli/src/config.rs`. Unknown
+    fields stay rejected, and key-like fields stay rejected.
+  - All writes go through `AppServices` jobs (`start_port`, `start_migrate_in_place` with
+    `reviewed`, `start_build`, `start_pack`, `rollback`). The server and MCP never call the
+    engine directly, and nothing exposes a stored key.
+- **Sandbox quirks seen in PR 1:**
+  - tokio and axum are not in the workspace yet. Add them only in `server/`.
+  - Some sessions have hooks that block shell commands containing certain words. Write
+    text files with the Write tool, not shell heredocs.
+  - `cdn.playwright.dev` is blocked, so Playwright in the sandbox needs a preinstalled
+    Chromium path; the pinned toolchain cannot be downloaded either
+    (`RUSTUP_TOOLCHAIN=stable`).
+- **Acceptance items from PR 1 still open** (on the user's machine): the key is shared
+  between desktop and CLI, and shell completions work in bash, zsh, fish and PowerShell.
+- **New in this update:** §6–§9 list which design choices are fixed and which the design
+  doc must decide, and §15 is the end-to-end test to run once **after all of Phase 12**.
+
 ---
 
 ## 0. Start-of-phase checklist (tick these in the phase file)
@@ -584,6 +616,27 @@ through the engine (ADR 0005).
 
 ---
 
+## 9a. Decisions for the 12.B–12.E design doc
+
+Write these in a short addendum to `docs/superpowers/specs/2026-11-20-phase12-api-design.md`
+before PR 2, and get the user's approval. Fixed means do not reopen it.
+
+| Topic | Fixed | Decide (and record in the ADR) |
+|---|---|---|
+| Async | axum + tokio live only in `server/`; `core` and `cli` logic stay sync; a test greps `core/Cargo.toml` for tokio | whether `ummp serve` is in `cli` behind a cargo feature or in a separate `ummp-server` binary (the first keeps one install) |
+| REST auth | `127.0.0.1` bind, bearer token file mode 0600, constant-time compare, 1 MiB body limit, CORS off | token rotation command (`ummp serve --rotate-token`) yes/no |
+| Paths | `allowed_roots` from `ummp.toml`, canonicalize then prefix-check, `resolve_within` for joins | default roots: home only (keep), and how Windows drive roots and symlinks are compared |
+| Jobs and SSE | same job and event JSON as the desktop; events ordered per job | how long finished jobs stay queryable (suggest: as long as `jobs.db` keeps them) |
+| OpenAPI | one source of truth | `utoipa` generation, or committed `docs/openapi.json` plus a router-paths test (pick the smaller one) |
+| MCP | stdio only; write tools need `approve` or `confirm`; no tool returns a key | crate placement: `server/` module `mcp` (default, shares the path check) or a new `mcp/` crate; hand-written JSON-RPC or an SDK (check licence and size first) |
+| Action | composite action, builds from source until Phase 13 | cache key and toolchain pin strategy |
+| Plugins | out of process, JSON lines, no file writes, `build::process::run` with timeout and scrubbed env, 8 MiB stdout cap, `resolve_within` on returned paths, no `.jar`/`.class` | plugin discovery folder layout and what `plugins check` prints |
+
+ADR numbers: 0016 REST + async runtime, 0017 MCP, 0018 plugin protocol (next free number
+after the merge of PR 1 is 0016).
+
+---
+
 ## 10. Step-by-step order
 1. **D1:**
    - skill check;
@@ -603,7 +656,8 @@ through the engine (ADR 0005).
    3. Open PR 1 via REST and send the short report.
    4. Wait for the merge.
 5. **B2:** 12.B + 12.C as PR 2. **B3:** 12.D + 12.E as PR 3. Same rules as B1.
-6. After PR 3: write the completion report in the phase file. **Do not start Phase 13.**
+6. After PR 3 is merged: run the final acceptance test in **§15**, record the results in
+   the phase file, and write the completion report. **Do not start Phase 13.**
 
 ## 11. Docs to update (in each PR, for its part)
 - **ADRs:** 0015–0018. Also update `docs/decisions/README.md` and the next ADR number in
@@ -659,3 +713,57 @@ README §7, plus:
       for real once, if the user agreed.
 - [ ] The §11 docs are updated.
 - [ ] A short Vietnamese report after each PR. Nothing is merged without the user.
+- [ ] The §15 final acceptance test has been run on merged `master` and recorded.
+
+---
+
+## 15. Final acceptance test (run once, after all of Phase 12 is merged)
+
+Run it on a fresh clone of `master`, with a fresh data folder (`UMMP_DATA_DIR=<temp>`), and
+the synthetic fixtures only (`DemoWidget`). Record every result, with the command and a
+short output excerpt, in `docs/phase/phase-12-api.md` under "Final acceptance". A line
+without evidence is not a pass. Anything that cannot run in the sandbox (a real desktop, a
+real shell, a real MCP client) is listed for the user with exact steps; it is never marked
+passed on a guess.
+
+### 15.1 Automatic (sandbox)
+1. The four root commands and the desktop checks (`npm ci`, `npm run check`, `npx vitest
+   run`, Playwright, `cargo build/test/clippy/fmt` in `ui/src-tauri`). Record the test counts.
+2. Both CI jobs green on the merge commit.
+3. Every ★ test of 12.0–12.E has a recorded mutation check (break it, see RED, restore).
+   List them in a table: test, mutation, result.
+4. Dependency boundary: `core/Cargo.toml` and `cli/Cargo.toml` contain no tokio or axum
+   (unless the design doc chose the cargo-feature placement; then the default build must
+   still have none).
+5. Key-leak sweep: save a recognisable fake key, run **every** CLI command with `--json`,
+   every REST route, every MCP tool and a plugin call, then search all outputs, logs, job
+   files and `jobs.db` for the key text. Expected: not found, apart from `credentials.json`.
+
+### 15.2 End-to-end flows (sandbox, real processes)
+| # | Flow | Expected |
+|---|---|---|
+| 1 | CLI: `ummp --json analyze`, `scan`, `migrate` (plan), `port`, `rollback` on a fixture | envelope `schema: 1`; exit codes 0/2/3/5 as documented; rollback restores the tree byte for byte |
+| 2 | Config precedence: the same setting by flag, env and `ummp.toml` | flag beats env beats file; a key in the TOML file is rejected |
+| 3 | REST: start `ummp serve` on port 0; call every route with and without the token | 401 without; the SSE events of a port job match the desktop golden events; `migrate` without `reviewed` is refused; a path outside `allowed_roots` is rejected; a body over 1 MiB gives 413 |
+| 4 | REST non-loopback: `--listen 0.0.0.0` without `--i-understand-remote` | refused |
+| 5 | MCP: JSON-RPC over pipes: `initialize`, `tools/list`, `ummp_plan`, `ummp_port approve:false` (writes nothing), `ummp_port approve:true` (writes), `ummp_rollback` without and with `confirm` | as in §7 |
+| 6 | Plugin: the fake plugin renames `DemoWidget` to `DemoGadget` through the engine; then a plugin returning `../../x`; then a hanging plugin; then `ummp_api = 2` | applied and rolled back; rejected; killed at 30 s; refused with a clear message |
+| 7 | Same job through the three surfaces (CLI, REST, MCP) on the same fixture | identical `result` JSON (ignoring ids and timestamps) |
+| 8 | Parallel use: the desktop-style job and a REST job on one data folder | no database lock errors; both finish |
+
+### 15.3 Needs the user's machine (give the exact steps, wait for the answer)
+1. **Key sharing:** save a key in the desktop app, then run `ummp ai-key status` (masked);
+   delete it with the CLI and check that the desktop shows "not set"; repeat in the other
+   direction. Also check that the environment variable wins.
+2. **Completions:** install and try them in real bash, zsh, fish and PowerShell.
+3. **Real MCP client:** `claude mcp add ummp -- ummp mcp`, ask Claude Code to port
+   `demo-fabric-mod`, and keep a summary of the transcript (only with the user's consent).
+4. **GitHub Action:** one real run from `intorbmn/ummp-build-sandbox` on a `push`
+   workflow; record the run id and the step summary.
+5. **Windows:** `ummp --json analyze` and `ummp serve` on Windows (paths with drive
+   letters, `allowed_roots`, the token file); the desktop installer still starts.
+
+### 15.4 Report
+End with a table of every §14 box and every §15 line: PASS / FAIL / NOT RUN (with who must
+run it). Fix failures in a new small PR (one fix, one test that failed first). Send the user
+a very short Vietnamese report. Do not merge, and do not start Phase 13.
