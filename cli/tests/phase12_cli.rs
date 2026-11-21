@@ -9,6 +9,19 @@ fn ummp(args: &[&str]) -> Output {
         .expect("run ummp")
 }
 
+fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
 fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
     match (actual, expected) {
         (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
@@ -437,6 +450,116 @@ fn build_json_missing_project_uses_invalid_input_envelope() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["error"]["kind"], "invalid_input");
+}
+
+#[test]
+fn port_json_matches_golden_report_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/loader/fabric-src");
+    let output_dir = dir.path().join("ported");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "port",
+            source.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "neoforge",
+            "--output",
+            output_dir.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "port");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/port-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
+}
+
+#[test]
+fn rollback_json_matches_golden_result_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/loader/fabric-src");
+    let project = dir.path().join("project");
+    copy_tree(&source, &project);
+    let mappings = dir.path().join("mappings.json");
+    let snapshots = dir.path().join("snapshots");
+    std::fs::write(&mappings, "[]").unwrap();
+
+    let migrate = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "migrate",
+            project.to_str().unwrap(),
+            "--from",
+            "1.21.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "neoforge",
+            "--mappings",
+            mappings.to_str().unwrap(),
+            "--apply",
+            "--snapshots",
+            snapshots.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        migrate.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&migrate.stdout),
+        String::from_utf8_lossy(&migrate.stderr)
+    );
+
+    let rollback = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "rollback",
+            project.to_str().unwrap(),
+            "--snapshots",
+            snapshots.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        rollback.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&rollback.stdout),
+        String::from_utf8_lossy(&rollback.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&rollback.stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "rollback");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/rollback-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
+    assert_eq!(envelope["result"]["restored"], true);
 }
 
 #[test]
