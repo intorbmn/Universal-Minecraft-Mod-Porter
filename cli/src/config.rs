@@ -132,7 +132,7 @@ pub fn data_dir() -> PathBuf {
 }
 
 fn default_data_dir() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("UMMP_DATA_DIR") {
+    if let Some(path) = std::env::var_os("UMMP_DATA_DIR").filter(|path| !path.is_empty()) {
         return Some(PathBuf::from(path));
     }
 
