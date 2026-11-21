@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Desktop AI assist tab: the AI provider (Anthropic / OpenAI-compatible) can be switched on the tab itself; the choice is saved to settings before the key form changes, and a failed save keeps the previous provider.
+
 ### Added
 - Phase 12.B (in progress): local Axum REST API scaffold, `ummp serve`, localhost binding, bearer-token authentication, allowed-root path validation, job SSE, OpenAPI contract and request-size limits.
 - Phase 12.0: shared interim file-backed AI credentials for desktop and CLI, environment-first provider resolution, one-time migration of legacy AI keys from the OS keyring, masked credential management in the AI screen/Settings, and `ummp ai-key set|status|delete`.
