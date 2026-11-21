@@ -353,7 +353,12 @@ impl AppServices {
             from,
             source_loader,
             target_loader,
-        } = resolve_plan(plan_kb_path(&self.settings(), req), req.mappings.clone(), &project, req)?;
+        } = resolve_plan(
+            plan_kb_path(&self.settings(), req),
+            req.mappings.clone(),
+            &project,
+            req,
+        )?;
         let set = MigrationEngine::default().compute_edits(&plan, &project)?;
         let attention: Vec<String> = set
             .technologies
@@ -448,7 +453,10 @@ fn resolve_plan(
         .analyze(&project.root, &fs)
         .map_err(input_err)?;
     let first = report.mods.first();
-    let source_loader = req.source_loader.as_deref().map(str::to_ascii_lowercase)
+    let source_loader = req
+        .source_loader
+        .as_deref()
+        .map(str::to_ascii_lowercase)
         .or_else(|| first.and_then(|m| loader_label(&m.metadata.loader).map(str::to_owned)));
     let from = match (&req.from, first) {
         (Some(f), _) => f.clone(),
@@ -485,11 +493,14 @@ fn resolve_plan(
     })
 }
 
-
 /// Selects request-level KB overrides before the saved application setting.
 fn plan_kb_path(settings: &Settings, req: &PlanRequest) -> Option<PathBuf> {
     req.kb.clone().or_else(|| {
-        if req.mappings.is_none() { settings.kb_path.clone() } else { None }
+        if req.mappings.is_none() {
+            settings.kb_path.clone()
+        } else {
+            None
+        }
     })
 }
 

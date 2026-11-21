@@ -11,8 +11,7 @@ use super::snapshots::{default_snapshots, load_store, save_store};
 use super::views::JobApproval;
 use super::{
     check_input, input_err, plan_kb_path, resolve_plan, slash, AppError, AppServices, InputKind,
-    PlanRequest,
-    EVENT_JOB_APPROVAL,
+    PlanRequest, EVENT_JOB_APPROVAL,
 };
 use crate::ai::orchestrator::{ApplyTarget, Orchestrator};
 use crate::ai::{AiConfig, AiProvider, ApprovalGate, AuditLog};

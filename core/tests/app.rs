@@ -207,7 +207,6 @@ fn plan_req(input: PathBuf) -> PlanRequest {
     }
 }
 
-
 #[test]
 fn plan_uses_request_level_mappings_override() {
     let d = tempdir().unwrap();

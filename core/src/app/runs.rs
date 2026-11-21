@@ -258,7 +258,11 @@ impl AppServices {
                 .map(|root| root.join(default_pack_name(&req)))
         });
         let kb_path = req.kb.clone().or_else(|| {
-            if req.mappings.is_none() { settings.kb_path } else { None }
+            if req.mappings.is_none() {
+                settings.kb_path
+            } else {
+                None
+            }
         });
         let mappings = req.mappings.clone();
         self.start_job("pack", move |ctx| {

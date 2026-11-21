@@ -260,7 +260,19 @@ fn migrate_json_missing_input_uses_invalid_input_envelope() {
     let mappings = dir.path().join("mappings.json");
     std::fs::write(&mappings, "[]").unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
-        .args(["--json", "migrate", missing.to_str().unwrap(), "--from", "1.20.1", "--to", "1.21.1", "--loader", "neoforge", "--mappings", mappings.to_str().unwrap()])
+        .args([
+            "--json",
+            "migrate",
+            missing.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "neoforge",
+            "--mappings",
+            mappings.to_str().unwrap(),
+        ])
         .env("UMMP_DATA_DIR", data.path())
         .output().unwrap();
     assert_eq!(output.status.code(), Some(5), "{}", String::from_utf8_lossy(&output.stderr));

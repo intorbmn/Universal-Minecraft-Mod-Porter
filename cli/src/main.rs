@@ -715,7 +715,11 @@ fn plan_markdown(plan: &ummp_core::app::views::PlanView) -> String {
         let _ = writeln!(out, "\nWarning: {warning}");
     }
     for skipped in &plan.skipped {
-        let _ = writeln!(out, "\nSkipped: {} ({})", skipped.description, skipped.reason);
+        let _ = writeln!(
+            out,
+            "\nSkipped: {} ({})",
+            skipped.description, skipped.reason
+        );
     }
     out
 }
@@ -852,7 +856,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 mappings,
                 snapshots,
             };
-            let plan = services.plan(&request).map_err(|error| map_app_error(&error))?;
+            let plan = services
+                .plan(&request)
+                .map_err(|error| map_app_error(&error))?;
             let markdown = plan_markdown(&plan);
             if apply && !json_mode {
                 print!("{markdown}");
@@ -877,8 +883,12 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             if json_mode {
                 output::set_result(result);
             } else if apply {
-                println!("\nMigration completed. Checkpoint: {}",
-                    result["migration"]["checkpoint"].as_str().unwrap_or("created"));
+                println!(
+                    "\nMigration completed. Checkpoint: {}",
+                    result["migration"]["checkpoint"]
+                        .as_str()
+                        .unwrap_or("created")
+                );
             } else {
                 print!("{markdown}");
                 if !plan.files.is_empty() {
