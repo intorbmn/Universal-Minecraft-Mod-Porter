@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, master, phase-11-ui, phase-12-api, phase-12b-rest, phase-12c-mcp, phase-12d-action]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, phase-13a-b-performance-cache]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -116,3 +116,20 @@ jobs:
         working-directory: ui/src-tauri
       - run: cargo fmt --check
         working-directory: ui/src-tauri
+
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install && rustc -V
+      - name: Resolve complete workspace lockfile
+        run: cargo generate-lockfile
+      - name: Install Rust security tools
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
+      - name: Audit RustSec advisories
+        run: cargo audit
+      - name: Check dependency policy
+        run: cargo deny check
