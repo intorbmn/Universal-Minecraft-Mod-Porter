@@ -104,3 +104,18 @@ remain outside `core`.
 - Added an integration test for `adapters --json`: validates the versioned envelope, stable result keys, and typed adapter entries.
 - CI run for the test commit is required before treating it as verified.
 - `remap-jar`, `adapters`, and `rollback` now expose structured JSON results; updated `docs/CLI.md` to state exactly which commands have command-specific JSON results.
+
+
+## 12.A AppServices command routing
+
+- Confirmed CI run #252 on commit `0ed95d1`: both `build-test-lint` and `desktop` passed.
+- Routed CLI `port` and `build` through `AppServices` jobs. The CLI polls the job view,
+  forwards log lines, and returns the job's structured result in JSON mode.
+- Preserved local build risk confirmation (Medium requires confirmation; High requires
+  `--i-accept-risk`) and the existing custom build report path.
+- Extended `PortRequest` with optional KB/mapping overrides so CLI flags are not dropped
+  by the application boundary.
+- Routed `rollback` through `AppServices`, including the CLI's custom snapshot directory.
+- Added CLI JSON failure-contract tests for invalid `port`, `build`, and `rollback` inputs.
+- Verification pending: the CI run for this routing change must pass before these changes
+  are treated as complete.

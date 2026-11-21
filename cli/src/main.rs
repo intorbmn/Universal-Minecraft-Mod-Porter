@@ -15,21 +15,20 @@ use std::process::Command;
 use std::process::Stdio;
 use std::sync::Arc;
 use ummp_ai_providers::{AnthropicProvider, OpenAiCompatibleProvider};
-use ummp_core::adapter::{AdapterRegistry, Handling};
+use ummp_core::adapter::AdapterRegistry;
 use ummp_core::ai::orchestrator::{AiSessionReport, ApplyTarget, Orchestrator};
 use ummp_core::ai::{AiConfig, AiProvider, ApprovalGate, ApproveReviewed, AuditLog, DenyAll};
 use ummp_core::analyzer::AnalyzerEngine;
+use ummp_core::app::{AppServices, BuildJobRequest, PortRequest};
 use ummp_core::app::credentials::{
     default_data_dir, resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore,
 };
 use ummp_core::app::helpers::{
-    detected_loader, mod_identity, open_kb, pack_format, risk_decision, side, NoIndex, RiskDecision,
+    detected_loader, open_kb, pack_format, side, NoIndex,
 };
 use ummp_core::app::snapshots::{default_snapshots, load_store, save_store};
-use ummp_core::build::github::GithubBackend;
-use ummp_core::build::local::{default_workdir, LocalBackend};
-use ummp_core::build::report::{score, to_markdown};
-use ummp_core::build::{BuildBackend, BuildRequest, Stage};
+use ummp_core::jobs::JobState;
+use ummp_core::build::local::default_workdir;
 use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
@@ -39,9 +38,7 @@ use ummp_core::modpack::graph::PackGraph;
 use ummp_core::modpack::plan::Side;
 use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
 use ummp_core::modpack::{import_with, ImportOptions};
-use ummp_core::port::{port, PortOptions};
 use ummp_core::project::{DefaultProjectManager, ProjectManager};
-use ummp_core::scan::{scan_path, Severity};
 use uuid::Uuid;
 
 macro_rules! println {
@@ -230,22 +227,67 @@ fn ai_config(args: &AiArgs) -> Result<AiConfig, Box<dyn std::error::Error>> {
     })
 }
 
-/// Local builds run mod code on this machine: High risk needs `--i-accept-risk`, Medium
-/// needs `--yes` or a y/N answer. GitHub builds run on a disposable runner and only warn.
-fn check_risk(
-    risk: Option<Severity>,
-    local: bool,
-    accept: bool,
-    yes: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match risk_decision(risk, local, accept, yes) {
-        RiskDecision::Allow => Ok(()),
-        RiskDecision::AllowWithWarning => {
-            println!("Warning: risk indicators found; building on a disposable GitHub runner.");
-            Ok(())
+/// Runs an application job to completion, forwarding its log to the CLI stream.
+fn wait_for_job(
+    services: &AppServices,
+    id: Uuid,
+    failure_code: ExitCode,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let mut logged = 0;
+    loop {
+        let job = services.job(id).map_err(|error| map_app_error(&error))?;
+        for line in job.log.iter().skip(logged) {
+            println!("{line}");
         }
-        RiskDecision::Refuse(why) => Err(CliFailure::new(ExitCode::Refused, why).into()),
-        RiskDecision::Confirm => {
+        logged = job.log.len();
+        match job.state {
+            JobState::Succeeded => {
+                return Ok(job.result.unwrap_or_else(|| serde_json::json!({})));
+            }
+            JobState::Failed | JobState::TimedOut => {
+                return Err(CliFailure::new(
+                    failure_code,
+                    job.error.unwrap_or_else(|| "application job failed".into()),
+                )
+                .into());
+            }
+            JobState::Cancelled | JobState::Skipped => {
+                return Err(CliFailure::new(
+                    ExitCode::Error,
+                    "application job did not complete",
+                )
+                .into());
+            }
+            JobState::Pending | JobState::Running => {
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
+        }
+    }
+}
+
+/// Starts a build through AppServices, preserving the local-build risk confirmation.
+fn run_app_build(
+    path: &Path,
+    args: BuildArgs,
+    config: &CliConfig,
+) -> Result<(bool, serde_json::Value), Box<dyn std::error::Error>> {
+    let BuildArgs {
+        local,
+        repo,
+        workdir,
+        stages,
+        timeout,
+        java,
+        i_accept_risk,
+        yes,
+        report,
+    } = args;
+    let services = app_services(config)?;
+    let mut confirm_medium = yes || i_accept_risk;
+
+    if local && !confirm_medium {
+        let scan = services.scan(path).map_err(|error| map_app_error(&error))?;
+        if scan.level == Some(ummp_core::app::views::RiskLevel::Medium) {
             if !std::io::stdin().is_terminal() {
                 return Err(CliFailure::new(
                     ExitCode::InvalidInput,
@@ -257,95 +299,36 @@ fn check_risk(
             std::io::stdout().flush()?;
             let mut line = String::new();
             std::io::stdin().lock().read_line(&mut line)?;
-            if line.trim().eq_ignore_ascii_case("y") {
-                Ok(())
-            } else {
-                Err(CliFailure::new(ExitCode::Refused, "build cancelled").into())
+            if !line.trim().eq_ignore_ascii_case("y") {
+                return Err(CliFailure::new(ExitCode::Refused, "build cancelled").into());
             }
+            confirm_medium = true;
         }
     }
-}
 
-/// Runs `ummp build`; `Ok(true)` when every stage that ran passed.
-fn run_build(
-    path: &Path,
-    a: BuildArgs,
-    config: &CliConfig,
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let BuildArgs {
-        local,
-        repo,
-        workdir,
-        stages,
-        timeout,
-        java,
-        i_accept_risk,
-        yes,
-        report,
-    } = a;
-    let path = path.to_path_buf();
-    if !path.is_dir() {
-        return Err(CliFailure::new(
-            ExitCode::InvalidInput,
-            "JAR-only mods can only be scanned (`ummp scan`); `build` needs the source project",
-        )
-        .into());
-    }
-    let scan = scan_path(&path)?;
-    print!("{}", scan.to_text());
-    check_risk(scan.risk(), local, i_accept_risk, yes)?;
-    let stages = stages
-        .iter()
-        .map(|s| match s.trim() {
-            "build" => Ok(Stage::Build),
-            "test" => Ok(Stage::Test),
-            "server" => Ok(Stage::Server),
-            other => Err(CliFailure::new(
-                ExitCode::InvalidInput,
-                format!("unknown stage `{other}` (use build, test, server)"),
-            )),
+    let id = services
+        .start_build(BuildJobRequest {
+            path: path.to_path_buf(),
+            local,
+            repo: config.sandbox_repo(repo),
+            stages,
+            timeout_secs: timeout,
+            java,
+            workdir: Some(workdir.unwrap_or_else(default_workdir)),
+            accept_high_risk: i_accept_risk,
+            confirm_medium,
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    let (mod_name, detected_java) = mod_identity(&path);
-    let req = BuildRequest {
-        project: path,
-        mod_name,
-        stages,
-        java: java.or(detected_java),
-        timeout: std::time::Duration::from_secs(timeout),
-    };
-    let workdir = workdir.unwrap_or_else(default_workdir);
-    let outcome = if local {
-        LocalBackend {
-            workdir,
-            gradle: None,
-        }
-        .run(&req)
-        .map_err(|error| CliFailure::new(ExitCode::BuildFailed, error.to_string()))?
-    } else {
-        let repo = config
-            .sandbox_repo(repo)
-            .unwrap_or_else(|| "intorbmn/ummp-build-sandbox".into());
-        println!("Building on GitHub Actions in {repo} (this takes a few minutes)...");
-        GithubBackend {
-            repo,
-            gh: "gh".into(),
-            git: "git".into(),
-            poll: std::time::Duration::from_secs(15),
-            workdir,
-            token: None,
-        }
-        .run(&req)
-        .map_err(|error| CliFailure::new(ExitCode::BuildFailed, error.to_string()))?
-    };
-    let md = to_markdown(&outcome, &scan);
-    std::fs::write(outcome.workdir.join("ummp-report.md"), &md)?;
-    if let Some(p) = report {
-        std::fs::write(p, &md)?;
+        .map_err(|error| map_app_error(&error))?;
+    let result = wait_for_job(&services, id, ExitCode::BuildFailed)?;
+
+    if let (Some(path), Some(markdown)) = (report, result["report"].as_str()) {
+        std::fs::write(path, markdown)?;
     }
-    println!("\n{md}");
-    let (passed, run) = score(&outcome);
-    Ok(passed == run)
+    let passed = result["passed"].as_bool().unwrap_or(false);
+    if let Some(markdown) = result["report"].as_str() {
+        println!("{markdown}");
+    }
+    Ok((passed, result))
 }
 
 fn main() {
@@ -1049,8 +1032,12 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         }
 
         Commands::Build { path, opts } => {
-            if !run_build(&path, opts, &config)? {
+            let (passed, result) = run_app_build(&path, opts, &config)?;
+            if !passed {
                 exit_code = ExitCode::BuildFailed.value();
+            }
+            if json_mode {
+                output::set_result(result);
             }
         }
 
@@ -1067,42 +1054,47 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             build,
             build_opts,
         } => {
-            let output = config.output_dir(output);
-            let kb = if kb.is_none() && mappings.is_none() && config.kb.is_none() {
-                println!("No knowledge base given: structural migration only (descriptors, build files, loader conversion).");
-                KnowledgeBase::open(Path::new(":memory:"))?
-            } else {
-                open_configured_kb(kb, mappings, &config)?
-            };
-            let result = port(
-                &PortOptions {
+            let services = app_services(&config)?;
+            let id = services
+                .start_port(PortRequest {
                     input,
-                    output,
+                    output: config.output_dir(output),
                     to,
-                    loader,
                     from,
+                    loader,
                     zip,
                     min_confidence,
-                },
-                &kb,
-            )?;
-            let r = &result.report;
-            let count = |h: Handling| r.technologies.iter().filter(|f| f.handling == h).count();
-            println!("Ported source: {}", result.output.display());
-            if let Some(z) = &result.zip {
-                println!("Zip: {}", z.display());
+                    kb,
+                    mappings,
+                })
+                .map_err(|error| map_app_error(&error))?;
+            let port_result = wait_for_job(&services, id, ExitCode::Error)?;
+            println!(
+                "Ported source: {}",
+                port_result["output"].as_str().unwrap_or("?")
+            );
+            if let Some(zip) = port_result["zip"].as_str() {
+                println!("Zip: {zip}");
             }
             println!(
-                "Changed or new files: {}, deleted: {}; findings: {} auto, {} assisted, {} manual",
-                r.changes.len(),
-                r.deletes.len(),
-                count(Handling::Auto),
-                count(Handling::Assisted),
-                count(Handling::Manual)
+                "Report: {}/UMMP_REPORT.md",
+                port_result["output"].as_str().unwrap_or("?")
             );
-            println!("Report: {}", result.output.join("UMMP_REPORT.md").display());
-            if build && !run_build(&result.output, build_opts, &config)? {
-                exit_code = ExitCode::BuildFailed.value();
+
+            let result = if build {
+                let output = PathBuf::from(port_result["output"].as_str().ok_or_else(|| {
+                    CliFailure::new(ExitCode::Error, "port job returned no output path")
+                })?);
+                let (passed, build_result) = run_app_build(&output, build_opts, &config)?;
+                if !passed {
+                    exit_code = ExitCode::BuildFailed.value();
+                }
+                serde_json::json!({ "port": port_result, "build": build_result })
+            } else {
+                port_result
+            };
+            if json_mode {
+                output::set_result(result);
             }
         }
 
@@ -1131,33 +1123,19 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             snapshots,
             checkpoint,
         } => {
-            let project = pm.open(&path)?;
-            let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
-            let store = load_store(&snap_dir)?;
-            let id = match checkpoint {
-                Some(id) => id,
-                None => {
-                    store
-                        .latest()
-                        .ok_or_else(|| {
-                            CliFailure::new(
-                                ExitCode::InvalidInput,
-                                "no checkpoints found in the snapshot directory",
-                            )
-                        })?
-                        .id
-                }
-            };
-            store.restore(id, &project.root)?;
+            let services = app_services(&config)?;
+            let id = services
+                .rollback_with_snapshots(&path, checkpoint, snapshots.as_deref())
+                .map_err(|error| map_app_error(&error))?;
             let result = serde_json::json!({
                 "restored": true,
-                "project": project.root,
+                "project": path,
                 "checkpoint": id,
             });
             if json_mode {
                 output::set_result(result);
             } else {
-                println!("Restored {} to checkpoint {id}", project.root.display());
+                println!("Restored {} to checkpoint {id}", path.display());
             }
         }
     }

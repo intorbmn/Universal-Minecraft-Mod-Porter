@@ -197,3 +197,55 @@ fn adapters_json_has_stable_versioned_result() {
         assert!(adapter["level"].is_string());
     }
 }
+
+
+#[test]
+fn port_json_missing_input_uses_invalid_input_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing-mod");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "port", missing.to_str().unwrap(), "--to", "1.21.1"])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(5));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "port");
+    assert_eq!(value["error"]["kind"], "invalid_input");
+}
+
+#[test]
+fn rollback_json_missing_project_uses_invalid_input_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing-project");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "rollback", missing.to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(5));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "rollback");
+    assert_eq!(value["error"]["kind"], "invalid_input");
+}
+
+#[test]
+fn build_json_missing_project_uses_invalid_input_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing-project");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "build", missing.to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(5));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "build");
+    assert_eq!(value["error"]["kind"], "invalid_input");
+}

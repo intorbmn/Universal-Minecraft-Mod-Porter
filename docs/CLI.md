@@ -71,8 +71,10 @@ ummp analyze ./my-mod --json
 ```
 
 `analyze` and `scan` return their application `*View` result objects. `adapters`,
-`remap-jar`, and `rollback` also return structured command-specific results. Remaining
-commands are still being migrated and may return an envelope containing only `exit_code`. Errors use:
+`remap-jar`, `port`, `build`, and `rollback` return structured command-specific results.
+Long-running `port` and `build` operations run as `AppServices` jobs; their logs go to stderr
+in JSON mode. Remaining commands are still being migrated and may return an envelope
+containing only `exit_code`.
 
 ```json
 {"schema":1,"error":{"kind":"invalid_input","message":"..."}}

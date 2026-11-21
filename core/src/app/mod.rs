@@ -152,6 +152,11 @@ pub struct PortRequest {
     pub loader: Option<String>,
     pub zip: bool,
     pub min_confidence: f64,
+    /// Optional command-level overrides for the configured knowledge base.
+    #[serde(default)]
+    pub kb: Option<PathBuf>,
+    #[serde(default)]
+    pub mappings: Option<PathBuf>,
 }
 
 pub use runs::{BuildJobRequest, PackRequest};
@@ -556,10 +561,17 @@ impl AppServices {
                 output.display()
             )));
         }
-        let kb_path = settings.kb_path;
+        let kb_path = req.kb.clone().or_else(|| {
+            if req.mappings.is_none() {
+                settings.kb_path
+            } else {
+                None
+            }
+        });
+        let mappings = req.mappings.clone();
         self.start_job("port", move |ctx| {
             ctx.step("validate", 1, 3)?;
-            let kb = open_kb(kb_path, None)?;
+            let kb = open_kb(kb_path, mappings)?;
             ctx.step("porting", 2, 3)?;
             let result = port(
                 &PortOptions {
@@ -648,18 +660,33 @@ impl AppServices {
     /// Returns [`AppError::Input`] when the project cannot be opened or has no checkpoint,
     /// and [`AppError::Checkpoint`] when the restore itself fails.
     pub fn rollback(&self, project: &Path, checkpoint: Option<Uuid>) -> Result<(), AppError> {
+        self.rollback_with_snapshots(project, checkpoint, None).map(|_| ())
+    }
+
+    /// Restores a checkpoint from the supplied snapshot directory, or the project default.
+    ///
+    /// # Errors
+    /// Returns [`AppError::Input`] when the project or checkpoint is missing, and
+    /// [`AppError::Checkpoint`] when the restore itself fails.
+    pub fn rollback_with_snapshots(
+        &self,
+        project: &Path,
+        checkpoint: Option<Uuid>,
+        snapshots: Option<&Path>,
+    ) -> Result<Uuid, AppError> {
         let project = DefaultProjectManager.open(project).map_err(input_err)?;
-        let store = load_store(&default_snapshots(&project.root))?;
+        let snap_dir = snapshots
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| default_snapshots(&project.root));
+        let store = load_store(&snap_dir)?;
         let id = match checkpoint {
             Some(id) => id,
-            None => {
-                store
-                    .latest()
-                    .ok_or_else(|| AppError::Input("no checkpoints found for this project".into()))?
-                    .id
-            }
+            None => store
+                .latest()
+                .ok_or_else(|| AppError::Input("no checkpoints found for this project".into()))?
+                .id,
         };
         store.restore(id, &project.root)?;
-        Ok(())
+        Ok(id)
     }
 }

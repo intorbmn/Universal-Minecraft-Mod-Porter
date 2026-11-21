@@ -375,6 +375,8 @@ fn port_req(input: PathBuf, output: PathBuf) -> PortRequest {
         loader: Some("neoforge".into()),
         zip: false,
         min_confidence: 0.8,
+        kb: None,
+        mappings: None,
     }
 }
 
