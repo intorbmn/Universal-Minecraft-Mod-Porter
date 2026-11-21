@@ -521,7 +521,7 @@ mod tests {
     fn oversized_credentials_are_rejected_before_deserialization() {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
-        fs::write(store.path(), vec![b'x'; MAX_CREDENTIALS_BYTES as usize + 1]).unwrap();
+        fs::write(store.path(), vec![b'x'; 16 * 1024 + 1]).unwrap();
         let error = store.get(AiProviderKind::Anthropic).unwrap_err().to_string();
         assert!(error.contains("exceeds the supported size limit"));
     }
