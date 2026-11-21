@@ -289,8 +289,7 @@ pub fn validate_openai_base_url(value: Option<&str>) -> Result<Option<String>, A
             || url.chars().any(char::is_control)
     }) {
         return Err(AppError::Input(
-            "OpenAI base URL must use http:// or https:// and contain no control characters"
-                .into(),
+            "OpenAI base URL must use http:// or https:// and contain no control characters".into(),
         ));
     }
     Ok(value.map(str::to_owned))
