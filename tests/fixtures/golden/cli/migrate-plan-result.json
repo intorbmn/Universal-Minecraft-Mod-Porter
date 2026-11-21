@@ -19,7 +19,15 @@
     }
   ],
   "deletes": [""],
-  "technologies": [""],
+  "technologies": [
+    {
+      "tech": "",
+      "handling": "auto",
+      "file": "",
+      "line": null,
+      "message": ""
+    }
+  ],
   "skipped": [
     {
       "description": "",
