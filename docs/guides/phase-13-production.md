@@ -6,7 +6,8 @@ Read [README.md](README.md) first. Rough history: `docs/drafts/phase-13-producti
 Read this block first; it wins where the text below differs.
 - **Starting point:** `master` after PR #21. Phase 12 is COMPLETED (REST, MCP, GitHub Action,
   out-of-process plugins). The next ADR number is **0020** (0018 = Apache-2.0 license,
-  0019 = plugin protocol). Do not start until the user says so.
+  0019 = plugin protocol). The user approved Phase 13 and the 13A–13B implementation plan on
+  2026-11-22; work is isolated on `phase-13a-b-performance-cache`.
 - **Already decided** (§1a): prebuilt `ummp` CLI on GitHub Releases so MCP users need no
   Rust. The repo is Apache-2.0 (ADR 0018); release archives must include `LICENSE`.
 - **Inputs from the Phase 12 work that this phase must handle:**
