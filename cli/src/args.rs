@@ -137,7 +137,10 @@ pub enum Commands {
     /// Start the local MCP server over stdio for an MCP-compatible assistant.
     Mcp,
     /// List and validate out-of-process plugins.
-    Plugins { #[command(subcommand)] cmd: PluginsCmd },
+    Plugins {
+        #[command(subcommand)]
+        cmd: PluginsCmd,
+    },
     /// Detect loader, Minecraft/Java versions, dependencies and build system.
     Analyze {
         /// Project root path (source tree or a folder of JARs).

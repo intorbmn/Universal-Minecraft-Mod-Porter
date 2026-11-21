@@ -37,8 +37,8 @@ use ummp_core::modpack::graph::PackGraph;
 use ummp_core::modpack::plan::{ModIndex, Side};
 use ummp_core::modpack::run::{migrate_pack, parse_loader, MigrateOptions};
 use ummp_core::modpack::{import_with, ImportOptions};
-use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use ummp_core::plugins::PluginManager;
+use ummp_core::project::{DefaultProjectManager, ProjectManager};
 use uuid::Uuid;
 
 macro_rules! println {
@@ -828,7 +828,10 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                         println!("No plugins installed.");
                     } else {
                         for plugin in plugins {
-                            println!("{} {} ({:?}, API {})", plugin.name, plugin.version, plugin.kind, plugin.ummp_api);
+                            println!(
+                                "{} {} ({:?}, API {})",
+                                plugin.name, plugin.version, plugin.kind, plugin.ummp_api
+                            );
                         }
                     }
                 }
@@ -837,7 +840,10 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                     if json_mode {
                         output::set_result(serde_json::json!({"valid": true, "plugin": plugin}));
                     } else {
-                        println!("Plugin {} {}: OK (API {})", plugin.name, plugin.version, plugin.ummp_api);
+                        println!(
+                            "Plugin {} {}: OK (API {})",
+                            plugin.name, plugin.version, plugin.ummp_api
+                        );
                     }
                 }
             }
