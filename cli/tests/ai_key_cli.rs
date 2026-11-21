@@ -161,7 +161,9 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
             return false;
         }
         stream
-            .write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .write_all(
+                b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            )
             .unwrap();
         true
     });
