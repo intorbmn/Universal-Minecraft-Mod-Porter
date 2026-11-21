@@ -19,9 +19,7 @@ pub trait SecretStore: Send + Sync {
 }
 
 fn validate_name(name: &str, legacy_read: bool) -> Result<(), String> {
-    if SECRET_NAMES.contains(&name)
-        || (legacy_read && LEGACY_AI_SECRET_NAMES.contains(&name))
-    {
+    if SECRET_NAMES.contains(&name) || (legacy_read && LEGACY_AI_SECRET_NAMES.contains(&name)) {
         Ok(())
     } else {
         Err("unknown credential name".into())
@@ -75,7 +73,10 @@ pub struct MemorySecretStore(Mutex<HashMap<String, String>>);
 impl MemorySecretStore {
     pub fn set_legacy(&self, name: &str, value: &str) {
         assert!(LEGACY_AI_SECRET_NAMES.contains(&name));
-        self.0.lock().unwrap().insert(name.to_owned(), value.to_owned());
+        self.0
+            .lock()
+            .unwrap()
+            .insert(name.to_owned(), value.to_owned());
     }
 }
 
