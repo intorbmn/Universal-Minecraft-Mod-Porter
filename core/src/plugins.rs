@@ -332,7 +332,13 @@ fn sensitive(path: &Path) -> bool {
                 .iter()
                 .any(|word| part.contains(word))
                 && [
-                    ".json", ".yaml", ".yml", ".toml", ".properties", ".txt", ".conf",
+                    ".json",
+                    ".yaml",
+                    ".yml",
+                    ".toml",
+                    ".properties",
+                    ".txt",
+                    ".conf",
                 ]
                 .iter()
                 .any(|suffix| part.ends_with(suffix));
