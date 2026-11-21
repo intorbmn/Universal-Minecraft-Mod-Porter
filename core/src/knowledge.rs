@@ -1074,6 +1074,27 @@ mod tests {
     }
 
     #[test]
+    fn cache_table_is_added_to_existing_knowledge_database() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("existing.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(SCHEMA).unwrap();
+        }
+        let kb = KnowledgeBase::open(&path).unwrap();
+        let count: i64 = kb
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master
+                 WHERE type = 'table' AND name = 'analysis_cache'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
     fn test_schema_and_open() {
         let (_kb_dir, kb) = setup_kb();
         // tables exist
