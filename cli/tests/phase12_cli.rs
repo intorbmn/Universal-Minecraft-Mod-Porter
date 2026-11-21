@@ -494,6 +494,72 @@ fn port_json_matches_golden_report_shape() {
 }
 
 #[test]
+fn remap_jar_json_matches_golden_result_shape() {
+    use std::io::Write;
+    use ummp_core::knowledge::{KnowledgeBase, Mapping};
+
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let kb_path = dir.path().join("mappings.db");
+    let kb = KnowledgeBase::open(&kb_path).unwrap();
+    kb.insert_mapping(&Mapping {
+        version: "1.17".into(),
+        loader: "forge".into(),
+        from_api: "example.old.Widget".into(),
+        to_api: "example.new.Widget".into(),
+        kind: "move".into(),
+        source: "phase12-test".into(),
+        confidence: 0.99,
+    })
+    .unwrap();
+    drop(kb);
+
+    let input = dir.path().join("input.jar");
+    let mut archive = zip::ZipWriter::new(std::fs::File::create(&input).unwrap());
+    archive
+        .start_file("META-INF/MANIFEST.MF", zip::write::FileOptions::default())
+        .unwrap();
+    archive.write_all(b"Manifest-Version: 1.0\n\n").unwrap();
+    archive.finish().unwrap();
+    let output_path = dir.path().join("output.jar");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "remap-jar",
+            input.to_str().unwrap(),
+            output_path.to_str().unwrap(),
+            "--from",
+            "1.16.5",
+            "--to",
+            "1.17.1",
+            "--loader",
+            "forge",
+            "--kb",
+            kb_path.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output_path.is_file());
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "remap-jar");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/remap-jar-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
+}
+
+#[test]
 fn rollback_json_matches_golden_result_shape() {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
