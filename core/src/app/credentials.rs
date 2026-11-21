@@ -450,8 +450,18 @@ mod tests {
         }
 
         let store = FileKeyStore::in_dir(dir.path());
-        assert_eq!(store.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(), ANTHROPIC);
-        assert_eq!(store.get(AiProviderKind::Openai).unwrap().unwrap().expose(), OPENAI);
+        assert_eq!(
+            store
+                .get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
+            ANTHROPIC
+        );
+        assert_eq!(
+            store.get(AiProviderKind::Openai).unwrap().unwrap().expose(),
+            OPENAI
+        );
         assert_eq!(
             store.openai_base_url().unwrap().as_deref(),
             Some("https://api.example.test/v1")
@@ -522,7 +532,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
         fs::write(store.path(), vec![b'x'; 16 * 1024 + 1]).unwrap();
-        let error = store.get(AiProviderKind::Anthropic).unwrap_err().to_string();
+        let error = store
+            .get(AiProviderKind::Anthropic)
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("exceeds the supported size limit"));
     }
 
