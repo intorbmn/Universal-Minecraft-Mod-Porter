@@ -505,6 +505,62 @@ mod tests {
         assert!(!output.exists());
     }
 
+    /// The confirm gate itself must be what stops the rollback. The project has a real
+    /// checkpoint inside the allowed root, so without the gate the restore would succeed.
+    #[test]
+    fn rollback_with_real_checkpoint_needs_confirm() {
+        use ummp_core::app::snapshots::{default_snapshots, save_store};
+        use ummp_core::checkpoint::CheckpointStore;
+
+        let allowed = tempfile::tempdir().unwrap();
+        let project = allowed.path().join("demo");
+        std::fs::create_dir_all(&project).unwrap();
+        let file = project.join("DemoWidget.java");
+        std::fs::write(&file, "class DemoWidget {}").unwrap();
+
+        let snaps = default_snapshots(&project);
+        let mut store = CheckpointStore::new();
+        store
+            .snapshot(Uuid::new_v4(), "before-edit", &project, &snaps)
+            .unwrap();
+        save_store(&snaps, &store).unwrap();
+        std::fs::write(&file, "class DemoGadget {}").unwrap();
+
+        let data = tempfile::tempdir().unwrap();
+        let services = Arc::new(
+            AppServices::open(ummp_core::app::Settings::new(data.path().to_path_buf())).unwrap(),
+        );
+        let server = McpServer::new(services, vec![allowed.path().to_path_buf()]);
+        let call = |confirm| {
+            serde_json::to_value(
+                server
+                    .ummp_rollback(Parameters(RollbackArgs {
+                        project: project.clone(),
+                        checkpoint: None,
+                        confirm,
+                    }))
+                    .unwrap(),
+            )
+            .unwrap()
+        };
+
+        let refused = call(false);
+        assert_eq!(refused["isError"], true);
+        assert!(refused.to_string().contains("confirm=true"));
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "class DemoGadget {}",
+            "confirm=false must not restore the checkpoint"
+        );
+
+        let restored = call(true);
+        assert_ne!(restored["isError"], true, "{restored}");
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "class DemoWidget {}"
+        );
+    }
+
     #[test]
     fn rollback_without_confirmation_is_refused_before_path_access() {
         let data = tempfile::tempdir().unwrap();
