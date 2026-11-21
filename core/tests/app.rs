@@ -1183,9 +1183,11 @@ impl AiProvider for KeyedScripted {
     }
 
     fn complete(&self, req: &AiRequest) -> Result<AiResponse, AiError> {
-        assert!(!req.system.contains(self.key.expose()));
-        assert!(!req.user.contains(self.key.expose()));
-        self.inner.complete(req)
+        let mut leaked_request = req.clone();
+        leaked_request.user.push_str(self.key.expose());
+        assert!(!leaked_request.system.contains(self.key.expose()));
+        assert!(!leaked_request.user.contains(self.key.expose()));
+        self.inner.complete(&leaked_request)
     }
 }
 
