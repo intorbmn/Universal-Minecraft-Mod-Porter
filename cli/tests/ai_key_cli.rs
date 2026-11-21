@@ -168,7 +168,7 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     let address = listener.local_addr().unwrap();
     listener.set_nonblocking(true).unwrap();
     let server = std::thread::spawn(move || {
-        for _ in 0..2 {
+        for request_index in 0..3 {
         let deadline = Instant::now() + Duration::from_secs(5);
         let (mut stream, _) = loop {
             match listener.accept() {
@@ -211,13 +211,23 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         if reader.read_exact(&mut body).is_err() {
             return false;
         }
-        let response = br#"{"choices":[{"message":{"content":"{\"edits\":[],\"notes\":[\"No changes needed\"]}"}}],"usage":{"prompt_tokens":1,"completion_tokens":1},"model":"test-model"}"#;
+        let content = if request_index == 1 {
+            r#"{"summary":"No changes needed","risks":[],"files_to_change":[]}"#
+        } else {
+            r#"{"edits":[],"notes":["No changes needed"]}"#
+        };
+        let response = serde_json::json!({
+            "choices": [{"message": {"content": content}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+            "model": "test-model"
+        })
+        .to_string();
         let headers = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             response.len()
         );
         stream.write_all(headers.as_bytes()).unwrap();
-        stream.write_all(response).unwrap();
+        stream.write_all(response.as_bytes()).unwrap();
         }
         true
     });
@@ -299,7 +309,7 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     .unwrap();
     assert_json_shape(&assist_envelope["result"], &assist_golden);
 
-    assert!(server.join().unwrap(), "AI provider did not receive both requests");
+    assert!(server.join().unwrap(), "AI provider did not receive all requests");
 
     let envelope: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(envelope["schema"], 1);
