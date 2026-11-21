@@ -3,6 +3,16 @@
 UMMP's CLI is intended for interactive use, scripts and CI. The contract is versioned so
 external callers can detect incompatible output changes.
 
+## Local REST API (Phase 12.B)
+
+Start the localhost API with `ummp serve --port 7432`. The bearer token is printed once and stored in the shared data directory as `server-token`. See [API.md](API.md) for routes, authentication, path rules and remote-bind acknowledgement.
+
+```sh
+ummp serve
+# Only when intentionally exposing a non-loopback interface:
+ummp serve --listen 0.0.0.0 --i-understand-remote
+```
+
 ## Shell completions
 
 Generate a completion script and install it using your shell's normal completion mechanism:
@@ -37,11 +47,12 @@ kb = "D:/Minecraft/mappings.db"
 sandbox_repo = "your-name/ummp-build-sandbox"
 ai_provider = "anthropic"
 openai_base_url = "http://localhost:11434/v1"
+allowed_roots = ["D:/Minecraft/mods", "D:/Minecraft/projects"]
 ```
 
 Precedence is CLI flag > `UMMP_*` environment variable > TOML > built-in default.
 Supported variables are `UMMP_OUTPUT_ROOT`, `UMMP_KB`, `UMMP_BUILD_REPO`,
-`UMMP_AI_PROVIDER`, and `UMMP_OPENAI_BASE_URL`. The previous
+`UMMP_AI_PROVIDER`, and `UMMP_OPENAI_BASE_URL`. The optional `allowed_roots` list controls the REST API's filesystem boundary; if omitted, only the user's home directory is allowed. The previous
 `UMMP_OUTPUT_DIR` and `UMMP_PROVIDER` names remain accepted for compatibility.
 
 API keys and other secrets are not valid TOML fields. Configure them with
