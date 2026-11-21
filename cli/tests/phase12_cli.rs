@@ -311,31 +311,39 @@ fn pack_inspect_json_returns_a_structured_pack_result() {
 }
 
 #[test]
-fn ai_assist_missing_key_is_a_json_refusal() {
+fn ai_debug_missing_key_is_a_json_refusal() {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
-    let mappings = dir.path().join("mappings.json");
-    std::fs::write(&mappings, "[]").unwrap();
+    let log = dir.path().join("build.log");
+    std::fs::write(&log, "synthetic build failure").unwrap();
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/loader/fabric-src");
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args([
             "--json",
-            "ai-assist",
+            "ai-debug",
             fixture.to_str().unwrap(),
+            "--log",
+            log.to_str().unwrap(),
             "--from",
             "1.20.1",
             "--to",
             "1.21.1",
             "--loader",
             "fabric",
-            "--mappings",
-            mappings.to_str().unwrap(),
         ])
         .env("UMMP_DATA_DIR", data.path())
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("OPENAI_API_KEY")
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stdout: {}\\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["error"]["kind"], "refused");
