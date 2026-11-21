@@ -281,3 +281,12 @@ remain outside `core`.
 
 - Security review of `server/` was done by hand (no security-review skill in this session): token is 244 random bits, file mode 0600, constant-time digest compare; loopback by default, remote bind needs `--i-understand-remote`; every request path is canonicalised and checked against `allowed_roots` (symlink-escape test present); 1 MiB body limit; CORS off; writes only through `AppServices`; the token is printed once to stdout and never logged (`token_never_logged`). Residual risks: a time-of-check/time-of-use gap between path check and use, and the token printed to the terminal. Both go to KNOWN_LIMITATIONS.
 - Existing tests also cover `port_job_completes_and_sse_events_are_ordered`, `cancel_works`, `rejects_symlink_escape`, `core_remains_free_of_tokio` and `token_file_is_private`.
+
+
+## 12.C design checkpoint — 2026-11-21
+
+- PR #16 (12.B REST) merged at `c1d08b44aa8d21363a4dfd3e76c30633e5528f12`; CI for the final 12.B implementation passed (run #553).
+- Created `phase-12c-mcp` from the merged `master`.
+- Chose `server/src/mcp.rs` to share the REST crate, runtime and path policy.
+- Checked official `rmcp 3.10.0`: its declared MSRV is Rust 1.88, compatible with the repository's pinned Rust 1.97.0. Stdio/server transport is supported.
+- Added ADR 0017 and the 12.C design addendum. Implementation and verification are next; 12.C is not marked complete.
