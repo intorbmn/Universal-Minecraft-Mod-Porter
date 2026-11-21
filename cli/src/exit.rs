@@ -11,7 +11,7 @@ pub enum ExitCode {
     Refused = 2,
     Partial = 3,
     BuildFailed = 4,
-    InvalidInput = 6,
+    InvalidInput = 5,
 }
 
 impl ExitCode {
