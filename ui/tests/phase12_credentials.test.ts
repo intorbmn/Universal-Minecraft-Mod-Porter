@@ -29,12 +29,21 @@ describe('shared AI credentials', () => {
 
   it('saves the typed key before starting AI and clears the input', async () => {
     const onStart = vi.fn();
+    let saved = false;
     invoke.mockImplementation(async (command: string) => {
       if (command === 'settings') return { ai_provider: 'anthropic' };
       if (command === 'ai_key_status') {
-        return { saved: false, masked: null, path: '/tmp/credentials.json', base_url: null };
+        return {
+          saved,
+          masked: saved ? 'sk-ant-…0000' : null,
+          path: '/tmp/credentials.json',
+          base_url: null,
+        };
       }
-      if (command === 'ai_key_save') return { masked: 'sk-ant-…0000', warning: null };
+      if (command === 'ai_key_save') {
+        saved = true;
+        return { masked: 'sk-ant-…0000', warning: null };
+      }
       if (command === 'start_ai_assist') return 'job-1';
       return undefined;
     });
@@ -60,5 +69,7 @@ describe('shared AI credentials', () => {
     expect(saveIndex).toBeGreaterThanOrEqual(0);
     expect(startIndex).toBeGreaterThan(saveIndex);
     expect(input).toHaveValue('');
+    expect(await screen.findByText('sk-ant-…0000')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('sk-ant-test-0000000000000000');
   });
 });

@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-10 complete; Phase 11 (desktop UI) is implemented on `phase-11-ui`; automated CI is green. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress on `phase-12-api`. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -76,7 +76,10 @@ ummp rollback path/to/mod
 # JAR-only mod: remap class names into a new JAR (input is not modified)
 ummp remap-jar mod.jar mod-1.17.jar --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 
-# AI assistance (needs ANTHROPIC_API_KEY; proposals are reviewed, approved, then applied with a checkpoint)
+# AI assistance (save a key once; proposals are reviewed, approved, then applied with a checkpoint)
+ummp ai-key set --provider anthropic
+ummp ai-key status
+ummp ai-key delete --provider anthropic
 ummp ai-assist path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 ummp ai-debug path/to/mod --log build.log --from 1.16.5 --to 1.17.1 --loader forge
 
@@ -98,7 +101,7 @@ ummp pack export path/to/instance --to-format mrpack
 # exit codes: 0 done, 2 refused (High-risk JAR; review it, then --allow-risk), 3 done, mods left to you
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 ummp completions bash # also: zsh, fish, powershell
-# local model: --provider openai --base-url http://localhost:11434/v1 ; settings: --ai-config ai.json
+# OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
 ```
 `ummp.toml` can set `output_dir`, `sandbox_repo` and `provider`; CLI flags override `UMMP_*` environment values and config. See [docs/CLI.md](docs/CLI.md).\n\n`--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
 (the knowledge-base export format); `--kb` takes a knowledge-base SQLite file instead.

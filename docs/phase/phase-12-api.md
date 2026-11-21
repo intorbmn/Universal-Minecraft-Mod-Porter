@@ -139,3 +139,18 @@ remain outside `core`.
   index selection, output options, KB/mappings overrides and pack exit codes.
 - Added regression coverage for request-level mapping overrides and the CLI invalid-input
   JSON contract. CI verification is pending for this commit.
+
+
+## PR 1 verification follow-up
+
+- Added a core integration test that resolves a synthetic AI key from `credentials.json`
+  and asserts it never appears in settings, the jobs database, job views, job logs, or events.
+- Strengthened the AI screen test to verify the masked key appears after save and the raw value
+  never enters the rendered document.
+- Added a dedicated Tauri Cargo cache to CI; the previous desktop job had no Rust cache and
+  rebuilt the Tauri dependency graph on every run.
+- Corrected the implementation plan and project docs to use ADR 0015 for interim AI storage;
+  ADR 0016 remains reserved for REST.
+- CI verification for this follow-up is pending. The only remaining PR 1 acceptance outside
+  automation is the user's real-machine check that a key saved in desktop is visible as masked
+  status to the CLI (and vice versa).
