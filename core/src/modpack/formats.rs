@@ -929,7 +929,7 @@ pub fn write_curseforge(
         std::fs::create_dir_all(parent)?;
     }
     let mut z = zip::ZipWriter::new(File::create(file)?);
-    z.start_file("manifest.json", zip::write::FileOptions::default())?;
+    z.start_file("manifest.json", zip::write::SimpleFileOptions::default())?;
     z.write_all(
         serde_json::to_string_pretty(&manifest)
             .map_err(|e| PackError::Invalid(e.to_string()))?
