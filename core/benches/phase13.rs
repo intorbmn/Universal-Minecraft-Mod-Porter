@@ -69,7 +69,7 @@ fn bench_analyze_one(c: &mut Criterion) {
     let jar = fixture_jar();
     let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
     c.bench_function("analyze/one_jar", |b| {
-        b.iter(|| inspect_jar(black_box(&jar), fs.as_ref()).expect("analyze fixture JAR"))
+        b.iter(|| inspect_jar(black_box(&jar), fs.as_ref()).expect("analyze fixture JAR"));
     });
 }
 
@@ -78,14 +78,14 @@ fn bench_analyze_300(c: &mut Criterion) {
     let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
     let engine = AnalyzerEngine::default();
     c.bench_function("analyze/300_jars", |b| {
-        b.iter(|| engine.analyze(black_box(corpus.path()), &fs).expect("analyze corpus"))
+        b.iter(|| engine.analyze(black_box(corpus.path()), &fs).expect("analyze corpus"));
     });
 }
 
 fn bench_scan_300(c: &mut Criterion) {
     let corpus = corpus_300();
     c.bench_function("scan/300_jars", |b| {
-        b.iter(|| scan_path(black_box(corpus.path())).expect("scan corpus"))
+        b.iter(|| scan_path(black_box(corpus.path())).expect("scan corpus"));
     });
 }
 
@@ -96,8 +96,8 @@ fn bench_pack_inspect_300(c: &mut Criterion) {
             let work = tempdir().expect("pack work directory");
             let mut pack = import(corpus.path(), work.path()).expect("import mod folder");
             analyze_pack(&mut pack, &AnalyzeOptions::default()).expect("analyze mod folder");
-            black_box(pack.entries.len())
-        })
+            black_box(pack.entries.len());
+        });
     });
 }
 
@@ -144,7 +144,7 @@ fn bench_plan_dry_run_port(c: &mut Criterion) {
                 black_box(report.files_scanned)
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 }
 
@@ -156,7 +156,10 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
     let mut class_bytes = Vec::new();
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index).expect("read fixture entry");
-        if entry.name().ends_with(".class") {
+        if std::path::Path::new(entry.name())
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("class"))
+        {
             class_name = Some(entry.name().to_string());
             entry.read_to_end(&mut class_bytes).expect("read class bytes");
             break;
@@ -217,7 +220,7 @@ fn bench_scan_5mb(c: &mut Criterion) {
     let mut group = c.benchmark_group("scan");
     group.throughput(criterion::Throughput::Bytes(5 * 1024 * 1024));
     group.bench_with_input(BenchmarkId::new("jar_entry", "5_mib"), &jar, |b, path| {
-        b.iter(|| scan_path(black_box(path.as_path())).expect("scan 5 MiB JAR"))
+        b.iter(|| scan_path(black_box(path.as_path())).expect("scan 5 MiB JAR"));
     });
     group.finish();
 }
