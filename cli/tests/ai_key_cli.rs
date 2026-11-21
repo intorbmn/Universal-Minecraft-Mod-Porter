@@ -7,6 +7,30 @@ const fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_ummp")
 }
 
+fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
+    match (actual, expected) {
+        (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
+            let mut actual_keys = actual.keys().collect::<Vec<_>>();
+            let mut expected_keys = expected.keys().collect::<Vec<_>>();
+            actual_keys.sort();
+            expected_keys.sort();
+            assert_eq!(actual_keys, expected_keys);
+            for (key, value) in expected {
+                assert_json_shape(&actual[key], value);
+            }
+        }
+        (serde_json::Value::Array(actual), serde_json::Value::Array(expected)) => {
+            if let Some(sample) = expected.first() {
+                assert!(!actual.is_empty());
+                for value in actual {
+                    assert_json_shape(value, sample);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 #[test]
 fn set_reads_stdin_and_status_only_shows_a_masked_key() {
     let dir = tempfile::tempdir().unwrap();
@@ -32,6 +56,11 @@ fn set_reads_stdin_and_status_only_shows_a_masked_key() {
     assert_eq!(set["schema"], 1);
     assert_eq!(set["result"]["saved"], true);
     assert_eq!(set["result"]["masked"], "sk-ant-…0000");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/ai-key-set-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&set["result"], &golden);
 
     let status = Command::new(binary())
         .args(["--json", "ai-key", "status"])
@@ -43,6 +72,11 @@ fn set_reads_stdin_and_status_only_shows_a_masked_key() {
     assert!(!status_text.contains("sk-ant-test-0000000000000000"));
     let value: serde_json::Value = serde_json::from_str(&status_text).unwrap();
     assert_eq!(value["result"]["providers"][0]["masked"], "sk-ant-…0000");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/ai-key-status-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&value["result"], &golden);
 }
 
 #[test]
@@ -76,11 +110,17 @@ fn delete_removes_only_the_selected_provider() {
     assert_eq!(child.wait().unwrap().code(), Some(0));
 
     let deleted = Command::new(binary())
-        .args(["ai-key", "delete", "--provider", "openai"])
+        .args(["--json", "ai-key", "delete", "--provider", "openai"])
         .env("UMMP_DATA_DIR", dir.path())
         .output()
         .unwrap();
     assert_eq!(deleted.status.code(), Some(0));
+    let deleted_value: serde_json::Value = serde_json::from_slice(&deleted.stdout).unwrap();
+    let deleted_golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/ai-key-delete-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&deleted_value["result"], &deleted_golden);
 
     let status = Command::new(binary())
         .args(["--json", "ai-key", "status", "--provider", "openai"])
