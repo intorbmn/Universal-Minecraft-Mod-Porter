@@ -332,7 +332,7 @@ pub fn start_ai_assist(
                 .map_err(UiError::from)?
                 .unwrap_or_else(|| "https://api.openai.com/v1".into());
             Arc::new(OpenAiCompatibleProvider::with_api_key(
-                url,
+                &url,
                 key.expose().to_owned(),
             ))
         }
