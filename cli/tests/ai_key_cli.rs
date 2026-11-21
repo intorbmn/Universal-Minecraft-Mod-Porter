@@ -73,7 +73,7 @@ fn set_reads_stdin_and_status_only_shows_a_masked_key() {
     assert_json_shape(&set["result"], &golden);
 
     let status = Command::new(binary())
-        .args(["--json", "ai-key", "status"])
+        .args(["--json", "ai-key", "status", "--provider", "anthropic"])
         .env("UMMP_DATA_DIR", dir.path())
         .output()
         .unwrap();
