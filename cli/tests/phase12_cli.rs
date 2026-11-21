@@ -170,7 +170,10 @@ fn completions_are_generated_for_supported_shells() {
             "powershell" => "Register-ArgumentCompleter",
             _ => unreachable!(),
         };
-        assert!(script.contains(marker), "{shell} completion registration missing");
+        assert!(
+            script.contains(marker),
+            "{shell} completion registration missing"
+        );
     }
 }
 
