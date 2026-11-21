@@ -37,7 +37,7 @@ remain outside `core`.
 
 - User approved the Phase 12 design specification on 2026-11-20.
 - Added ADR 0015, status Accepted (interim), for file-backed AI credentials.
-- Reconciled ADR numbering to the Phase 12 guide: ADR 0015 is interim AI credential storage; the CLI contract remains documented in `docs/CLI.md`; later ADRs are REST 0016, MCP 0017 and plugins 0018.
+- Reconciled ADR numbering to the Phase 12 guide: ADR 0015 is interim AI credential storage; the CLI contract remains documented in `docs/CLI.md`; later ADRs are REST 0016, MCP 0017, project license 0018 and plugins 0019.
 - Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
 - At the design approval checkpoint, implementation code had not yet been changed.
 
