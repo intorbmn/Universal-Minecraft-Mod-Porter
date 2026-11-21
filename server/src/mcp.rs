@@ -324,9 +324,7 @@ impl McpServer {
         }))
     }
 
-    #[tool(
-        description = "Get the current state, progress, recent logs and result of a UMMP job."
-    )]
+    #[tool(description = "Get the current state, progress, recent logs and result of a UMMP job.")]
     fn ummp_job(
         &self,
         Parameters(JobArgs { id }): Parameters<JobArgs>,
@@ -336,9 +334,7 @@ impl McpServer {
         result(self.services.job(id))
     }
 
-    #[tool(
-        description = "Request cancellation of a running UMMP job."
-    )]
+    #[tool(description = "Request cancellation of a running UMMP job.")]
     fn ummp_cancel(
         &self,
         Parameters(JobArgs { id }): Parameters<JobArgs>,
