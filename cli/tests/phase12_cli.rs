@@ -215,10 +215,21 @@ fn adapters_json_has_stable_versioned_result() {
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "adapters");
     let result = value["result"].as_object().unwrap();
-    assert_eq!(
-        result.keys().map(String::as_str).collect::<Vec<_>>(),
-        ["adapters"]
-    );
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/adapters-result.json"
+    ))
+    .unwrap();
+    let keys = |value: &serde_json::Value| {
+        let mut keys = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys
+    };
+    assert_eq!(keys(&value["result"]), keys(&golden));
     let adapters = result["adapters"].as_array().unwrap();
     assert!(!adapters.is_empty());
     for adapter in adapters {
