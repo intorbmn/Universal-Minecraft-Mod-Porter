@@ -224,7 +224,7 @@ impl ApiError {
 
 impl From<AppError> for ApiError {
     fn from(error: AppError) -> Self {
-        let status = match error {
+        let status = match &error {
             AppError::Input(_) => StatusCode::BAD_REQUEST,
             AppError::Refused(_) => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
@@ -338,7 +338,7 @@ async fn analyze(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let path = allowed_path(&state, &body.path)?;
     let services = Arc::clone(&state.services);
-    blocking(move || services.analyze(&path).map(|view| serde_json::to_value(view).unwrap()))
+    blocking(move || services.analyze(&path).and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string()))))
         .await
         .map(Json)
 }
@@ -349,7 +349,7 @@ async fn scan(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let path = allowed_path(&state, &body.path)?;
     let services = Arc::clone(&state.services);
-    blocking(move || services.scan(&path).map(|view| serde_json::to_value(view).unwrap()))
+    blocking(move || services.scan(&path).and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string()))))
         .await
         .map(Json)
 }
@@ -400,7 +400,7 @@ async fn plan(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let request = body.into_request(&state)?;
     let services = Arc::clone(&state.services);
-    blocking(move || services.plan(&request).map(|view| serde_json::to_value(view).unwrap()))
+    blocking(move || services.plan(&request).and_then(|view| serde_json::to_value(view).map_err(|e| AppError::Input(e.to_string()))))
         .await
         .map(Json)
 }
@@ -533,7 +533,7 @@ async fn job_events(
                 == Some(id) =>
         {
             let kind = event.kind.clone();
-            Some(Ok(SseEvent::default().event(kind).json_data(event).unwrap()))
+            SseEvent::default().event(kind).json_data(event).ok().map(Ok)
         }
         _ => None,
     });
