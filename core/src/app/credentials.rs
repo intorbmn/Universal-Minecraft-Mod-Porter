@@ -5,6 +5,7 @@
 
 use super::{AppError, Secret};
 use serde::{Deserialize, Serialize};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -118,16 +119,20 @@ impl CredentialsFile {
                 "This key does not use the usual sk-ant- prefix; it will still be saved."
                     .to_owned(),
             );
-        let mut file = self.read()?;
-        *Self::key_mut(&mut file, provider) = Some(value);
-        self.write(&file)?;
-        Ok(warning)
+        self.with_exclusive_lock(|| {
+            let mut file = self.read()?;
+            *Self::key_mut(&mut file, provider) = Some(value);
+            self.write(&file)?;
+            Ok(warning)
+        })
     }
 
     pub fn delete(&self, provider: AiProviderKind) -> Result<(), AppError> {
-        let mut file = self.read()?;
-        *Self::key_mut(&mut file, provider) = None;
-        self.write(&file)
+        self.with_exclusive_lock(|| {
+            let mut file = self.read()?;
+            *Self::key_mut(&mut file, provider) = None;
+            self.write(&file)
+        })
     }
 
     pub fn masked(&self, provider: AiProviderKind) -> Result<Option<String>, AppError> {
@@ -140,9 +145,32 @@ impl CredentialsFile {
 
     pub fn set_openai_base_url(&self, value: Option<&str>) -> Result<(), AppError> {
         let value = validate_openai_base_url(value)?;
-        let mut file = self.read()?;
-        file.openai_base_url = value;
-        self.write(&file)
+        self.with_exclusive_lock(|| {
+            let mut file = self.read()?;
+            file.openai_base_url = value;
+            self.write(&file)
+        })
+    }
+
+    /// Serializes credential read-modify-write operations across CLI and desktop processes.
+    fn with_exclusive_lock<T>(
+        &self,
+        operation: impl FnOnce() -> Result<T, AppError>,
+    ) -> Result<T, AppError> {
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| AppError::Input("credentials file has no parent directory".into()))?;
+        std::fs::create_dir_all(parent)?;
+        let lock_path = self.path.with_file_name("credentials.json.lock");
+        let lock = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(lock_path)?;
+        lock.lock()?;
+        operation()
     }
 
     fn read(&self) -> Result<StoredCredentials, AppError> {
