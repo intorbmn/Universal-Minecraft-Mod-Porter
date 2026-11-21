@@ -114,7 +114,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         1,
         "initialize",
         serde_json::json!({
-            "protocolVersion": "2025-03-26",
+            "protocolVersion": "2025-06-18",
             "capabilities": {},
             "clientInfo": { "name": "ummp-integration-test", "version": "0.1.0" }
         }),
