@@ -1,6 +1,8 @@
 //! Local, authenticated REST adapter over `AppServices`.
 //! All synchronous application work runs on Tokio's blocking pool.
 
+pub mod mcp;
+
 use axum::{
     body::Body,
     extract::{DefaultBodyLimit, Path, State},
@@ -265,7 +267,7 @@ where
         .map_err(ApiError::from)
 }
 
-fn canonical_roots(roots: Vec<PathBuf>) -> Vec<PathBuf> {
+pub(crate) fn canonical_roots(roots: Vec<PathBuf>) -> Vec<PathBuf> {
     let roots = if roots.is_empty() {
         std::env::var_os("HOME")
             .map(PathBuf::from)
@@ -310,6 +312,17 @@ fn canonical_candidate(path: &FsPath) -> Result<PathBuf, ApiError> {
     Ok(resolved)
 }
 
+/// Shared canonical path policy used by REST and MCP adapters.
+pub(crate) fn resolve_allowed_path(path: &FsPath, roots: &[PathBuf]) -> Result<PathBuf, String> {
+    let resolved = canonical_candidate(path)
+        .map_err(|_| "path cannot be resolved or escapes its canonical parent".to_owned())?;
+    if roots.iter().any(|root| path_is_within(&resolved, root)) {
+        Ok(resolved)
+    } else {
+        Err("path is outside configured allowed_roots".into())
+    }
+}
+
 fn path_is_within(path: &FsPath, root: &FsPath) -> bool {
     #[cfg(windows)]
     {
@@ -328,18 +341,13 @@ fn path_is_within(path: &FsPath, root: &FsPath) -> bool {
 }
 
 fn allowed_path(state: &ApiState, path: &FsPath) -> Result<PathBuf, ApiError> {
-    let resolved = canonical_candidate(path)?;
-    if state
-        .roots
-        .iter()
-        .any(|root| path_is_within(&resolved, root))
-    {
-        Ok(resolved)
-    } else {
-        Err(ApiError::forbidden(
-            "path is outside configured allowed_roots",
-        ))
-    }
+    resolve_allowed_path(path, &state.roots).map_err(|message| {
+        if message == "path is outside configured allowed_roots" {
+            ApiError::forbidden(message)
+        } else {
+            ApiError::bad_request(message)
+        }
+    })
 }
 
 fn optional_path(state: &ApiState, path: Option<PathBuf>) -> Result<Option<PathBuf>, ApiError> {
