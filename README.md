@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. PR #14 (12.0 + 12.A) and PR #16 (12.B REST) are merged. Phase 12.C MCP is under implementation on `phase-12c-mcp`. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. PRs #14 (12.0 + 12.A), #16 (12.B REST), and #17 (12.C MCP) are merged. Phase 12.D is verified; Phase 12.E implementation is complete and undergoing final CI verification on `phase-12d-action`. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -25,6 +25,8 @@ Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. P
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [API.md](docs/API.md) | Local REST API, authentication and routes |
+| [MCP.md](docs/MCP.md) | MCP tools, resources and client setup |
+| [PLUGIN_PROTOCOL.md](docs/PLUGIN_PROTOCOL.md) | Plugin manifest, JSON Lines protocol and security limits |
 | [phase-11-ui.md](docs/phase/phase-11-ui.md) | Phase 11 implementation and verification record |
 | [ui/README.md](ui/README.md) | Desktop app setup and developer workflow |
 | [guides/](docs/guides/README.md) | Step-by-step guides for the remaining phases (10–14) |
@@ -84,6 +86,10 @@ ummp ai-key delete --provider anthropic
 ummp ai-assist path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 ummp ai-debug path/to/mod --log build.log --from 1.16.5 --to 1.17.1 --loader forge
 
+# Out-of-process plugins (API 1)
+ummp plugins list
+ummp plugins check ./plugins/demo-renamer
+
 # Malware-risk scan (exit code 2 on High risk); runs automatically before every build
 ummp scan path/to/mod-or.jar
 # Build + tests + dedicated-server start on GitHub Actions (needs `gh auth login` and a build repo)
@@ -103,6 +109,8 @@ ummp pack export path/to/instance --to-format mrpack
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 ummp completions bash # also: zsh, fish, powershell
 ummp serve # local REST API at 127.0.0.1:7432\nummp mcp # MCP stdio server for a connected assistant
+ummp plugins list # installed plugins
+ummp plugins check ./plugins/my-plugin
 # OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
 ```
 `ummp.toml` supports `output_root`, `kb`, `sandbox_repo`, `ai_provider` and
@@ -118,3 +126,21 @@ See [ROADMAP.md](docs/ROADMAP.md) for the development plan.
 ## License
 
 Apache-2.0 (see [LICENSE](LICENSE) and ADR 0018). UMMP grants no rights to Minecraft, Mojang code, or the mods you port.
+
+
+## GitHub Action
+
+Use UMMP from another repository's CI workflow:
+
+```yaml
+- name: Scan Minecraft mod
+  id: ummp
+  uses: intorbmn/Universal-Minecraft-Mod-Porter@master
+  with:
+    command: scan
+    path: ./my-mod
+    fail-on-risk: high
+```
+
+The composite action also supports `analyze`, `port` and `build`. Plugins are discovered in `<data_dir>/plugins/`; validate an executable with `ummp plugins check DIR`. See
+[docs/CLI.md](docs/CLI.md#github-action-phase-12d) for inputs, risk thresholds and outputs.

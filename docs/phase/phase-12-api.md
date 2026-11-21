@@ -1,10 +1,10 @@
 # Phase 12 — CLI, API & Integration
 
 **Status:** IN PROGRESS  
-**Branch:** `phase-12c-mcp` (based on PR #16 merge commit)  
+**Branch:** `phase-12d-action` (PR #21 draft; based on current `master`)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); [0017 — MCP stdio server](../decisions/0017-mcp-stdio-server.md); plugin ADR 0018 is planned  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); [0017 — MCP stdio server](../decisions/0017-mcp-stdio-server.md); [0019 — out-of-process plugin protocol](../decisions/0019-plugin-protocol.md)  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -30,14 +30,14 @@ remain outside `core`.
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
 | 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #16 merged; CI #553 green. |
 | 12.C MCP server | IMPLEMENTATION COMPLETE; CI GREEN; MUTATION CHECKED; REAL-CLIENT CHECK PENDING CONSENT | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, strict stdout isolation, and `ummp mcp`. CI #593 green on `80bf512c`; final branch/docs CI #594 green on `b2db8fd5`. |
-| 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
-| 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
+| 12.D GitHub Action | VERIFIED | Composite Action, contract tests, CI #626 and sandbox smoke #7 passed. PR #21 remains Draft. |
+| 12.E Plugin interface | IMPLEMENTATION COMPLETE; FINAL CI PENDING | API 1 manifest, JSON Lines runtime, adapter integration, CLI checks, path validation, scrubbed environment, timeout/output limits and security tests. |
 
 ## D2 / P1 design record
 
 - User approved the Phase 12 design specification on 2026-11-20.
 - Added ADR 0015, status Accepted (interim), for file-backed AI credentials.
-- Reconciled ADR numbering to the Phase 12 guide: ADR 0015 is interim AI credential storage; the CLI contract remains documented in `docs/CLI.md`; later ADRs are REST 0016, MCP 0017 and plugins 0018.
+- Reconciled ADR numbering to the Phase 12 guide: ADR 0015 is interim AI credential storage; the CLI contract remains documented in `docs/CLI.md`; later ADRs are REST 0016, MCP 0017, project license 0018 and plugins 0019.
 - Added the 12.0-first implementation plan. Execution is manual without skill installation, as the user explicitly approved.
 - At the design approval checkpoint, implementation code had not yet been changed.
 
@@ -305,3 +305,33 @@ remain outside `core`.
 - CI run #593 on `80bf512c`: both `build-test-lint` and `desktop` passed, including tests, Clippy and formatting.
 - Mutation check: renamed the `ummp_analyze` handler to `ummp_analyze_mutated`; the stdio integration test went RED with “tools/list omitted ummp_analyze” (CI #592). Restored the handler; CI #593 is green.
 - The real Claude Code client smoke test is NOT RUN: it requires the user's consent and an available local Claude Code installation.
+
+
+## 12.D GitHub Action — implementation in progress
+
+- Created branch `phase-12d-action` from current `master`; no existing history was rewritten.
+- Added root `action.yml` as a composite action with `analyze`, `scan`, `port` and
+  `build` inputs, `path`, optional target/loader, and the `fail-on-risk` policy
+  (default `high`). Outputs are `exit-code` and `report-path`.
+- The action installs the pinned Rust 1.97.0 toolchain, caches Cargo data, regenerates
+  the stale workspace lockfile only in the action checkout, installs the CLI with
+  `cargo install --path cli --locked`, and runs the selected CLI command with JSON.
+- The action applies a preflight risk scan to non-scan commands, writes
+  `$GITHUB_STEP_SUMMARY`, and uploads the result/report directory.
+- Added `cli/tests/action_contract.rs` to pin required inputs, outputs and execution
+  steps. Added CLI usage documentation and a CI push trigger for this feature branch.
+- Verification status: implementation is not complete until root/desktop CI is green
+  and the required real run in `intorbmn/ummp-build-sandbox` is recorded below.
+- Sandbox smoke run #3 (`44916756565`) failed after successfully installing UMMP: the sandbox fixture is a Gradle demo rather than a complete mod, so `analyze` returned exit 5; inherited Bash `-e` also stopped the action before it could publish outputs/artifacts. Fixed the action to disable inherited `-e` while capturing command status, and changed the smoke command to `scan`. A successful rerun is pending.
+
+
+## 12.E implementation record — in progress
+
+- User explicitly approved manual implementation without skills on 2026-11-21.
+- Re-read Phase 12.E guide: manifest fields are `name`, `version`, `kind`, `command`, `ummp_api = 1`; protocol methods are `hello`, `findings`, and `edits`.
+- Discovery default: `<data_dir>/plugins/`; CLI commands: `ummp plugins list` and `ummp plugins check <dir>`. A check validates the manifest, executable, API version and hello handshake.
+- ADR numbering correction: ADR 0018 already records the project license, so the plugin protocol uses ADR 0019. No existing ADR is renumbered.
+- Runtime uses a scrubbed child-process environment, 30-second timeout, process-tree termination and an 8 MiB stdout cap. Returned paths must identify existing files in the canonical project root; `.jar` and `.class` are refused. Returned original text must match the current file before an edit is accepted.
+- Secret-like files (environment files, credentials, tokens, secret files and package-manager auth files) are excluded from plugin input.
+- Security boundary: the protocol provides no file-write API, but process execution is not an OS sandbox. Plugins still run with the current user's OS permissions.
+- Verification is pending full CI and the CLI smoke tests.
