@@ -256,6 +256,12 @@ impl TechAdapter for PluginAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapter::AdapterRegistry;
+    use crate::checkpoint::CheckpointStore;
+    use crate::descriptor::DescriptorTarget;
+    use crate::migration::{MigrationEngine, MigrationPlan, MigrationRequest, RunOptions};
+    use crate::project::Project;
+    use uuid::Uuid;
 
     #[test]
     fn refuses_jar_class_and_secret_paths() {
@@ -280,5 +286,112 @@ mod tests {
         std::fs::write(dir.path().join(PLUGIN_MANIFEST),
             "name='demo'\nversion='1'\nkind='rules'\ncommand=['bin/plugin']\nummp_api=2\n").unwrap();
         assert!(matches!(PluginAdapter::load(dir.path()), Err(PluginError::Api { found: 2, .. })));
+    }
+
+    #[cfg(unix)]
+    fn fake_plugin(dir: &Path, response: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(dir.join("plugin.sh"), format!("#!/bin/sh\nIFS= read -r request\nprintf '%s\\n' '{}'\n", response)).unwrap();
+        let mut permissions = std::fs::metadata(dir.join("plugin.sh")).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(dir.join("plugin.sh"), permissions).unwrap();
+        std::fs::write(dir.join(PLUGIN_MANIFEST),
+            "name='demo'\nversion='1.0.0'\nkind='rules'\ncommand=['plugin.sh']\nummp_api=1\n").unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn plugin_edit_is_checkpointed_and_rollback_restores_source() {
+        let plugin_dir = tempfile::tempdir().unwrap();
+        fake_plugin(plugin_dir.path(),
+            r#"[{"path":"src/Main.java","original":"class DemoWidget {}","updated":"class DemoGadget {}"}]"#);
+        let project_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(project_dir.path().join("src")).unwrap();
+        std::fs::write(project_dir.path().join("src/Main.java"), "class DemoWidget {}").unwrap();
+        let project = Project::new(project_dir.path().canonicalize().unwrap());
+        let rel = PathBuf::from("src/Main.java");
+        let files = vec![rel.clone()];
+        let plan = MigrationPlan {
+            request: MigrationRequest {
+                source_minecraft: "1.20.1".into(),
+                target_minecraft: "1.21.1".into(),
+                target_loader: "fabric".into(),
+                min_confidence: 0.8,
+                source_loader: Some("fabric".into()),
+            },
+            stages: Vec::new(),
+            skipped: Vec::new(),
+            breaking_changes: Vec::new(),
+            recipes: Vec::new(),
+            descriptor_target: DescriptorTarget {
+                minecraft: "1.21.1".into(),
+                loader: "fabric".into(),
+                loader_version: None,
+            },
+            java: None,
+            pack_formats: Default::default(),
+            datapack_renames: false,
+        };
+        let plugin = PluginAdapter::load(plugin_dir.path()).unwrap();
+        let cx = AdapterContext {
+            root: &project.root,
+            files: &files,
+            plan: Some(&plan),
+            source_loader: Some("fabric".into()),
+        };
+        let set = plugin.edits(&cx).unwrap();
+        assert_eq!(set.edits.len(), 1);
+        let engine = MigrationEngine::default()
+            .with_adapters(AdapterRegistry::new(vec![Box::new(plugin)]));
+        let snapshots = tempfile::tempdir().unwrap();
+        let mut store = CheckpointStore::new();
+        let checkpoint = engine.apply_edit_set(&set, &project, &mut store, &RunOptions {
+            dry_run: false,
+            snapshot_root: snapshots.path(),
+            session_id: Uuid::new_v4(),
+        }).unwrap().unwrap();
+        let file = project.root.join("src/Main.java");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "class DemoGadget {}");
+        store.restore(checkpoint, &project.root).unwrap();
+        assert_eq!(std::fs::read_to_string(file).unwrap(), "class DemoWidget {}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn plugin_environment_is_scrubbed() {
+        let env = scrubbed_env();
+        for secret in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN", "UMMP_REST_TOKEN"] {
+            assert!(!env.iter().any(|(key, _)| key.eq_ignore_ascii_case(secret)), "{secret}");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hanging_plugin_is_killed_at_timeout() {
+        let dir = tempfile::tempdir().unwrap();
+        let spec = ProcSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "sleep 5".into()],
+            cwd: dir.path().into(),
+            env: scrubbed_env(),
+            timeout: Duration::from_millis(100),
+        };
+        let (status, _) = run_with_input(&spec, b"{}\n", 1024).unwrap();
+        assert_eq!(status, ProcStatus::TimedOut);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn plugin_stdout_is_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let spec = ProcSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "head -c 4096 /dev/zero".into()],
+            cwd: dir.path().into(),
+            env: scrubbed_env(),
+            timeout: Duration::from_secs(2),
+        };
+        let error = run_with_input(&spec, b"{}\n", 128).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
     }
 }
