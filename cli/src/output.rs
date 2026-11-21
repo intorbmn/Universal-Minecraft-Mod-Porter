@@ -59,29 +59,21 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn success_envelope_matches_golden_shape() {
-        assert_eq!(
-            success_envelope("scan", &json!({"level": "low"})),
-            json!({
-                "schema": 1,
-                "command": "scan",
-                "result": {"level": "low"},
-            })
-        );
+    fn success_envelope_matches_golden_fixture() {
+        let golden: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/golden/cli/scan-envelope.json"
+        ))
+        .unwrap();
+        assert_eq!(success_envelope("scan", &json!({})), golden);
     }
 
     #[test]
-    fn failure_envelope_matches_golden_shape() {
-        assert_eq!(
-            failure_envelope("invalid_input", "bad path"),
-            json!({
-                "schema": 1,
-                "error": {
-                    "kind": "invalid_input",
-                    "message": "bad path",
-                }
-            })
-        );
+    fn failure_envelope_matches_golden_fixture() {
+        let golden: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/golden/cli/error-envelope.json"
+        ))
+        .unwrap();
+        assert_eq!(failure_envelope("invalid_input", "bad path"), golden);
     }
 
     #[test]
