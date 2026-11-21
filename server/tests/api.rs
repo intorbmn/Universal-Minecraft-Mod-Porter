@@ -74,6 +74,7 @@ fn authorized(agent: &ureq::Agent, method: &str, url: &str) -> ureq::Request {
         _ => agent.post(url),
     }
     .set("Authorization", &format!("Bearer {TOKEN}"))
+    .set("Content-Type", "application/json")
 }
 
 fn status(result: Result<ureq::Response, ureq::Error>) -> u16 {
