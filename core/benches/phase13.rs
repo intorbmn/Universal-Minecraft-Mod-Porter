@@ -1,15 +1,13 @@
 //! Phase 13A reproducible microbenchmarks.
-use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion,
-};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 use ummp_core::analyzer::{inspect_jar, AnalyzerEngine};
-use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::build::local::copy_project;
+use ummp_core::bytecode::{remap_jar, ClassMap};
 use ummp_core::checkpoint::CheckpointStore;
 use ummp_core::filesystem::{FileSystem, LocalFileSystem};
 use ummp_core::knowledge::KnowledgeBase;
@@ -41,8 +39,7 @@ fn corpus_300() -> TempDir {
     let dir = tempdir().expect("temporary corpus");
     for i in 0..300 {
         let source = &jars[i % jars.len()];
-        fs::copy(source, dir.path().join(format!("mod-{i:03}.jar")))
-            .expect("copy fixture JAR");
+        fs::copy(source, dir.path().join(format!("mod-{i:03}.jar"))).expect("copy fixture JAR");
     }
     dir
 }
@@ -52,13 +49,17 @@ fn five_mb_jar() -> (TempDir, PathBuf) {
     let path = dir.path().join("five-mb.jar");
     let file = fs::File::create(&path).expect("create JAR");
     let mut zip = zip::ZipWriter::new(file);
-    zip.start_file("src/main/java/Large.java", zip::write::FileOptions::default())
-        .expect("start JAR entry");
+    zip.start_file(
+        "src/main/java/Large.java",
+        zip::write::FileOptions::default(),
+    )
+    .expect("start JAR entry");
     let chunk = "public class Large { String payload = \"benchmark-data\"; }\n";
     let mut remaining = 5 * 1024 * 1024;
     while remaining > 0 {
         let take = remaining.min(chunk.len());
-        zip.write_all(&chunk.as_bytes()[..take]).expect("write JAR entry");
+        zip.write_all(&chunk.as_bytes()[..take])
+            .expect("write JAR entry");
         remaining -= take;
     }
     zip.finish().expect("finish JAR");
@@ -78,7 +79,11 @@ fn bench_analyze_300(c: &mut Criterion) {
     let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
     let engine = AnalyzerEngine::default();
     c.bench_function("analyze/300_jars", |b| {
-        b.iter(|| engine.analyze(black_box(corpus.path()), &fs).expect("analyze corpus"));
+        b.iter(|| {
+            engine
+                .analyze(black_box(corpus.path()), &fs)
+                .expect("analyze corpus")
+        });
     });
 }
 
@@ -161,7 +166,9 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
             .is_some_and(|ext| ext.eq_ignore_ascii_case("class"))
         {
             class_name = Some(entry.name().to_string());
-            entry.read_to_end(&mut class_bytes).expect("read class bytes");
+            entry
+                .read_to_end(&mut class_bytes)
+                .expect("read class bytes");
             break;
         }
     }
@@ -181,9 +188,10 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
     let dir = tempdir().expect("remap fixture directory");
     let input = dir.path().join("five-mib.jar");
     let mut jar = zip::ZipWriter::new(fs::File::create(&input).expect("create remap fixture"));
-    let options = zip::write::FileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
-    jar.start_file(&class_name, options).expect("write class entry");
+    let options =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    jar.start_file(&class_name, options)
+        .expect("write class entry");
     jar.write_all(&class_bytes).expect("write class bytes");
     jar.start_file("assets/benchmark/payload.bin", options)
         .expect("write payload entry");
@@ -201,12 +209,8 @@ fn bench_remap_5mb(c: &mut Criterion) {
         b.iter_batched(
             || tempdir().expect("remap output directory"),
             |output| {
-                let result = remap_jar(
-                    &input,
-                    &output.path().join("remapped.jar"),
-                    &stages,
-                )
-                .expect("remap benchmark JAR");
+                let result = remap_jar(&input, &output.path().join("remapped.jar"), &stages)
+                    .expect("remap benchmark JAR");
                 black_box(result.classes_changed)
             },
             BatchSize::SmallInput,
