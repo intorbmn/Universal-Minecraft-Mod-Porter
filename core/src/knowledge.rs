@@ -1038,7 +1038,7 @@ mod tests {
         assert_eq!(value, Some(vec!["cached".to_string()]));
         let changed_rules = CacheKey {
             rules_sha256: "rules-b".into(),
-            ..key.clone()
+            ..key
         };
         let changed_content = CacheKey::new(CacheKind::Analysis, b"other bytes", "rules-a".into());
         assert!(kb.cache_get::<Vec<String>>(&changed_rules).unwrap().is_none());
@@ -1053,7 +1053,7 @@ mod tests {
         kb.cache_put(&key, &serde_json::json!({"value": 1})).unwrap();
         let old_version = CacheKey {
             ummp_version: "0.0.0".into(),
-            ..key.clone()
+            ..key
         };
         assert!(kb.cache_get::<serde_json::Value>(&old_version).unwrap().is_none());
     }
