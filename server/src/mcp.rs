@@ -15,6 +15,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::{
     error::Error,
+    fmt::Write as _,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -60,7 +61,7 @@ impl McpServer {
         super::resolve_allowed_path(path, &self.roots).map_err(AppError::Refused)
     }
 
-    fn plan_request(path: PathBuf, to: String, loader: String) -> PlanRequest {
+    const fn plan_request(path: PathBuf, to: String, loader: String) -> PlanRequest {
         PlanRequest {
             input: path,
             from: None,
@@ -92,13 +93,10 @@ fn report_markdown(job: &JobView) -> String {
         job.id, job.state, job.step
     );
     if let Some(progress) = &job.progress {
-        report.push_str(&format!(
-            "- Progress: {}/{}\n",
-            progress.done, progress.total
-        ));
+        let _ = writeln!(report, "- Progress: {}/{}", progress.done, progress.total);
     }
     if let Some(error) = &job.error {
-        report.push_str(&format!("\n## Error\n\n{error}\n"));
+        let _ = writeln!(report, "\n## Error\n\n{error}");
     }
     if let Some(value) = &job.result {
         report.push_str("\n## Result\n\n```json\n");
@@ -108,7 +106,7 @@ fn report_markdown(job: &JobView) -> String {
     if !job.log.is_empty() {
         report.push_str("\n## Log\n");
         for line in &job.log {
-            report.push_str(&format!("- {line}\n"));
+            let _ = writeln!(report, "- {line}");
         }
     }
     report
