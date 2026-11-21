@@ -447,6 +447,37 @@ mod tests {
     }
 
     #[test]
+    fn port_without_approval_returns_plan_and_writes_nothing() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/demo-fabric-mod");
+        let fixtures_root = fixture.parent().unwrap();
+        let descriptor = fixture.join("src/main/resources/fabric.mod.json");
+        let before = std::fs::read(&descriptor).unwrap();
+        let output = tempfile::tempdir().unwrap().path().join("ported");
+        let data = tempfile::tempdir().unwrap();
+
+        let services = Arc::new(
+            AppServices::open(ummp_core::app::Settings::new(data.path().to_path_buf())).unwrap(),
+        );
+        let server = McpServer::new(services, vec![fixtures_root.to_path_buf()]);
+        let response = server
+            .ummp_port(Parameters(PortArgs {
+                path: fixture,
+                to: "1.21.1".into(),
+                loader: "fabric".into(),
+                output: Some(output.clone()),
+                zip: false,
+                approve: false,
+            }))
+            .unwrap();
+
+        let value = serde_json::to_value(response).unwrap();
+        assert_ne!(value["isError"], true);
+        assert_eq!(std::fs::read(&descriptor).unwrap(), before);
+        assert!(!output.exists());
+    }
+
+    #[test]
     fn rollback_without_confirmation_is_refused_before_path_access() {
         let data = tempfile::tempdir().unwrap();
         let services = Arc::new(
