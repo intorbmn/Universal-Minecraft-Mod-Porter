@@ -67,7 +67,12 @@ pub enum PackCmd {
 }
 
 #[derive(Parser)]
-#[command(name = "ummp", version, about = "Universal Minecraft Mod Porter")]
+#[command(
+    name = "ummp",
+    version,
+    about = "Universal Minecraft Mod Porter",
+    after_help = "Exit codes:\n  0  Success\n  1  Unexpected error\n  2  Refused by a safety or review gate\n  3  Completed with items left for you\n  4  Build failed\n  5  Invalid input or command-line arguments"
+)]
 pub struct Cli {
     /// Emit a versioned JSON envelope; human-readable output moves to stderr.
     #[arg(long, global = true)]

@@ -71,6 +71,14 @@ fn run_pack_migrate(
         Box::new(NoIndex)
     };
     let out = migrate_pack(opts, index.as_ref(), kb)?;
+    if output::is_json_mode() {
+        output::set_result(serde_json::json!({
+            "output": out.output,
+            "report": out.report,
+            "written": out.written,
+            "exit_code": out.exit_code(),
+        }));
+    }
     let r = &out.report;
     println!("Output: {}", out.output.display());
     println!(
@@ -414,6 +422,12 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
             )?;
             analyze_pack(&mut p, &AnalyzeOptions { threads: 4 })?;
             let g = PackGraph::build(&p.entries);
+            if json_mode {
+                output::set_result(serde_json::json!({
+                    "pack": &p,
+                    "issues": g.issues.iter().map(|issue| format!("{issue:?}")).collect::<Vec<_>>(),
+                }));
+            }
             println!(
                 "{} ({:?}): Minecraft {}, loader {}",
                 p.name,
@@ -1011,6 +1025,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             if report.checkpoint_id.is_some() {
                 save_store(&snap_dir, &store)?;
             }
+            if json_mode {
+                output::set_result(&report);
+            }
             print_ai_report(&report, &cfg);
         }
 
@@ -1051,6 +1068,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             )?;
             if report.checkpoint_id.is_some() {
                 save_store(&snap_dir, &store)?;
+            }
+            if json_mode {
+                output::set_result(&report);
             }
             print_ai_report(&report, &cfg);
         }

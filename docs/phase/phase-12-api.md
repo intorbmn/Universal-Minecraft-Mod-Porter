@@ -68,11 +68,18 @@ remain outside `core`.
 
 ## Outstanding 12.A acceptance
 
-1. Provide structured JSON result views for every command, with logs on stderr.
-2. Ensure runtime input errors, safety refusals and build failures map consistently to codes 5, 2 and 4.
-3. Extend golden coverage to command result views and test config-file defaults overridden by flags.
-4. Verify bash, zsh, fish and PowerShell completions in CI.
-5. Keep build, tests, Clippy and rustfmt green after each change; complete manual acceptance before closing 12.A.
+1. Add golden fixtures for the remaining command-specific result objects and exercise config-file values overridden by real CLI flags.
+2. Complete one integration case for each documented exit code, including a general unexpected error.
+3. Verify shell completion installation/behavior in a real shell, beyond checking generated scripts.
+4. Keep build, tests, Clippy and rustfmt green; complete manual acceptance before closing 12.A.
+
+## 12.A JSON coverage follow-up
+
+- Added structured JSON results for `pack inspect`, `pack export`, `ai-assist` and `ai-debug`; all commands except shell completion generation now produce a versioned result or error envelope.
+- Added integration coverage for `pack inspect --json` and the missing-AI-key refusal envelope.
+- Added the six stable exit-code meanings to top-level `ummp --help`.
+- Corrected ADR 0015's stale historical note: ADR 0015 is the interim AI credential decision; the CLI contract remains in `docs/CLI.md`.
+- CI verification is pending for this follow-up.
 
 ## Decisions and open work
 

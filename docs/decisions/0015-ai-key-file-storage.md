@@ -3,7 +3,7 @@
 **Status:** Accepted (interim)  
 **Date:** 2026-11-20  
 **Supersedes:** The AI-provider-key storage portion of ADR 0014 only  
-**Related:** ADR 0004, 0005, 0010, 0014, 0015
+**Related:** ADR 0004, 0005, 0010, 0014
 
 ## Context
 
@@ -11,11 +11,6 @@ Phase 11 stores Anthropic and OpenAI-compatible API keys in the operating-system
 The user requested that AI keys be entered directly in the AI workflow and saved automatically
 so that the desktop app and CLI can share them. The user explicitly clarified that saving
 keys to a file is temporary, not a final storage preference.
-
-The repository already has an accepted ADR 0015 for the CLI output and configuration
-contract. ADRs are immutable after acceptance, so that decision remains ADR 0015. This
-credential decision is therefore recorded as ADR 0015 rather than deleting or renumbering
-an accepted record.
 
 ## Problem
 

@@ -286,3 +286,51 @@ fn migrate_json_missing_input_uses_invalid_input_envelope() {
     assert_eq!(value["schema"], 1);
     assert_eq!(value["error"]["kind"], "invalid_input");
 }
+
+
+#[test]
+fn pack_inspect_json_returns_a_structured_pack_result() {
+    let pack = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["--json", "pack", "inspect", pack.path().to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "pack");
+    assert_eq!(value["result"]["pack"]["format"], "folder");
+    assert!(value["result"]["pack"]["entries"].is_array());
+    assert!(value["result"]["issues"].is_array());
+}
+
+#[test]
+fn ai_assist_missing_key_is_a_json_refusal() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let mappings = dir.path().join("mappings.json");
+    std::fs::write(&mappings, "[]").unwrap();
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/loader/fabric-src");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json", "ai-assist", fixture.to_str().unwrap(),
+            "--from", "1.20.1", "--to", "1.21.1", "--loader", "fabric",
+            "--mappings", mappings.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["error"]["kind"], "refused");
+    assert!(value["error"]["message"].as_str().unwrap().contains("ai-key set"));
+}
