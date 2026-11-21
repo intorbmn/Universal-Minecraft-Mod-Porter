@@ -6,11 +6,12 @@
 use super::{AppError, Secret};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub const CREDENTIALS_FILE: &str = "credentials.json";
 const SCHEMA: u32 = 1;
+const MAX_CREDENTIALS_BYTES: u64 = 16 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -177,7 +178,15 @@ impl CredentialsFile {
         if !self.path.exists() {
             return Ok(StoredCredentials::default());
         }
-        let bytes = std::fs::read(&self.path)?;
+        let mut bytes = Vec::new();
+        std::fs::File::open(&self.path)?
+            .take(MAX_CREDENTIALS_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_CREDENTIALS_BYTES {
+            return Err(AppError::Input(
+                "credentials.json exceeds the supported size limit".into(),
+            ));
+        }
         let file: StoredCredentials = serde_json::from_slice(&bytes)
             .map_err(|_| AppError::Input("credentials.json is invalid or unsupported".into()))?;
         if file.schema != SCHEMA {
@@ -275,7 +284,9 @@ pub fn resolve_ai_key_from_store(
 }
 
 pub fn default_data_dir() -> Result<PathBuf, AppError> {
-    let override_dir = std::env::var_os("UMMP_DATA_DIR").map(PathBuf::from);
+    let override_dir = std::env::var_os("UMMP_DATA_DIR")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
 
     #[cfg(windows)]
     let fallback = std::env::var_os("APPDATA")
@@ -507,6 +518,15 @@ mod tests {
     }
 
     #[test]
+    fn oversized_credentials_are_rejected_before_deserialization() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FileKeyStore::in_dir(dir.path());
+        fs::write(store.path(), vec![b'x'; MAX_CREDENTIALS_BYTES as usize + 1]).unwrap();
+        let error = store.get(AiProviderKind::Anthropic).unwrap_err().to_string();
+        assert!(error.contains("exceeds the supported size limit"));
+    }
+
+    #[test]
     fn corrupt_credentials_return_a_clear_error() {
         let dir = tempfile::tempdir().unwrap();
         let store = FileKeyStore::in_dir(dir.path());
@@ -561,7 +581,7 @@ mod tests {
 
         // GitHub's Linux runner is unprivileged; skip when invoked as root, which bypasses
         // directory write permissions and would make this failure injection meaningless.
-        if std::env::var("USER").as_deref() == Ok("root") {
+        if fs::metadata(dir.path()).unwrap().uid() == 0 {
             return;
         }
         fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o500)).unwrap();
