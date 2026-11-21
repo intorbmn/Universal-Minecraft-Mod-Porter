@@ -686,7 +686,7 @@ impl AppServices {
                     .latest()
                     .ok_or_else(|| AppError::Input("no checkpoints found for this project".into()))?
                     .id
-            },
+            }
         };
         store.restore(id, &project.root)?;
         Ok(id)
