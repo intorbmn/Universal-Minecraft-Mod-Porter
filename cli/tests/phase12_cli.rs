@@ -353,7 +353,6 @@ fn ai_debug_missing_key_is_a_json_refusal() {
         .contains("ai-key set"));
 }
 
-
 #[test]
 fn cli_and_environment_provider_values_override_toml() {
     let dir = tempfile::tempdir().unwrap();
@@ -398,23 +397,19 @@ fn cli_and_environment_provider_values_override_toml() {
     let cli = run(Some("anthropic"));
     assert_eq!(cli.status.code(), Some(2));
     let cli_error: serde_json::Value = serde_json::from_slice(&cli.stdout).unwrap();
-    assert!(
-        cli_error["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("No anthropic API key")
-    );
+    assert!(cli_error["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("No anthropic API key"));
 
     // Environment overrides TOML when no explicit CLI value is present.
     let env = run(None);
     assert_eq!(env.status.code(), Some(2));
     let env_error: serde_json::Value = serde_json::from_slice(&env.stdout).unwrap();
-    assert!(
-        env_error["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("No openai API key")
-    );
+    assert!(env_error["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("No openai API key"));
 }
 
 #[cfg(unix)]
@@ -426,7 +421,11 @@ fn local_build_failure_uses_exit_code_four_and_json_result() {
     let data = tempfile::tempdir().unwrap();
     let project = dir.path().join("broken-gradle");
     std::fs::create_dir_all(&project).unwrap();
-    std::fs::write(project.join("settings.gradle"), "rootProject.name = 'broken'").unwrap();
+    std::fs::write(
+        project.join("settings.gradle"),
+        "rootProject.name = 'broken'",
+    )
+    .unwrap();
     std::fs::write(
         project.join("build.gradle"),
         "throw new GradleException('intentional build failure')",
