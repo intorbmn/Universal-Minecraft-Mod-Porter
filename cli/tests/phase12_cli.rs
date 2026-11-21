@@ -524,7 +524,7 @@ fn local_build_failure_uses_exit_code_four_and_json_result() {
 fn invalid_openai_base_url_does_not_save_cli_key() {
     let data = tempfile::tempdir().unwrap();
     let key_input = data.path().join("key.txt");
-    std::fs::write(&key_input, "sk-openai-test-0000000000000000\\n").unwrap();
+    std::fs::write(&key_input, "sk-openai-test-0000000000000000\n").unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args([
             "--json",
