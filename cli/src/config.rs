@@ -197,6 +197,10 @@ mod tests {
             Some("from-cli".into())
         );
         assert_eq!(
+            config.kb_path(Some("cli-mappings.db".into())),
+            Some(PathBuf::from("cli-mappings.db"))
+        );
+        assert_eq!(
             config.sandbox_repo(Some("cli/repo".into())).as_deref(),
             Some("cli/repo")
         );
