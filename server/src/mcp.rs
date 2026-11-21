@@ -336,7 +336,7 @@ impl McpServer {
         Parameters(RollbackArgs { project, checkpoint, confirm }): Parameters<RollbackArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         if !confirm {
-            return Ok(CallToolResult::error(vec![Content::text(
+            return Ok(CallToolResult::error(vec![ContentBlock::text(
                 "Rollback refused: obtain explicit human approval and call again with confirm=true.",
             )]));
         }
@@ -461,7 +461,7 @@ mod tests {
             "id": Uuid::nil(),
             "session": Uuid::nil(),
             "step": "scan",
-            "state": "succeeded",
+            "state": "Succeeded",
             "progress": null,
             "log": ["scan complete"],
             "result": { "clean": true },
