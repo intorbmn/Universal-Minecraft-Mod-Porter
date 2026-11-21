@@ -162,6 +162,7 @@ async fn delete_secret(store: Secrets<'_>, name: String) -> Result<(), UiError> 
     secret_blocking(&store, move |s| commands::delete_secret(s, &name)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn ai_key_status(
     keys: AiKeys<'_>,
@@ -170,6 +171,7 @@ fn ai_key_status(
     commands::ai_key_status(keys.inner().as_ref(), &provider)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn ai_key_save(
     keys: AiKeys<'_>,
@@ -180,6 +182,7 @@ fn ai_key_save(
     commands::ai_key_save(keys.inner().as_ref(), &provider, &key, base_url.as_deref())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn ai_key_delete(keys: AiKeys<'_>, provider: String) -> Result<(), UiError> {
     commands::ai_key_delete(keys.inner().as_ref(), &provider)
