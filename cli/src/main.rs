@@ -8,6 +8,7 @@ mod output;
 use args::{AiArgs, AiKeyCmd, BuildArgs, Cli, Commands, PackCmd};
 use config::CliConfig;
 use exit::{CliFailure, ExitCode};
+use std::fmt::Write as _;
 use std::io::{BufRead, IsTerminal, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -480,7 +481,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
                 )
                 .map_err(|error| map_app_error(&error))?;
             let result = wait_for_job(&services, id, ExitCode::Error)?;
-            let code = result["exit_code"].as_i64().unwrap_or(0) as i32;
+            let code = i32::try_from(result["exit_code"].as_i64().unwrap_or(0)).unwrap_or(0);
             println!("Output: {}", result["output"].as_str().unwrap_or("?"));
             println!("Manual items: {}", result["manual"].as_u64().unwrap_or(0));
             if output::is_json_mode() {
@@ -705,16 +706,16 @@ fn plan_markdown(plan: &ummp_core::app::views::PlanView) -> String {
         plan.files.len()
     );
     for file in &plan.files {
-        out.push_str(&format!("\n## {} ({:?})\n\n{}\n", file.path, file.kind, file.diff));
+        let _ = writeln!(out, "\n## {} ({:?})\n\n{}", file.path, file.kind, file.diff);
         if file.needs_attention {
             out.push_str("Needs adapter/manual attention.\n");
         }
     }
     for warning in &plan.warnings {
-        out.push_str(&format!("\nWarning: {warning}\n"));
+        let _ = writeln!(out, "\nWarning: {warning}");
     }
     for skipped in &plan.skipped {
-        out.push_str(&format!("\nSkipped: {} ({})\n", skipped.description, skipped.reason));
+        let _ = writeln!(out, "\nSkipped: {} ({})", skipped.description, skipped.reason);
     }
     out
 }
@@ -841,7 +842,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         } => {
             let services = app_services(&config)?;
             let request = PlanRequest {
-                input: path.clone(),
+                input: path,
                 from: Some(from),
                 to,
                 loader: Some(loader.to_lowercase()),
