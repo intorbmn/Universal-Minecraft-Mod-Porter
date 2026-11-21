@@ -107,3 +107,13 @@
 - If a pack-inspect benchmark cannot avoid external lookups, benchmark the local-only path or document the omission.
 - If incremental session evidence is insufficient, defer file skipping; do not infer success.
 - If no local repository execution environment is available, prepare source changes only when the GitHub editing path can preserve and validate exact files; clearly mark tests and CI as unverified until CI runs.
+
+## Execution log (2026-11-22)
+
+- Base commit `c9da882a41a86ae6449fed0a86b77de79fed3ed1` CI run `44928076309` was confirmed successful.
+- Added Criterion targets for all six guide workloads and `docs/PERFORMANCE.md`. Measurements remain pending: this session has no local Cargo/Rust toolchain, so no numbers are claimed.
+- Added deterministic cache keys, SQLite cache storage, bounded/corrupt-payload handling, and cache integration for pack JAR descriptor/adapter analysis plus static scan results.
+- Added tests for deterministic identity, cache hit parity, content/rule/version invalidation, and corrupt-row rebuild. They have not yet been executed.
+- Incremental port remains deferred: current JobDb/session state has no per-file hashes or durable successful-run manifest.
+- The current CI workflow's push filter does not include `phase-13a-b-performance-cache`; CI will run on a PR targeting `master`. No PR has been created.
+- Root `Cargo.lock` remains tracked but stale for the new Criterion dependency. Regenerate it with the pinned toolchain before the first PR; do not fabricate lockfile entries.
