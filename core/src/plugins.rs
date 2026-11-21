@@ -321,19 +321,49 @@ fn sensitive(path: &Path) -> bool {
         .filter_map(|c| c.as_os_str().to_str())
         .any(|part| {
             let part = part.to_ascii_lowercase();
-            part == ".env"
+            let private_key = [
+                ".pem", ".key", ".p12", ".pfx", ".jks", ".ppk", ".keystore",
+            ]
+            .iter()
+            .any(|suffix| part.ends_with(suffix))
+                || matches!(
+                    part.as_str(),
+                    "id_rsa" | "id_ed25519" | "id_ecdsa" | "id_dsa"
+                );
+            let secret_config = [
+                "credential", "secret", "token", "auth",
+            ]
+            .iter()
+            .any(|word| part.contains(word))
+                && [
+                    ".json", ".yaml", ".yml", ".toml", ".properties", ".txt", ".conf",
+                ]
+                .iter()
+                .any(|suffix| part.ends_with(suffix));
+            matches!(
+                part.as_str(),
+                ".ssh"
+                    | ".aws"
+                    | ".azure"
+                    | ".docker"
+                    | ".kube"
+                    | ".gnupg"
+                    | "gcloud"
+                    | ".npmrc"
+                    | "settings.xml"
+                    | "gradle.properties"
+                    | "local.properties"
+                    | ".netrc"
+                    | ".pypirc"
+                    | ".git-credentials"
+                    | "credentials"
+                    | "secrets"
+                    | "token"
+                    | "tokens"
+            ) || part == ".env"
                 || part.starts_with(".env.")
-                || part.contains("credential")
-                || part.contains("secret")
-                || part.contains("token")
-                || part == ".npmrc"
-                || part == "settings.xml"
-                || part == "gradle.properties"
-                || part == "local.properties"
-                || part == ".netrc"
-                || part == ".pypirc"
-                || part == ".git-credentials"
-                || part.contains("keystore")
+                || private_key
+                || secret_config
         })
 }
 
@@ -419,6 +449,13 @@ mod tests {
         assert!(forbidden(Path::new("a/B.class")));
         assert!(sensitive(Path::new(".env.production")));
         assert!(sensitive(Path::new("config/credentials.json")));
+        assert!(sensitive(Path::new(".ssh/id_ed25519")));
+        assert!(sensitive(Path::new(".aws/config")));
+        assert!(sensitive(Path::new(".docker/config.json")));
+        assert!(sensitive(Path::new("certs/private.pem")));
+        assert!(sensitive(Path::new("keys/release.p12")));
+        assert!(!sensitive(Path::new("src/TokenManager.java")));
+        assert!(!sensitive(Path::new("src/SecretManager.java")));
         assert!(!forbidden(Path::new("src/Main.java")));
     }
 
