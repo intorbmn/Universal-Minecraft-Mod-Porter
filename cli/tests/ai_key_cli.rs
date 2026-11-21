@@ -210,9 +210,9 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         if reader.read_exact(&mut body).is_err() {
             return false;
         }
-        let response = br#"{"choices":[{"message":{"content":"{\\"edits\\":[],\\"notes\\":[\\"No changes needed\\"]}"}}],"usage":{"prompt_tokens":1,"completion_tokens":1},"model":"test-model"}"#;
+        let response = br#"{"choices":[{"message":{"content":"{\"edits\":[],\"notes\":[\"No changes needed\"]}"}}],"usage":{"prompt_tokens":1,"completion_tokens":1},"model":"test-model"}"#;
         let headers = format!(
-            "HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\r\\n",
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             response.len()
         );
         stream.write_all(headers.as_bytes()).unwrap();
