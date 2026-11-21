@@ -1,18 +1,13 @@
-use axum::{
-    body::{to_bytes, Body},
-    http::{Request, StatusCode},
-    Router,
-};
 use std::{
     collections::BTreeMap,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 use tempfile::TempDir;
-use tower::ServiceExt;
 use ummp_core::{
-    app::{AppServices, PortRequest, Settings},
+    app::{AppServices, Settings},
     checkpoint::collect_files,
 };
 use ummp_server::router;
@@ -45,21 +40,48 @@ fn snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
         .collect()
 }
 
-fn setup(root: &Path) -> (TempDir, Arc<AppServices>, Router) {
+struct TestServer {
+    _data: TempDir,
+    services: Arc<AppServices>,
+    base: String,
+}
+
+async fn start_server(root: &Path) -> TestServer {
     let data = tempfile::tempdir().unwrap();
     let services = Arc::new(AppServices::open(Settings::new(data.path().to_path_buf())).unwrap());
     let app = router(Arc::clone(&services), TOKEN.into(), vec![root.to_path_buf()]);
-    (data, services, app)
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+    TestServer {
+        _data: data,
+        services,
+        base: format!("http://{address}"),
+    }
 }
 
-fn request(method: &str, uri: &str, body: Body) -> Request<Body> {
-    Request::builder()
-        .method(method)
-        .uri(uri)
-        .header("authorization", format!("Bearer {TOKEN}"))
-        .header("content-type", "application/json")
-        .body(body)
-        .unwrap()
+fn agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(20))
+        .build()
+}
+
+fn authorized(agent: &ureq::Agent, method: &str, url: &str) -> ureq::Request {
+    match method {
+        "GET" => agent.get(url),
+        _ => agent.post(url),
+    }
+    .set("Authorization", &format!("Bearer {TOKEN}"))
+}
+
+fn status(result: Result<ureq::Response, ureq::Error>) -> u16 {
+    match result {
+        Ok(response) => response.status(),
+        Err(ureq::Error::Status(code, _)) => code,
+        Err(error) => panic!("request failed: {error}"),
+    }
 }
 
 fn port_body(input: &Path, output: &Path) -> String {
@@ -77,44 +99,36 @@ fn port_body(input: &Path, output: &Path) -> String {
     .to_string()
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn requires_token() {
     let root = tempfile::tempdir().unwrap();
-    let (_data, _services, app) = setup(root.path());
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/v1/openapi.json")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let server = start_server(root.path()).await;
+    assert_eq!(
+        status(agent().get(&format!("{}/v1/openapi.json", server.base)).call()),
+        401
+    );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn rejects_path_outside_allowed_roots() {
     let root = tempfile::tempdir().unwrap();
-    let (_data, _services, app) = setup(root.path());
-    let response = app
-        .oneshot(request(
-            "POST",
-            "/v1/analyze",
-            Body::from(r#"{"path":"/etc/passwd"}"#),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let server = start_server(root.path()).await;
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/analyze", server.base),
+    )
+    .send_string(r#"{"path":"/etc/passwd"}"#);
+    assert_eq!(status(response), 403);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn plan_does_not_write() {
     let root = tempfile::tempdir().unwrap();
     let input = root.path().join("fabric");
     copy_tree(&fixture(), &input);
     let before = snapshot(&input);
-    let (_data, _services, app) = setup(root.path());
+    let server = start_server(root.path()).await;
     let body = serde_json::json!({
         "path": input,
         "from": "1.21.1",
@@ -122,20 +136,22 @@ async fn plan_does_not_write() {
         "loader": "neoforge",
         "min_confidence": 0.8
     });
-    let response = app
-        .oneshot(request("POST", "/v1/plan", Body::from(body.to_string())))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/plan", server.base),
+    )
+    .send_string(&body.to_string());
+    assert_eq!(status(response), 200);
     assert_eq!(snapshot(&input), before, "planning must not write to source");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn migrate_without_reviewed_is_refused() {
     let root = tempfile::tempdir().unwrap();
     let input = root.path().join("fabric");
     copy_tree(&fixture(), &input);
-    let (_data, _services, app) = setup(root.path());
+    let server = start_server(root.path()).await;
     let body = serde_json::json!({
         "path": input,
         "from": "1.21.1",
@@ -144,60 +160,52 @@ async fn migrate_without_reviewed_is_refused() {
         "min_confidence": 0.8,
         "reviewed": false
     });
-    let response = app
-        .oneshot(request("POST", "/v1/migrate", Body::from(body.to_string())))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/migrate", server.base),
+    )
+    .send_string(&body.to_string());
+    assert_eq!(status(response), 403);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn port_job_completes_and_sse_events_are_ordered() {
     let root = tempfile::tempdir().unwrap();
     let input = root.path().join("fabric");
     let output = root.path().join("ported");
     copy_tree(&fixture(), &input);
-    let (_data, _services, app) = setup(root.path());
+    let server = start_server(root.path()).await;
 
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/v1/port",
-            Body::from(port_body(&input, &output)),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let bytes = to_bytes(response.into_body(), 4096).await.unwrap();
-    let started: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/port", server.base),
+    )
+    .send_string(&port_body(&input, &output))
+    .unwrap();
+    let started: serde_json::Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
     let id = started["job"].as_str().unwrap();
 
-    let response = app
-        .oneshot(request(
-            "GET",
-            &format!("/v1/jobs/{id}/events"),
-            Body::empty(),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let mut body = response.into_body();
+    let response = authorized(
+        &agent(),
+        "GET",
+        &format!("{}/v1/jobs/{id}/events", server.base),
+    )
+    .call()
+    .unwrap();
+    let mut reader = BufReader::new(response.into_reader());
     let mut stream_text = String::new();
-    tokio::time::timeout(Duration::from_secs(30), async {
-        while let Some(frame) = http_body_util::BodyExt::frame(&mut body).await {
-            if let Ok(frame) = frame {
-                if let Ok(data) = frame.into_data() {
-                    stream_text.push_str(&String::from_utf8_lossy(&data));
-                    if stream_text.contains("event: job.finished") {
-                        break;
-                    }
-                }
-            }
+    loop {
+        let mut line = String::new();
+        if reader.read_line(&mut line).unwrap() == 0 {
+            break;
         }
-    })
-    .await
-    .expect("job event stream did not finish");
+        stream_text.push_str(&line);
+        if line.trim() == "event: job.finished" {
+            break;
+        }
+    }
     let started_at = stream_text.find("event: job.started").expect("started event missing");
     let finished_at = stream_text.find("event: job.finished").expect("finished event missing");
     assert!(started_at < finished_at, "{stream_text}");
@@ -205,52 +213,47 @@ async fn port_job_completes_and_sse_events_are_ordered() {
     assert!(output.join("UMMP_REPORT.md").is_file());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cancel_works() {
     let root = tempfile::tempdir().unwrap();
     let input = root.path().join("fabric");
     let output = root.path().join("ported");
     copy_tree(&fixture(), &input);
-    let (_data, services, app) = setup(root.path());
+    let server = start_server(root.path()).await;
 
     let (entered_tx, entered_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel();
     let release_rx = Mutex::new(release_rx);
-    services.set_step_hook(Arc::new(move |_job, step| {
+    server.services.set_step_hook(Arc::new(move |_job, step| {
         if step == "porting" {
             entered_tx.send(()).unwrap();
             release_rx.lock().unwrap().recv().unwrap();
         }
     }));
 
-    let response = app
-        .clone()
-        .oneshot(request(
-            "POST",
-            "/v1/port",
-            Body::from(port_body(&input, &output)),
-        ))
-        .await
-        .unwrap();
-    let bytes = to_bytes(response.into_body(), 4096).await.unwrap();
-    let started: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/port", server.base),
+    )
+    .send_string(&port_body(&input, &output))
+    .unwrap();
+    let started: serde_json::Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
     let id = started["job"].as_str().unwrap();
     entered_rx.recv_timeout(Duration::from_secs(10)).unwrap();
 
-    let response = app
-        .oneshot(request(
-            "POST",
-            &format!("/v1/jobs/{id}/cancel"),
-            Body::empty(),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/jobs/{id}/cancel", server.base),
+    )
+    .call();
+    assert_eq!(status(response), 202);
     release_tx.send(()).unwrap();
 
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            if services.job(id.parse().unwrap()).unwrap().state
+            if server.services.job(id.parse().unwrap()).unwrap().state
                 == ummp_core::jobs::JobState::Cancelled
             {
                 break;
@@ -262,42 +265,38 @@ async fn cancel_works() {
     .expect("job was not cancelled");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn body_too_large_is_413() {
     let root = tempfile::tempdir().unwrap();
-    let (_data, _services, app) = setup(root.path());
+    let server = start_server(root.path()).await;
     let body = format!(r#"{{"path":"{}"}}"#, "x".repeat(1024 * 1024));
-    let response = app
-        .oneshot(request("POST", "/v1/analyze", Body::from(body)))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    let response = authorized(
+        &agent(),
+        "POST",
+        &format!("{}/v1/analyze", server.base),
+    )
+    .send_string(&body);
+    assert_eq!(status(response), 413);
 }
 
-#[tokio::test]
-async fn health_is_public_and_openapi_lists_every_route() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn openapi_lists_every_route() {
     let root = tempfile::tempdir().unwrap();
-    let (_data, _services, app) = setup(root.path());
-    let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/v1/health")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let response = app
-        .oneshot(request("GET", "/v1/openapi.json", Body::empty()))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let bytes = to_bytes(response.into_body(), 64 * 1024).await.unwrap();
-    let spec: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    for route in [
+    let server = start_server(root.path()).await;
+    assert_eq!(
+        status(agent().get(&format!("{}/v1/health", server.base)).call()),
+        200
+    );
+    let response = authorized(
+        &agent(),
+        "GET",
+        &format!("{}/v1/openapi.json", server.base),
+    )
+    .call()
+    .unwrap();
+    let spec: serde_json::Value = serde_json::from_str(&response.into_string().unwrap()).unwrap();
+    let paths = spec["paths"].as_object().unwrap();
+    let expected = [
         "/v1/health",
         "/v1/analyze",
         "/v1/scan",
@@ -311,7 +310,9 @@ async fn health_is_public_and_openapi_lists_every_route() {
         "/v1/jobs/{id}/cancel",
         "/v1/sessions/{project}/rollback",
         "/v1/openapi.json",
-    ] {
-        assert!(spec["paths"].get(route).is_some(), "missing {route}");
+    ];
+    assert_eq!(paths.len(), expected.len());
+    for route in expected {
+        assert!(paths.contains_key(route), "missing {route}");
     }
 }
