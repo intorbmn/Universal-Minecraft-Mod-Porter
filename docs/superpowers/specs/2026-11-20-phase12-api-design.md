@@ -265,3 +265,13 @@ These decisions are recorded in ADR 0016. MCP and later Phase 12 decisions remai
 - **Lockfile constraint:** the tracked root `Cargo.lock` predates the `server/` workspace dependencies. Do not regenerate or commit it as part of 12.D. The Action regenerates a lockfile only inside its isolated checkout, then installs with `cargo install --path cli --locked`. This locks each individual run but dependency resolution can change between runs; revisit when the user decides whether the repository lockfile should be updated or untracked.
 - **Risk policy:** `scan` performs one scan; `analyze`, `port` and `build` first run a scan and stop when the selected `fail-on-risk` threshold is reached. Thresholds are `high` (default), `medium`, and `none`.
 - **Report contract:** `report-path` identifies a directory containing `result.json` plus any generated Markdown report. The directory is uploaded as one artifact.
+
+
+### 5.6 12.E plugin protocol decisions
+
+- **Discovery:** installed plugins are immediate child directories of `<data_dir>/plugins/`, each containing `ummp-plugin.toml`. `ummp plugins list` lists manifests; `ummp plugins check <dir>` validates the manifest, executable, API version and `hello` response.
+- **Protocol:** each invocation sends one JSON object terminated by LF and expects exactly one JSON response line. Requests are `hello`, `findings` and `edits`; project file contents are sent over stdin. Secret-like files are excluded.
+- **Execution:** child process, 30-second timeout, process-tree kill, allow-listed environment, 8 MiB stdout cap. Stderr is drained separately and is not protocol data.
+- **Edit validation:** each returned path must name an existing file supplied in the request, resolve within the canonical project root, and not end in `.jar` or `.class`. The returned `original` must exactly match current disk content. UMMP applies the resulting EditSet through MigrationEngine's checkpointed apply path.
+- **Trust limitation:** no portable OS sandbox is added. A malicious executable still has the current user's filesystem/process permissions; install only trusted executables. This is recorded as a limitation, not described as sandboxing.
+- **ADR numbering:** ADR 0018 is already accepted for the project license; plugin protocol uses ADR 0019.

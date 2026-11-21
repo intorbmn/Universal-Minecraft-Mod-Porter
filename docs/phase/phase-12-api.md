@@ -30,8 +30,8 @@ remain outside `core`.
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
 | 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #16 merged; CI #553 green. |
 | 12.C MCP server | IMPLEMENTATION COMPLETE; CI GREEN; MUTATION CHECKED; REAL-CLIENT CHECK PENDING CONSENT | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, strict stdout isolation, and `ummp mcp`. CI #593 green on `80bf512c`; final branch/docs CI #594 green on `b2db8fd5`. |
-| 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
-| 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
+| 12.D GitHub Action | VERIFIED | Composite Action, contract tests, CI #626 and sandbox smoke #7 passed. PR #21 remains Draft. |
+| 12.E Plugin interface | IMPLEMENTATION IN PROGRESS | Manifest, JSON Lines process boundary, plugin adapter integration, CLI checks and security tests are being added. |
 
 ## D2 / P1 design record
 
@@ -323,3 +323,15 @@ remain outside `core`.
 - Verification status: implementation is not complete until root/desktop CI is green
   and the required real run in `intorbmn/ummp-build-sandbox` is recorded below.
 - Sandbox smoke run #3 (`44916756565`) failed after successfully installing UMMP: the sandbox fixture is a Gradle demo rather than a complete mod, so `analyze` returned exit 5; inherited Bash `-e` also stopped the action before it could publish outputs/artifacts. Fixed the action to disable inherited `-e` while capturing command status, and changed the smoke command to `scan`. A successful rerun is pending.
+
+
+## 12.E implementation record — in progress
+
+- User explicitly approved manual implementation without skills on 2026-11-21.
+- Re-read Phase 12.E guide: manifest fields are `name`, `version`, `kind`, `command`, `ummp_api = 1`; protocol methods are `hello`, `findings`, and `edits`.
+- Discovery default: `<data_dir>/plugins/`; CLI commands: `ummp plugins list` and `ummp plugins check <dir>`. A check validates the manifest, executable, API version and hello handshake.
+- ADR numbering correction: ADR 0018 already records the project license, so the plugin protocol uses ADR 0019. No existing ADR is renumbered.
+- Runtime uses a scrubbed child-process environment, 30-second timeout, process-tree termination and an 8 MiB stdout cap. Returned paths must identify existing files in the canonical project root; `.jar` and `.class` are refused. Returned original text must match the current file before an edit is accepted.
+- Secret-like files (environment files, credentials, tokens, secret files and package-manager auth files) are excluded from plugin input.
+- Security boundary: the protocol provides no file-write API, but process execution is not an OS sandbox. Plugins still run with the current user's OS permissions.
+- Verification is pending full CI and the CLI smoke tests.
