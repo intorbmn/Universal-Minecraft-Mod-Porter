@@ -20,7 +20,7 @@ fn main() {
     } else if request.contains("\"method\":\"edits\"") {
         println!(
             "{}",
-            r#"[{"path":"src/Main.java","original":"class DemoWidget {}","updated":"class DemoMutated {}"}]"#
+            r#"[{"path":"src/Main.java","original":"class DemoWidget {}","updated":"class DemoGadget {}"}]"#
         );
     } else if request.contains("\"method\":\"env\"") {
         let fields = std::env::vars()
