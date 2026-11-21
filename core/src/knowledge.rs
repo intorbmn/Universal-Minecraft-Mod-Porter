@@ -212,7 +212,13 @@ impl KnowledgeBase {
             "SELECT payload FROM analysis_cache
              WHERE cache_kind = ?1 AND content_sha256 = ?2 AND ummp_version = ?3
                AND rules_sha256 = ?4 AND length(CAST(payload AS BLOB)) <= ?5",
-            params![key.kind.as_str(), key.content_sha256, key.ummp_version, key.rules_sha256, Self::MAX_CACHE_PAYLOAD_BYTES as i64],
+            params![
+                key.kind.as_str(),
+                key.content_sha256,
+                key.ummp_version,
+                key.rules_sha256,
+                Self::MAX_CACHE_PAYLOAD_BYTES as i64,
+            ],
             |row| row.get::<_, String>(0),
         );
         match payload {
@@ -238,7 +244,13 @@ impl KnowledgeBase {
             "INSERT OR REPLACE INTO analysis_cache
              (cache_kind, content_sha256, ummp_version, rules_sha256, payload)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![key.kind.as_str(), key.content_sha256, key.ummp_version, key.rules_sha256, payload],
+            params![
+                key.kind.as_str(),
+                key.content_sha256,
+                key.ummp_version,
+                key.rules_sha256,
+                payload,
+            ],
         )?;
         Ok(true)
     }
@@ -249,7 +261,12 @@ impl KnowledgeBase {
             "DELETE FROM analysis_cache
              WHERE cache_kind = ?1 AND content_sha256 = ?2 AND ummp_version = ?3
                AND rules_sha256 = ?4",
-            params![key.kind.as_str(), key.content_sha256, key.ummp_version, key.rules_sha256],
+            params![
+                key.kind.as_str(),
+                key.content_sha256,
+                key.ummp_version,
+                key.rules_sha256,
+            ],
         )?;
         Ok(())
     }
@@ -1018,7 +1035,10 @@ mod tests {
         assert!(kb.cache_put(&key, &vec!["cached".to_string()]).unwrap());
         let value: Option<Vec<String>> = kb.cache_get(&key).unwrap();
         assert_eq!(value, Some(vec!["cached".to_string()]));
-        let changed_rules = CacheKey { rules_sha256: "rules-b".into(), ..key.clone() };
+        let changed_rules = CacheKey {
+            rules_sha256: "rules-b".into(),
+            ..key.clone()
+        };
         let changed_content = CacheKey::new(CacheKind::Analysis, b"other bytes", "rules-a".into());
         assert!(kb.cache_get::<Vec<String>>(&changed_rules).unwrap().is_none());
         assert!(kb.cache_get::<Vec<String>>(&changed_content).unwrap().is_none());
@@ -1030,7 +1050,10 @@ mod tests {
         let (_dir, kb) = setup_kb();
         let key = CacheKey::new(CacheKind::Analysis, b"jar bytes", "rules".into());
         kb.cache_put(&key, &serde_json::json!({"value": 1})).unwrap();
-        let old_version = CacheKey { ummp_version: "0.0.0".into(), ..key.clone() };
+        let old_version = CacheKey {
+            ummp_version: "0.0.0".into(),
+            ..key.clone()
+        };
         assert!(kb.cache_get::<serde_json::Value>(&old_version).unwrap().is_none());
     }
 
