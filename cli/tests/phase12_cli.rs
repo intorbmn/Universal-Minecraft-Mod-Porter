@@ -168,7 +168,6 @@ fn scan_json_has_stable_versioned_envelope() {
     assert!(actual["result"].is_object());
 }
 
-
 #[test]
 fn adapters_json_has_stable_versioned_result() {
     let data = tempfile::tempdir().unwrap();
@@ -187,7 +186,10 @@ fn adapters_json_has_stable_versioned_result() {
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "adapters");
     let result = value["result"].as_object().unwrap();
-    assert_eq!(result.keys().map(String::as_str).collect::<Vec<_>>(), ["adapters"]);
+    assert_eq!(
+        result.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["adapters"]
+    );
     let adapters = result["adapters"].as_array().unwrap();
     assert!(!adapters.is_empty());
     for adapter in adapters {
