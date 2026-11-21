@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Desktop AI assist tab: the AI provider (Anthropic / OpenAI-compatible) can be switched on the tab itself; the choice is saved to settings before the key form changes, and a failed save keeps the previous provider.
 
 ### Added
+- Phase 12.D: root composite GitHub Action for analyze, scan, port and build, configurable risk gating, schema-1 JSON reports, GitHub Step Summary, report artifacts, and contract tests.
 - Phase 12.B: local Axum REST API, `ummp serve`, localhost binding, bearer-token authentication, allowed-root path validation, job SSE, OpenAPI contract and request-size limits. See ADR 0016 and `docs/API.md`.
 - Phase 12.C: official `rmcp` stdio MCP server, eight AppServices tools, `ummp://report/{job}` resource, canonical path and write-approval gates, protocol-only stdout, and a real-process JSON-RPC integration test. See ADR 0017 and `docs/MCP.md`.
 - Phase 12.0: shared interim file-backed AI credentials for desktop and CLI, environment-first provider resolution, one-time migration of legacy AI keys from the OS keyring, masked credential management in the AI screen/Settings, and `ummp ai-key set|status|delete`.
