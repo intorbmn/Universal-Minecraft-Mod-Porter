@@ -97,3 +97,10 @@ remain outside `core`.
 - Added pure success/failure JSON envelope builders and four golden-shape unit tests in `cli/src/output.rs`; commit `a935c36`.
 - CI run [#44852734836](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44852734836) failed only in Clippy: `success_envelope` accepted `serde_json::Value` by value without consuming it.
 - Fixed the Clippy finding by borrowing the result value; commit `7cbdd8e` (`fix(cli): borrow JSON envelope result`). The new commit's CI must pass before this change is considered verified.
+
+
+## 12.A utility JSON contract
+
+- Added an integration test for `adapters --json`: validates the versioned envelope, stable result keys, and typed adapter entries.
+- CI run for the test commit is required before treating it as verified.
+- `remap-jar`, `adapters`, and `rollback` now expose structured JSON results; updated `docs/CLI.md` to state exactly which commands have command-specific JSON results.
