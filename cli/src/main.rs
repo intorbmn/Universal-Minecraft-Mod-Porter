@@ -339,7 +339,7 @@ fn run_app_build(
 }
 
 fn main() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt().with_writer(std::io::stderr).init();
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
     let json_requested = arguments.iter().any(|arg| arg == "--json");
     let ai_key_set = arguments.windows(2).any(|pair| pair == ["ai-key", "set"]);
