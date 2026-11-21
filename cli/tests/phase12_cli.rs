@@ -274,8 +274,14 @@ fn migrate_json_missing_input_uses_invalid_input_envelope() {
             mappings.to_str().unwrap(),
         ])
         .env("UMMP_DATA_DIR", data.path())
-        .output().unwrap();
-    assert_eq!(output.status.code(), Some(5), "{}", String::from_utf8_lossy(&output.stderr));
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["error"]["kind"], "invalid_input");
