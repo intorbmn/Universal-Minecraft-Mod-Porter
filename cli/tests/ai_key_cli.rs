@@ -140,7 +140,7 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     });
 
     let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/loader/fabric-src");
+        .join("../tests/fixtures/loader/fabric-src");
     let log = dir.path().join("build.log");
     std::fs::write(&log, "synthetic build failure").unwrap();
     let base_url = format!("http://{address}/v1");
