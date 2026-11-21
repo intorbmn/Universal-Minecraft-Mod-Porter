@@ -3,6 +3,17 @@
 Items deferred from finished phases. Each line says what is missing and why it was left.
 Move an item into a phase file when it is picked up.
 
+## Monetization (user decision, 2026-11-21) — after all phases are finished
+- [ ] **Voluntary support with early access.** GitHub Sponsors / Ko-fi / Patreon; supporters
+  get pre-release builds early.
+- [ ] **Open source core + paid Pro edition.** Decide which features are Pro (candidates:
+  batch modpack porting, continuously updated version rule sets, built-in AI without a
+  user key) and how Pro is licensed/delivered.
+- [ ] **Pick the project license first** (it constrains the Pro model: permissive MIT/Apache
+  vs AGPL or dual licensing). Record it in an ADR before the first public release.
+- [ ] Check the Minecraft EULA / Mojang commercial guidelines and mod licenses before charging:
+  sell the tool only, never ported mods or Mojang code. Not legal advice; the user verifies.
+
 ## From the Windows app test (user, 2026-11-21) — after all phases are finished
 The user's order: finish every planned phase first, then pick these up.
 - [ ] **JAR input.** The app and CLI do not take a `.jar` as a port input: JARs only get a
