@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use commands::UiError;
 use secrets::{OsKeyring, SecretStore};
-use ummp_core::app::credentials::{AiKeyStore, FileKeyStore};
 use tauri::{AppHandle, Emitter, Manager, State};
+use ummp_core::app::credentials::{AiKeyStore, FileKeyStore};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
@@ -164,10 +164,7 @@ async fn delete_secret(store: Secrets<'_>, name: String) -> Result<(), UiError> 
 
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
-fn ai_key_status(
-    keys: AiKeys<'_>,
-    provider: String,
-) -> Result<commands::AiKeyStatus, UiError> {
+fn ai_key_status(keys: AiKeys<'_>, provider: String) -> Result<commands::AiKeyStatus, UiError> {
     commands::ai_key_status(keys.inner().as_ref(), &provider)
 }
 
