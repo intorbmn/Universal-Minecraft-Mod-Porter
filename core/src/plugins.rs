@@ -184,6 +184,14 @@ impl PluginAdapter {
     }
 
     fn invoke(&self, request: &Value) -> Result<Value, PluginError> {
+        self.invoke_with_env(request, scrubbed_env())
+    }
+
+    fn invoke_with_env(
+        &self,
+        request: &Value,
+        env: Vec<(String, String)>,
+    ) -> Result<Value, PluginError> {
         let mut input =
             serde_json::to_vec(request).map_err(|e| PluginError::Protocol(e.to_string()))?;
         input.push(b'\n');
@@ -194,7 +202,7 @@ impl PluginAdapter {
             program: self.program.clone(),
             args: self.args.clone(),
             cwd: self.info.directory.clone(),
-            env: scrubbed_env(),
+            env,
             timeout: PLUGIN_TIMEOUT,
         };
         let (status, output) = match run_with_input(&spec, &input, PLUGIN_STDOUT_LIMIT) {
@@ -389,11 +397,13 @@ impl TechAdapter for PluginAdapter {
 mod tests {
     use super::*;
     use crate::adapter::AdapterRegistry;
+    use crate::build::process::scrubbed_env_from;
     use crate::checkpoint::CheckpointStore;
     use crate::descriptor::DescriptorTarget;
     use crate::migration::{MigrationEngine, MigrationPlan, MigrationRequest, RunOptions};
     use crate::project::Project;
     use crate::resources::PackFormats;
+    use std::process::Command;
     use uuid::Uuid;
 
     #[test]
@@ -417,47 +427,46 @@ mod tests {
     }
 
     #[test]
-    fn refuses_api_two() {
+    fn ummp_api_2_refused_with_message() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join(PLUGIN_MANIFEST),
             "name='demo'\nversion='1'\nkind='rules'\ncommand=['bin/plugin']\nummp_api=2\n",
         )
         .unwrap();
-        assert!(matches!(
-            PluginAdapter::load(dir.path()),
-            Err(PluginError::Api { found: 2, .. })
-        ));
+        let error = PluginAdapter::load(dir.path()).unwrap_err();
+        assert!(error.to_string().contains("API 2"));
+        assert!(error.to_string().contains("API 1"));
     }
 
-    #[cfg(unix)]
-    fn fake_plugin(dir: &Path, response: &str) {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::write(
-            dir.join("plugin.sh"),
-            format!("#!/bin/sh\nIFS= read -r request\nprintf '%s\\n' '{response}'\n"),
-        )
-        .unwrap();
-        let mut permissions = std::fs::metadata(dir.join("plugin.sh"))
-            .unwrap()
-            .permissions();
-        permissions.set_mode(0o755);
-        std::fs::set_permissions(dir.join("plugin.sh"), permissions).unwrap();
+    fn fake_plugin(dir: &Path) {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../cli/tests/fixtures/fake_plugin.rs");
+        let binary_name = if cfg!(windows) {
+            "fake-plugin.exe"
+        } else {
+            "fake-plugin"
+        };
+        let status = Command::new("rustc")
+            .arg(fixture)
+            .arg("-o")
+            .arg(dir.join(binary_name))
+            .status()
+            .expect("rustc must be available for the fake plugin fixture");
+        assert!(status.success(), "fake plugin fixture must compile");
         std::fs::write(
             dir.join(PLUGIN_MANIFEST),
-            "name='demo'\nversion='1.0.0'\nkind='rules'\ncommand=['plugin.sh']\nummp_api=1\n",
+            format!(
+                "name='demo'\nversion='1.0.0'\nkind='rules'\ncommand=['{binary_name}']\nummp_api=1\n"
+            ),
         )
         .unwrap();
     }
 
-    #[cfg(unix)]
     #[test]
     fn plugin_edit_is_checkpointed_and_rollback_restores_source() {
         let plugin_dir = tempfile::tempdir().unwrap();
-        fake_plugin(
-            plugin_dir.path(),
-            r#"[{"path":"src/Main.java","original":"class DemoWidget {}","updated":"class DemoGadget {}"}]"#,
-        );
+        fake_plugin(plugin_dir.path());
         let project_dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(project_dir.path().join("src")).unwrap();
         std::fs::write(
@@ -527,37 +536,27 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
-    fn plugin_environment_is_scrubbed() {
-        let env = scrubbed_env();
-        for secret in [
-            "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY",
-            "GH_TOKEN",
-            "GITHUB_TOKEN",
-            "UMMP_REST_TOKEN",
-        ] {
-            assert!(
-                !env.iter().any(|(key, _)| key.eq_ignore_ascii_case(secret)),
-                "{secret}"
-            );
+    fn plugin_env_has_no_keys_or_values() {
+        let plugin_dir = tempfile::tempdir().unwrap();
+        fake_plugin(plugin_dir.path());
+        let plugin = PluginAdapter::load(plugin_dir.path()).unwrap();
+        let env = scrubbed_env_from(vec![
+            ("PATH".to_owned(), "/usr/bin".to_owned()),
+            ("OPENAI_API_KEY".to_owned(), "synthetic-openai-secret".to_owned()),
+            ("GITHUB_TOKEN".to_owned(), "synthetic-github-secret".to_owned()),
+            ("UMMP_REST_TOKEN".to_owned(), "synthetic-rest-secret".to_owned()),
+        ]);
+        let echoed = plugin
+            .invoke_with_env(&json!({"method":"env"}), env)
+            .unwrap();
+        for key in ["OPENAI_API_KEY", "GITHUB_TOKEN", "UMMP_REST_TOKEN"] {
+            assert!(echoed.get(key).is_none(), "plugin received {key}");
         }
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn hanging_plugin_is_killed_at_timeout() {
-        let dir = tempfile::tempdir().unwrap();
-        let spec = ProcSpec {
-            program: "/bin/sh".into(),
-            args: vec!["-c".into(), "sleep 5".into()],
-            cwd: dir.path().into(),
-            env: scrubbed_env(),
-            timeout: Duration::from_millis(100),
-        };
-        let (status, _) = run_with_input(&spec, b"{}\n", 1024).unwrap();
-        assert_eq!(status, ProcStatus::TimedOut);
+        let echoed = serde_json::to_string(&echoed).unwrap();
+        assert!(!echoed.contains("synthetic-openai-secret"));
+        assert!(!echoed.contains("synthetic-github-secret"));
+        assert!(!echoed.contains("synthetic-rest-secret"));
     }
 
     #[test]
@@ -568,6 +567,21 @@ mod tests {
         assert!(
             PluginAdapter::validate_path(root.path(), Path::new("../../outside"), &files).is_err()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hanging_plugin_killed_at_timeout() {
+        let dir = tempfile::tempdir().unwrap();
+        let spec = ProcSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "sleep 5".into()],
+            cwd: dir.path().into(),
+            env: scrubbed_env(),
+            timeout: Duration::from_millis(100),
+        };
+        let (status, _) = run_with_input(&spec, b"{}\n", 1024).unwrap();
+        assert_eq!(status, ProcStatus::TimedOut);
     }
 
     #[cfg(unix)]

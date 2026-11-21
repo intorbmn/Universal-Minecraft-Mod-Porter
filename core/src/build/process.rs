@@ -49,8 +49,16 @@ pub enum ProcStatus {
 /// The allow-listed subset of the current environment.
 #[must_use]
 pub fn scrubbed_env() -> Vec<(String, String)> {
-    std::env::vars()
-        .filter(|(k, _)| ENV_ALLOW.iter().any(|a| a.eq_ignore_ascii_case(k)))
+    scrubbed_env_from(std::env::vars())
+}
+
+/// Filters an arbitrary environment iterator through the same allow-list.
+pub(crate) fn scrubbed_env_from<I>(vars: I) -> Vec<(String, String)>
+where
+    I: IntoIterator<Item = (String, String)>,
+{
+    vars.into_iter()
+        .filter(|(key, _)| ENV_ALLOW.iter().any(|allowed| allowed.eq_ignore_ascii_case(key)))
         .collect()
 }
 
