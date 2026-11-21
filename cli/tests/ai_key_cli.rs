@@ -169,65 +169,65 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     listener.set_nonblocking(true).unwrap();
     let server = std::thread::spawn(move || {
         for request_index in 0..3 {
-        let deadline = Instant::now() + Duration::from_secs(5);
-        let (mut stream, _) = loop {
-            match listener.accept() {
-                Ok(connection) => break connection,
-                Err(error)
-                    if error.kind() == std::io::ErrorKind::WouldBlock
-                        && Instant::now() < deadline =>
-                {
-                    std::thread::sleep(Duration::from_millis(10));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let (mut stream, _) = loop {
+                match listener.accept() {
+                    Ok(connection) => break connection,
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && Instant::now() < deadline =>
+                    {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(_) => return false,
                 }
-                Err(_) => return false,
-            }
-        };
-        if stream
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .is_err()
-        {
-            return false;
-        }
-        let mut reader = BufReader::new(stream.try_clone().unwrap());
-        let mut content_length = 0;
-        loop {
-            let mut line = String::new();
-            if reader.read_line(&mut line).unwrap_or(0) == 0 {
+            };
+            if stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .is_err()
+            {
                 return false;
             }
-            if line == "\r\n" {
-                break;
-            }
-            if let Some((name, value)) = line.split_once(':') {
-                if name.eq_ignore_ascii_case("content-length") {
-                    content_length = value.trim().parse::<usize>().unwrap_or(0);
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut content_length = 0;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    return false;
+                }
+                if line == "\r\n" {
+                    break;
+                }
+                if let Some((name, value)) = line.split_once(':') {
+                    if name.eq_ignore_ascii_case("content-length") {
+                        content_length = value.trim().parse::<usize>().unwrap_or(0);
+                    }
                 }
             }
-        }
-        if content_length > 1_000_000 {
-            return false;
-        }
-        let mut body = vec![0; content_length];
-        if reader.read_exact(&mut body).is_err() {
-            return false;
-        }
-        let content = if request_index == 1 {
-            r#"{"summary":"No changes needed","risks":[],"files_to_change":[]}"#
-        } else {
-            r#"{"edits":[],"notes":["No changes needed"]}"#
-        };
-        let response = serde_json::json!({
-            "choices": [{"message": {"content": content}}],
-            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-            "model": "test-model"
-        })
-        .to_string();
-        let headers = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-            response.len()
-        );
-        stream.write_all(headers.as_bytes()).unwrap();
-        stream.write_all(response.as_bytes()).unwrap();
+            if content_length > 1_000_000 {
+                return false;
+            }
+            let mut body = vec![0; content_length];
+            if reader.read_exact(&mut body).is_err() {
+                return false;
+            }
+            let content = if request_index == 1 {
+                r#"{"summary":"No changes needed","risks":[],"files_to_change":[]}"#
+            } else {
+                r#"{"edits":[],"notes":["No changes needed"]}"#
+            };
+            let response = serde_json::json!({
+                "choices": [{"message": {"content": content}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+                "model": "test-model"
+            })
+            .to_string();
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                response.len()
+            );
+            stream.write_all(headers.as_bytes()).unwrap();
+            stream.write_all(response.as_bytes()).unwrap();
         }
         true
     });
@@ -297,7 +297,12 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         .env_remove("OPENAI_API_KEY")
         .output()
         .unwrap();
-    assert_eq!(assist.status.code(), Some(0), "{}", String::from_utf8_lossy(&assist.stderr));
+    assert_eq!(
+        assist.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&assist.stderr)
+    );
     let assist_text = String::from_utf8_lossy(&assist.stdout);
     assert!(!assist_text.contains("sk-openai-test-0000000000000000"));
     let assist_envelope: serde_json::Value = serde_json::from_str(&assist_text).unwrap();
@@ -309,7 +314,10 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
     .unwrap();
     assert_json_shape(&assist_envelope["result"], &assist_golden);
 
-    assert!(server.join().unwrap(), "AI provider did not receive all requests");
+    assert!(
+        server.join().unwrap(),
+        "AI provider did not receive all requests"
+    );
 
     let envelope: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(envelope["schema"], 1);
