@@ -30,6 +30,7 @@ fn action_installs_cli_and_publishes_ci_report() {
     for contract in [
         "actions-rust-lang/setup-rust-toolchain@v1",
         "cargo install --path cli --locked",
+        "set +e",
         "GITHUB_STEP_SUMMARY",
         "actions/upload-artifact@v4",
         "name: Apply UMMP exit code",
