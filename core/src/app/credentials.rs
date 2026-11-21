@@ -121,7 +121,7 @@ impl CredentialsFile {
                     .to_owned(),
             );
         self.with_exclusive_lock(|| {
-            let mut file = self.read()?;
+            let mut file = StoredCredentials::default();
             *Self::key_mut(&mut file, provider) = Some(value);
             self.write(&file)?;
             Ok(warning)
