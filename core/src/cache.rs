@@ -60,5 +60,7 @@ mod tests {
         let c = CacheKey::new(CacheKind::Analysis, b"other", "rules".into());
         assert_ne!(a.kind, b.kind);
         assert_ne!(a.content_sha256, c.content_sha256);
+        let old_version = CacheKey { ummp_version: "0.0.1".into(), ..a.clone() };
+        assert_ne!(a.ummp_version, old_version.ummp_version);
     }
 }
