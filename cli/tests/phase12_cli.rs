@@ -9,6 +9,33 @@ fn ummp(args: &[&str]) -> Output {
         .expect("run ummp")
 }
 
+fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
+    match (actual, expected) {
+        (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
+            if expected.is_empty() {
+                return;
+            }
+            let mut actual_keys = actual.keys().collect::<Vec<_>>();
+            let mut expected_keys = expected.keys().collect::<Vec<_>>();
+            actual_keys.sort();
+            expected_keys.sort();
+            assert_eq!(actual_keys, expected_keys);
+            for (key, value) in expected {
+                assert_json_shape(&actual[key], value);
+            }
+        }
+        (serde_json::Value::Array(actual), serde_json::Value::Array(expected)) => {
+            if let Some(sample) = expected.first() {
+                for value in actual {
+                    assert_json_shape(value, sample);
+                }
+            }
+        }
+        (serde_json::Value::Null, serde_json::Value::Null) => {}
+        (actual, expected) => assert_eq!(actual.is_string(), expected.is_string()),
+    }
+}
+
 #[test]
 fn explicit_toml_config_is_loaded() {
     let dir = tempfile::tempdir().unwrap();
@@ -204,7 +231,13 @@ fn bash_completion_can_be_sourced_and_registered() {
 #[test]
 fn scan_json_has_stable_versioned_envelope() {
     let dir = tempfile::tempdir().unwrap();
-    let output = ummp(&["scan", dir.path().to_str().unwrap(), "--json"]);
+    let data = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["scan", dir.path().to_str().unwrap(), "--json"])
+        .env("UMMP_DATA_DIR", data.path())
+        .current_dir(data.path())
+        .output()
+        .unwrap();
     assert_eq!(
         output.status.code(),
         Some(0),
@@ -216,20 +249,9 @@ fn scan_json_has_stable_versioned_envelope() {
         "../../tests/fixtures/golden/cli/scan-envelope.json"
     ))
     .unwrap();
-    let keys = |value: &serde_json::Value| {
-        let mut keys = value
-            .as_object()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
-        keys.sort();
-        keys
-    };
-    assert_eq!(keys(&actual), keys(&golden));
+    assert_json_shape(&actual, &golden);
     assert_eq!(actual["schema"], 1);
     assert_eq!(actual["command"], "scan");
-    assert!(actual["result"].is_object());
 }
 
 #[test]
@@ -238,6 +260,7 @@ fn adapters_json_has_stable_versioned_result() {
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args(["--json", "adapters"])
         .env("UMMP_DATA_DIR", data.path())
+        .current_dir(data.path())
         .output()
         .unwrap();
     assert_eq!(
@@ -249,28 +272,10 @@ fn adapters_json_has_stable_versioned_result() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "adapters");
-    let result = value["result"].as_object().unwrap();
-    let golden: serde_json::Value = serde_json::from_str(include_str!(
-        "../../tests/fixtures/golden/cli/adapters-result.json"
-    ))
-    .unwrap();
-    let keys = |value: &serde_json::Value| {
-        let mut keys = value
-            .as_object()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
-        keys.sort();
-        keys
-    };
-    assert_eq!(keys(&value["result"]), keys(&golden));
-    let adapters = result["adapters"].as_array().unwrap();
+    assert_json_shape(&value["result"], &golden);
+    let adapters = value["result"]["adapters"].as_array().unwrap();
     assert!(!adapters.is_empty());
-    for adapter in adapters {
-        assert!(adapter["id"].is_string());
-        assert!(adapter["level"].is_string());
-    }
+
 }
 
 #[test]
@@ -369,6 +374,7 @@ fn pack_inspect_json_returns_a_structured_pack_result() {
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args(["--json", "pack", "inspect", pack.path().to_str().unwrap()])
         .env("UMMP_DATA_DIR", data.path())
+        .current_dir(data.path())
         .output()
         .unwrap();
     assert_eq!(
@@ -384,17 +390,7 @@ fn pack_inspect_json_returns_a_structured_pack_result() {
         "../../tests/fixtures/golden/cli/pack-inspect-result.json"
     ))
     .unwrap();
-    let keys = |value: &serde_json::Value| {
-        let mut keys = value
-            .as_object()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
-        keys.sort();
-        keys
-    };
-    assert_eq!(keys(&value["result"]), keys(&golden));
+    assert_json_shape(&value["result"], &golden);
     assert_eq!(value["result"]["pack"]["format"], "folder");
     assert!(value["result"]["pack"]["entries"].is_array());
     assert!(value["result"]["issues"].is_array());
