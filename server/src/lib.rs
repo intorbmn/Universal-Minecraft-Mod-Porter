@@ -87,11 +87,11 @@ fn default_data_dir() -> PathBuf {
         .join(".ummp")
 }
 
-/// Starts the local API and prints its bearer token exactly once for the user to copy.
 fn log_server_started(address: SocketAddr, _token: &str) {
     tracing::info!(%address, "UMMP REST listening");
 }
 
+/// Starts the local API and prints its bearer token exactly once for the user to copy.
 pub fn serve(services: Arc<AppServices>, config: ServerConfig) -> Result<(), Box<dyn Error>> {
     if !config.listen.is_loopback() && !config.allow_remote {
         return Err("remote listening requires --i-understand-remote".into());
