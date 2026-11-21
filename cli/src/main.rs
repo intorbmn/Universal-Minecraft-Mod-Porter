@@ -786,18 +786,28 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             generate(shell, &mut command, "ummp", &mut std::io::stdout());
         }
         Commands::Analyze { path } => {
+            let report = app_services(&config)?
+                .analyze(&path)
+                .map_err(|error| map_app_error(&error))?;
             if json_mode {
-                let services = app_services(&config)?;
-                output::set_result(
-                    services
-                        .analyze(&path)
-                        .map_err(|error| map_app_error(&error))?,
-                );
+                output::set_result(report);
             } else {
-                let project = pm.open(&path)?;
-                let fs: Arc<dyn FileSystem> = Arc::new(LocalFileSystem);
-                let report = AnalyzerEngine::default().analyze(&project.root, &fs)?;
-                print!("{}", report.to_text());
+                println!("Input: {}", path.display());
+                for m in &report.mods {
+                    println!(
+                        "{} ({}) v{} | {} | Minecraft {} | Java {:?}",
+                        m.name, m.id, m.version, m.loader, m.minecraft, m.java
+                    );
+                }
+                if let Some(build) = report.build_system {
+                    println!("Build system: {build}");
+                }
+                if !report.languages.is_empty() {
+                    println!("Languages: {}", report.languages.join(", "));
+                }
+                for tech in &report.technologies {
+                    println!("Technology: {tech:?}");
+                }
             }
         }
 
@@ -1004,20 +1014,21 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         }
 
         Commands::Scan { path } => {
+            let report = app_services(&config)?
+                .scan(&path)
+                .map_err(|error| map_app_error(&error))?;
+            if report.level == Some(ummp_core::app::views::RiskLevel::High) {
+                exit_code = ExitCode::Refused.value();
+            }
             if json_mode {
-                let services = app_services(&config)?;
-                let report = services
-                    .scan(&path)
-                    .map_err(|error| map_app_error(&error))?;
-                if report.level == Some(ummp_core::app::views::RiskLevel::High) {
-                    exit_code = ExitCode::Refused.value();
-                }
                 output::set_result(report);
             } else {
-                let report = scan_path(&path)?;
-                print!("{}", report.to_text());
-                if report.risk() == Some(Severity::High) {
-                    exit_code = ExitCode::Refused.value();
+                println!("Risk: {:?}", report.level.unwrap_or(ummp_core::app::views::RiskLevel::Low));
+                for finding in &report.findings {
+                    println!(
+                        "[{:?}] {}: {} ({})",
+                        finding.severity, finding.rule, finding.evidence, finding.file
+                    );
                 }
             }
         }
