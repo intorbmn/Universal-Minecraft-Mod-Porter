@@ -39,7 +39,10 @@ fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
 #[test]
 #[should_panic(expected = "JSON shape mismatch")]
 fn json_shape_rejects_null_where_object_is_expected() {
-    assert_json_shape(&serde_json::Value::Null, &serde_json::json!({ "field": "" }));
+    assert_json_shape(
+        &serde_json::Value::Null,
+        &serde_json::json!({ "field": "" }),
+    );
 }
 
 #[test]
@@ -156,6 +159,12 @@ fn global_json_flag_works_after_subcommand() {
         .env("UMMP_DATA_DIR", data.path())
         .output()
         .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["command"], "scan");
@@ -187,8 +196,13 @@ fn invalid_arguments_use_exit_code_five() {
 #[test]
 fn build_rejects_non_project_input_with_code_five() {
     let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
     let missing = dir.path().join("missing-project");
-    let output = ummp(&["build", missing.to_str().unwrap()]);
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args(["build", missing.to_str().unwrap()])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
     assert_eq!(output.status.code(), Some(5));
 }
 
@@ -542,11 +556,7 @@ fn cli_and_environment_provider_values_override_toml() {
         .join("../tests/fixtures/loader/fabric-src");
 
     let run = |config_provider: &str, env_provider: &str, cli_provider: Option<&str>| {
-        std::fs::write(
-            &config,
-            format!("ai_provider = \"{config_provider}\""),
-        )
-        .unwrap();
+        std::fs::write(&config, format!("ai_provider = \"{config_provider}\"")).unwrap();
         let data = tempfile::tempdir().unwrap();
         let mut args = vec![
             "--config",
