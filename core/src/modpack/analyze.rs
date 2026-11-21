@@ -275,3 +275,48 @@ pub fn gate(pack: &Pack, allow_risk: bool) -> Result<(), PackError> {
         )))
     }
 }
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+    use crate::modpack::{EntryKind, PackFormat};
+    use tempfile::tempdir;
+
+    #[test]
+    fn second_analyze_hits_cache_and_is_identical() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/fabric-a.jar");
+        let work = tempdir().unwrap();
+        let jar = work.path().join("fabric-a.jar");
+        std::fs::copy(source, &jar).unwrap();
+        let kb = KnowledgeBase::open(&work.path().join("knowledge.db")).unwrap();
+
+        let make_pack = || {
+            let mut entry = PackEntry::new("mods/fabric-a.jar", EntryKind::Mod);
+            entry.local = Some(jar.clone());
+            Pack {
+                name: "cache-test".into(),
+                version: "1".into(),
+                format: PackFormat::Folder,
+                mc: None,
+                loader: None,
+                loader_version: None,
+                root: work.path().to_path_buf(),
+                entries: vec![entry],
+                overrides: Vec::new(),
+                warnings: Vec::new(),
+            }
+        };
+
+        let mut first = make_pack();
+        analyze_pack_cached(&mut first, &AnalyzeOptions::default(), &kb).unwrap();
+        let expected = serde_json::to_value(&first.entries[0]).unwrap();
+
+        let mut second = make_pack();
+        analyze_pack_cached(&mut second, &AnalyzeOptions::default(), &kb).unwrap();
+        let actual = serde_json::to_value(&second.entries[0]).unwrap();
+        assert_eq!(actual, expected);
+        assert!(second.entries[0].mod_info.is_some());
+    }
+}
+
