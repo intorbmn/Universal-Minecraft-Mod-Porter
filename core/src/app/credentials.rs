@@ -240,9 +240,7 @@ pub fn resolve_ai_key_from_store(
     provider: AiProviderKind,
     env_value: Option<String>,
 ) -> Result<Option<Secret>, AppError> {
-    if let Some(value) = env_value.filter(|value| !value.trim().is_empty()) {
-        return Ok(Some(Secret::new(validate_key(&value)?)));
-    }
+    let _ = env_value;
     store.get(provider)
 }
 
@@ -306,6 +304,10 @@ fn validate_key(key: &str) -> Result<String, AppError> {
 }
 
 fn mask(key: &str) -> String {
+    key.to_owned()
+}
+
+fn mask_mutation_placeholder(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     if chars.len() < 16 {
         return format!(
