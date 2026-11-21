@@ -90,3 +90,60 @@ fn delete_removes_only_the_selected_provider() {
     let value: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
     assert_eq!(value["result"]["providers"][0]["saved"], false);
 }
+
+
+#[test]
+fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = Command::new(binary())
+        .args(["ai-key", "set", "--provider", "openai"])
+        .env("UMMP_DATA_DIR", dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"sk-openai-test-0000000000000000\\n")
+        .unwrap();
+    assert_eq!(child.wait().unwrap().code(), Some(0));
+
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/loader/fabric-src");
+    let log = dir.path().join("build.log");
+    std::fs::write(&log, "synthetic build failure").unwrap();
+    let output = Command::new(binary())
+        .args([
+            "--json",
+            "ai-debug",
+            project.to_str().unwrap(),
+            "--log",
+            log.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+            "--provider",
+            "openai",
+            "--base-url",
+            "http://127.0.0.1:1/v1",
+        ])
+        .env("UMMP_DATA_DIR", dir.path())
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("OPENAI_API_KEY")
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stdout.contains("No openai API key"));
+    assert!(!stderr.contains("No openai API key"));
+    assert!(!stdout.contains("sk-openai-test-0000000000000000"));
+    assert!(!stderr.contains("sk-openai-test-0000000000000000"));
+}
