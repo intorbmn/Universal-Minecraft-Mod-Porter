@@ -768,7 +768,8 @@ const fn command_name(command: &Commands) -> &'static str {
     match command {
         Commands::AiKey { .. } => "ai-key",
         Commands::Completions { .. } => "completions",
-        Commands::Mcp => "mcp",\n        Commands::Serve { .. } => "serve",
+        Commands::Mcp => "mcp",
+        Commands::Serve { .. } => "serve",
         Commands::Analyze { .. } => "analyze",
         Commands::Migrate { .. } => "migrate",
         Commands::RemapJar { .. } => "remap-jar",
@@ -812,6 +813,17 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
 
     match command {
         Commands::AiKey { cmd } => run_ai_key(cmd, json_mode)?,
+        Commands::Mcp => {
+            if json_mode {
+                return Err(CliFailure::new(
+                    ExitCode::InvalidInput,
+                    "--json cannot be combined with the stdio MCP server",
+                )
+                .into());
+            }
+            let services = Arc::new(app_services(&config)?);
+            ummp_server::mcp::serve(services, config.allowed_roots())?;
+        }
         Commands::Serve {
             listen,
             port,
