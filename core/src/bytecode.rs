@@ -218,7 +218,7 @@ pub fn remap_jar(
         let mut entry = archive.by_index(i)?;
         let name = entry.name().replace('\\', "/");
         if entry.is_dir() {
-            writer.add_directory(name, FileOptions::default())?;
+            writer.add_directory(name, SimpleFileOptions::default())?;
             continue;
         }
         let upper = name.to_ascii_uppercase();
