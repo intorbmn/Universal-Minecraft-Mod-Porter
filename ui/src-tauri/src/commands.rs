@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
+use ummp_core::app::credentials::{AiKeyStore, AiProviderKind, resolve_ai_key_from_store};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
-use ummp_core::app::credentials::{resolve_ai_key_from_store, AiKeyStore, AiProviderKind};
 use ummp_core::app::{
     AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Secret, Settings,
 };
@@ -220,11 +220,10 @@ fn ai_provider(value: &str) -> Result<AiProviderKind, UiError> {
     }
 }
 
-pub fn ai_key_status(
-    store: &dyn AiKeyStore,
-    provider: &str,
-) -> Result<AiKeyStatus, UiError> {
-    let masked = store.masked(ai_provider(provider)?).map_err(UiError::from)?;
+pub fn ai_key_status(store: &dyn AiKeyStore, provider: &str) -> Result<AiKeyStatus, UiError> {
+    let masked = store
+        .masked(ai_provider(provider)?)
+        .map_err(UiError::from)?;
     Ok(AiKeyStatus {
         saved: masked.is_some(),
         masked,
@@ -242,9 +241,7 @@ pub fn ai_key_save(
     let secret = Secret::new(key);
     let warning = store.set(provider, &secret).map_err(UiError::from)?;
     if provider == AiProviderKind::Openai {
-        store
-            .set_openai_base_url(base_url)
-            .map_err(UiError::from)?;
+        store.set_openai_base_url(base_url).map_err(UiError::from)?;
     }
     let masked = store
         .masked(provider)
@@ -362,8 +359,8 @@ pub fn start_ai_assist(
 mod tests {
     use super::*;
     use crate::secrets::MemorySecretStore;
-    use ummp_core::app::credentials::FileKeyStore;
     use tempfile::tempdir;
+    use ummp_core::app::credentials::FileKeyStore;
 
     fn services(dir: &Path) -> AppServices {
         AppServices::open(Settings::new(dir.to_path_buf())).unwrap()
@@ -449,13 +446,7 @@ mod tests {
     fn ai_key_commands_return_only_masked_credentials() {
         let dir = tempdir().unwrap();
         let keys = FileKeyStore::in_dir(dir.path());
-        let saved = ai_key_save(
-            &keys,
-            "anthropic",
-            "sk-ant-test-0000000000000000",
-            None,
-        )
-        .unwrap();
+        let saved = ai_key_save(&keys, "anthropic", "sk-ant-test-0000000000000000", None).unwrap();
         assert_eq!(saved.masked, "sk-ant-…0000");
         let status = ai_key_status(&keys, "anthropic").unwrap();
         assert!(status.saved);
@@ -475,20 +466,29 @@ mod tests {
         migrate_legacy_ai_keys(&legacy, &keys);
 
         assert_eq!(
-            keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
+            keys.get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
             "sk-ant-test-0000000000000000"
         );
         assert_eq!(legacy.get("anthropic_api_key").unwrap(), None);
 
-        keys.set(AiProviderKind::Anthropic, &Secret::new("new-key-1234567890"))
-            .unwrap();
+        keys.set(
+            AiProviderKind::Anthropic,
+            &Secret::new("new-key-1234567890"),
+        )
+        .unwrap();
         legacy.set_legacy("anthropic_api_key", "old-key-1234567890");
         migrate_legacy_ai_keys(&legacy, &keys);
         assert_eq!(
             keys.get(AiProviderKind::Anthropic).unwrap().unwrap().expose(),
             "new-key-1234567890"
         );
-        assert_eq!(legacy.get("anthropic_api_key").unwrap().as_deref(), Some("old-key-1234567890"));
+        assert_eq!(
+            legacy.get("anthropic_api_key").unwrap().as_deref(),
+            Some("old-key-1234567890")
+        );
     }
 
     #[test]
