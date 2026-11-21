@@ -58,7 +58,10 @@ fn response(
     loop {
         let mut line = String::new();
         stdout.read_line(&mut line).unwrap();
-        assert!(!line.is_empty(), "MCP server closed stdout before response {id}");
+        assert!(
+            !line.is_empty(),
+            "MCP server closed stdout before response {id}"
+        );
         let value: serde_json::Value = serde_json::from_str(&line)
             .unwrap_or_else(|error| panic!("stdout contained non-JSON MCP data: {error}: {line}"));
         if value.get("id") == Some(&serde_json::json!(id)) {
@@ -129,7 +132,13 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         }),
     );
 
-    let listed = response(&mut child, &mut stdout, 2, "tools/list", &serde_json::json!({}));
+    let listed = response(
+        &mut child,
+        &mut stdout,
+        2,
+        "tools/list",
+        &serde_json::json!({}),
+    );
     let names = listed["result"]["tools"]
         .as_array()
         .unwrap()
@@ -190,7 +199,10 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
             "approve": false
         }),
     );
-    assert_eq!(preview["result"]["structuredContent"]["writes_started"], false);
+    assert_eq!(
+        preview["result"]["structuredContent"]["writes_started"],
+        false
+    );
     assert_eq!(
         std::fs::read(input.join("src/main/resources/fabric.mod.json")).unwrap(),
         before,
