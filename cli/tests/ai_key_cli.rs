@@ -131,7 +131,10 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
                 Err(_) => return false,
             }
         };
-        if stream.set_read_timeout(Some(Duration::from_secs(5))).is_err() {
+        if stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .is_err()
+        {
             return false;
         }
         let mut reader = BufReader::new(stream.try_clone().unwrap());
@@ -195,7 +198,10 @@ fn ai_debug_resolves_a_saved_file_key_before_provider_request() {
         .output()
         .unwrap();
 
-    assert!(server.join().unwrap(), "AI provider did not use the saved key");
+    assert!(
+        server.join().unwrap(),
+        "AI provider did not use the saved key"
+    );
     assert_eq!(output.status.code(), Some(1));
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
