@@ -6,11 +6,11 @@ use rmcp::{
         CallToolResult, ContentBlock, ListResourceTemplatesResult, ReadResourceRequestParams,
         ReadResourceResponse, ReadResourceResult, ResourceContents, ResourceTemplate, ServerCapabilities, ServerConfig,
     },
-    schemars::JsonSchema,
     tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler, ServiceExt,
     service::RequestContext,
     transport::stdio,
 };
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use std::{
