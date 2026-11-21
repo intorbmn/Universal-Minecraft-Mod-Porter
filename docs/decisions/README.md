@@ -24,3 +24,5 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0014](0014-desktop-ui-boundary-and-keyring.md) | Desktop UI boundary, credential storage, and workflow UI | Accepted (partly superseded by 0015) |
 | [0015](0015-ai-key-file-storage.md) | Interim file-backed AI API key storage | Accepted (interim) |
 | [0016](0016-local-rest-api.md) | Local REST API and async boundary | Accepted |
+
+| [0017](0017-mcp-stdio-server.md) | MCP server over stdio | Accepted |
