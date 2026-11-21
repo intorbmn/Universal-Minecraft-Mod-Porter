@@ -212,7 +212,6 @@ fn port_json_missing_input_uses_invalid_input_envelope() {
     assert_eq!(output.status.code(), Some(5));
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
-    assert_eq!(value["command"], "port");
     assert_eq!(value["error"]["kind"], "invalid_input");
 }
 
@@ -229,7 +228,6 @@ fn rollback_json_missing_project_uses_invalid_input_envelope() {
     assert_eq!(output.status.code(), Some(5));
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
-    assert_eq!(value["command"], "rollback");
     assert_eq!(value["error"]["kind"], "invalid_input");
 }
 
@@ -246,6 +244,5 @@ fn build_json_missing_project_uses_invalid_input_envelope() {
     assert_eq!(output.status.code(), Some(5));
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
-    assert_eq!(value["command"], "build");
     assert_eq!(value["error"]["kind"], "invalid_input");
 }

@@ -472,7 +472,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
                     online,
                     sources,
                     side: side(&s)?,
-                    output: config.output_dir(output),
+                    output,
                     allow_risk,
                     loader_version,
                     formats,
