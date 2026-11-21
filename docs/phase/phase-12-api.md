@@ -28,7 +28,7 @@ remain outside `core`.
 |---|---|---|
 | 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
-| 12.B REST API | IMPLEMENTATION IN PROGRESS | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
+| 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
 | 12.C MCP server | NOT STARTED; GATED | stdio transport; every write must use safe application services and explicit approval. |
 | 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
@@ -267,3 +267,17 @@ remain outside `core`.
 - Added `allowed_roots` to the strict `ummp.toml` config contract; absent configuration defaults to the user's home directory.
 - Added ADR 0016, `docs/API.md`, `docs/openapi.json`, and real-TCP integration tests on ephemeral ports for auth, path containment, read-only planning, review refusal, job/SSE ordering, cancellation, request size and OpenAPI route coverage; added tracing-capture coverage for token non-disclosure.
 - Manual security review: no route exposes credentials; all request paths are checked before reaching `AppServices`; writes use existing service methods and the reviewed migration gate; synchronous work is isolated with `spawn_blocking`. Full automated verification is pending CI.
+
+### 12.B verification and mutation evidence — 2026-11-21
+
+- Re-run locally on `480c356`: `cargo test --all` 329 passed / 0 failed, `cargo clippy --all --all-targets -- -D warnings` clean, `cargo fmt --all -- --check` clean. CI: both jobs green.
+- Mutation checks of the starred REST tests (each applied, marker confirmed with grep, test went RED, change restored, `ummp-server` tests 10/10 green again):
+
+| Test | Mutation | Result |
+|---|---|---|
+| `requires_token` | `authorize` accepts every request (`if true \|\| ...`) | RED |
+| `rejects_path_outside_allowed_roots` | `path_is_within` always returns true | RED |
+| `plan_does_not_write` | the plan handler writes `injected.txt` into the source folder | RED |
+
+- Security review of `server/` was done by hand (no security-review skill in this session): token is 244 random bits, file mode 0600, constant-time digest compare; loopback by default, remote bind needs `--i-understand-remote`; every request path is canonicalised and checked against `allowed_roots` (symlink-escape test present); 1 MiB body limit; CORS off; writes only through `AppServices`; the token is printed once to stdout and never logged (`token_never_logged`). Residual risks: a time-of-check/time-of-use gap between path check and use, and the token printed to the terminal. Both go to KNOWN_LIMITATIONS.
+- Existing tests also cover `port_job_completes_and_sse_events_are_ordered`, `cancel_works`, `rejects_symlink_escape`, `core_remains_free_of_tokio` and `token_file_is_private`.

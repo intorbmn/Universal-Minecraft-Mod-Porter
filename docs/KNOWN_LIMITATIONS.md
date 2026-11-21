@@ -133,6 +133,7 @@ Each entry names the module and the phase expected to address it.
 
 - **REST API is local and single-user only.** Remote binding is an explicit opt-in and is not protected by TLS; do not expose it to untrusted networks. There are no AI routes, token-rotation command, or multi-user authorization model. Phase 12.B.
 - **REST job events are bounded in-memory replay.** Events older than the server's 4096-event buffer are not replayed to late subscribers; persisted job state remains available through `GET /v1/jobs/{id}`. Phase 12.B.
+- **REST path checks have a time-of-check/time-of-use gap.** A path is canonicalised and checked against `allowed_roots` before use; a local process that swaps a directory for a symlink in between could escape. The bearer token is printed once to the terminal when `ummp serve` starts.
 
 ## Not started
 Phases 13-14 (production readiness, community) have no code yet.
