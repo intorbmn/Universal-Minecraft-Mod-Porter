@@ -88,6 +88,10 @@ fn default_data_dir() -> PathBuf {
 }
 
 /// Starts the local API and prints its bearer token exactly once for the user to copy.
+fn log_server_started(address: SocketAddr, _token: &str) {
+    tracing::info!(%address, "UMMP REST listening");
+}
+
 pub fn serve(services: Arc<AppServices>, config: ServerConfig) -> Result<(), Box<dyn Error>> {
     if !config.listen.is_loopback() && !config.allow_remote {
         return Err("remote listening requires --i-understand-remote".into());
@@ -101,7 +105,7 @@ pub fn serve(services: Arc<AppServices>, config: ServerConfig) -> Result<(), Box
     runtime.block_on(async move {
         let address = SocketAddr::new(config.listen, config.port);
         let listener = TcpListener::bind(address).await?;
-        eprintln!("UMMP REST listening on http://{}/v1", listener.local_addr()?);
+        log_server_started(listener.local_addr()?, &token);
         axum::serve(listener, router(services, token, config.allowed_roots)).await?;
         Ok::<(), Box<dyn Error>>(())
     })?;
@@ -623,6 +627,40 @@ mod tests {
             ..ServerConfig::default()
         };
         assert!(!config.allow_remote);
+    }
+
+
+    #[test]
+    fn token_never_logged() {
+        use std::io::{self, Write};
+        use tracing_subscriber::fmt::MakeWriter;
+
+        #[derive(Clone)]
+        struct Capture(Arc<Mutex<Vec<u8>>>);
+        impl Write for Capture {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.0.lock().expect("capture lock").extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> { Ok(()) }
+        }
+        impl<'a> MakeWriter<'a> for Capture {
+            type Writer = Self;
+            fn make_writer(&'a self) -> Self::Writer { self.clone() }
+        }
+
+        let output = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(Capture(Arc::clone(&output)))
+            .without_time()
+            .with_ansi(false)
+            .finish();
+        let token = "synthetic-server-token-never-log";
+        tracing::subscriber::with_default(subscriber, || {
+            log_server_started("127.0.0.1:7432".parse().unwrap(), token);
+        });
+        let logs = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+        assert!(!logs.contains(token), "{logs}");
     }
 
     #[cfg(unix)]
