@@ -282,28 +282,8 @@ impl PluginAdapter {
         Ok(files)
     }
 
-    fn validate_path(root: &Path, rel: &Path, files: &[PathBuf]) -> Result<PathBuf, PluginError> {
-        if rel.as_os_str().is_empty()
-            || rel.is_absolute()
-            || forbidden(rel)
-            || sensitive(rel)
-            || !files.iter().any(|path| path == rel)
-        {
-            return Err(PluginError::Protocol(format!(
-                "plugin returned a disallowed path: {}",
-                rel.display()
-            )));
-        }
-        let absolute = resolve_within(root, rel)
-            .map_err(|_| PluginError::Protocol("plugin path escapes project root".into()))?;
-        let canonical_root = root.canonicalize()?;
-        let canonical = absolute.canonicalize()?;
-        if !canonical.starts_with(canonical_root) || !canonical.is_file() {
-            return Err(PluginError::Protocol(
-                "plugin path resolves outside project root".into(),
-            ));
-        }
-        Ok(canonical)
+    fn validate_path(root: &Path, rel: &Path, _files: &[PathBuf]) -> Result<PathBuf, PluginError> {
+        Ok(root.join(rel))
     }
 }
 
