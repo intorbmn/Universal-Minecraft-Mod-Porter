@@ -83,3 +83,13 @@ remain outside `core`.
 - MCP default transport: stdio.
 - Plugin execution: child process with bounded JSON-lines input/output, timeout and path validation.
 - Do not merge this phase or begin Phase 13 without the user's review.
+
+## 12.A follow-up — AppServices routing
+
+- CI run [#44849585900](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44849585900) on `e8a83ee`: root build, tests, Clippy and rustfmt passed. Desktop web checks, Vitest and Playwright passed; desktop Rust build was still running at the time of this update.
+- Fixed the desktop OpenAI provider call to borrow the configured base URL; commit `e8a83ee`.
+- Routed both human-readable and JSON `analyze` and `scan` commands through `AppServices`, removing their direct CLI calls to the analyzer/scanner. Human output now renders the corresponding serializable app views.
+- Commit: `c394737f` (`refactor(cli): route analyze and scan through app services`).
+- CI run [#44849791146](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/44849791146) was triggered for that commit and is pending. No test success is claimed for this change until that run completes.
+- Remaining 12.A work is still substantial: route plan/migrate, port, build, pack and rollback through application services; add domain result views for every supported JSON command; complete error/exit mapping and golden tests; verify all four shell completions and documentation.
+
