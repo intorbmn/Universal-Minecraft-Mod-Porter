@@ -21,7 +21,7 @@ locally on branch `phase-10-modpack`.
 | 9 Advanced Technology Adapters | COMPLETED | Adapter SDK + 15 technology rules, native report, Groovy/Scala, Mixin member renames, loader conversion (Fabric/Quilt ↔ NeoForge, Forge ↔ NeoForge), `ummp port`. See `docs/phase/phase-09-adapters.md`, ADR 0012 |
 | 10 Modpack Migration | COMPLETED | `ummp pack inspect|migrate|export`: 4 pack formats read and written, parallel analysis, dependency graph, risk gate, planner, optional read-only Modrinth lookups, config migration through `MigrationEngine`, report. See `docs/phase/phase-10-modpack.md`, ADR 0013 |
 | 11 User Interface | COMPLETED | 11.A–11.F; both CI jobs green; Windows MSI/NSIS built (sandbox run 44718403971) and smoke-tested by the user on 2026-11-20 (main flow works; AI and job cancellation not tested by hand, covered by automated tests). Merged in PR #11. See `docs/phase/phase-11-ui.md` |
-| 12 CLI, API & External Integration | IN_PROGRESS | PR 1 implementation (12.0 credentials + 12.A CLI contract) is ready for review; CI #288 passed both root and desktop jobs on `9660301`. Real-machine, shell-completion and mutation acceptance remain; 12.B–12.E are gated by PR review. See `docs/phase/phase-12-api.md`. |
+| 12 CLI, API & External Integration | IN_PROGRESS | PR #14 (12.0 + 12.A) merged at `e86a914`; 12.B REST implementation is underway on `phase-12b-rest`. Verification pending CI. See `docs/phase/phase-12-api.md`. |
 | 13 Optimization & Production Readiness | NOT_STARTED | |
 | 14 Community & Ecosystem | NOT_STARTED | |
 
