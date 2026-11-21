@@ -663,7 +663,7 @@ fn invalid_openai_base_url_does_not_save_cli_key() {
             "file:///tmp/invalid",
         ])
         .env("UMMP_DATA_DIR", data.path())
-        .stdin(Stdio::from(std::fs::File::open(key_input).unwrap()))
+        .stdin(Stdio::from(std::fs::File::open(&key_input).unwrap()))
         .output()
         .unwrap();
 
