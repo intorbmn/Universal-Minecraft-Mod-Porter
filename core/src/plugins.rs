@@ -51,6 +51,8 @@ pub enum PluginError {
     Timeout(u64),
     #[error("plugin stdout exceeded {0} bytes")]
     OutputLimit(usize),
+    #[error("plugin request exceeded {0} bytes")]
+    RequestLimit(usize),
 }
 
 #[derive(Serialize)]
@@ -136,6 +138,7 @@ impl PluginAdapter {
     fn invoke(&self, request: &Value) -> Result<Value, PluginError> {
         let mut input = serde_json::to_vec(request).map_err(|e| PluginError::Protocol(e.to_string()))?;
         input.push(b'\n');
+        if input.len() > PLUGIN_STDOUT_LIMIT { return Err(PluginError::RequestLimit(PLUGIN_STDOUT_LIMIT)); }
         let spec = ProcSpec { program: self.program.clone(), args: self.args.clone(),
             cwd: self.info.directory.clone(), env: scrubbed_env(), timeout: PLUGIN_TIMEOUT };
         let (status, output) = match run_with_input(&spec, &input, PLUGIN_STDOUT_LIMIT) {
