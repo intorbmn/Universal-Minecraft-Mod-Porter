@@ -1,6 +1,5 @@
 //! Phase 12 CLI contract tests against the real binary.
 
-use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
 fn ummp(args: &[&str]) -> Output {
@@ -524,7 +523,9 @@ fn local_build_failure_uses_exit_code_four_and_json_result() {
 #[test]
 fn invalid_openai_base_url_does_not_save_cli_key() {
     let data = tempfile::tempdir().unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ummp"))
+    let key_input = data.path().join("key.txt");
+    std::fs::write(&key_input, "sk-openai-test-0000000000000000\\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args([
             "--json",
             "ai-key",
@@ -535,18 +536,9 @@ fn invalid_openai_base_url_does_not_save_cli_key() {
             "file:///tmp/invalid",
         ])
         .env("UMMP_DATA_DIR", data.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stdin(Stdio::from(std::fs::File::open(key_input).unwrap()))
+        .output()
         .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(b"sk-openai-test-0000000000000000\\n")
-        .unwrap();
-    let output = child.wait_with_output().unwrap();
 
     assert_eq!(
         output.status.code(),
