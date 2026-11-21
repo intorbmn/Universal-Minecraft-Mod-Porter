@@ -1225,11 +1225,7 @@ fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
             continue;
         }
         if event.kind == "job.approval" {
-            let approval: Uuid = event.payload["approval"]
-                .as_str()
-                .unwrap()
-                .parse()
-                .unwrap();
+            let approval: Uuid = event.payload["approval"].as_str().unwrap().parse().unwrap();
             svc.decide(approval, true).unwrap();
         }
         let finished = event.kind == "job.finished";
@@ -1240,8 +1236,8 @@ fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
     }
 
     let settings = std::fs::read_to_string(data_dir.join("settings.json")).unwrap();
-    let database = String::from_utf8_lossy(&std::fs::read(data_dir.join("jobs.db")).unwrap())
-        .into_owned();
+    let database =
+        String::from_utf8_lossy(&std::fs::read(data_dir.join("jobs.db")).unwrap()).into_owned();
     let event_json = serde_json::to_string(&events).unwrap();
     let job_json = serde_json::to_string(&svc.job(job).unwrap()).unwrap();
     let logs = svc.job(job).unwrap().log.join("\n");
