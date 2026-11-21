@@ -8,6 +8,7 @@ license = "MIT"
 [dependencies]
 ummp-core = { path = "../core" }
 ummp-ai-providers = { path = "../providers" }
+ummp-server = { path = "../server" }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 serde = { version = "1", features = ["derive"] }

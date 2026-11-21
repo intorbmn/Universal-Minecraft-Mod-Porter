@@ -242,3 +242,17 @@ The branch HEAD is `9e5dcb18050a727ec5cddd7e0e388ab6f9ace1e4`; current master is
 - Each PR is opened only after tests, docs, review and CI are ready. Wait for the user to review and merge before beginning the next PR.
 - The phase is complete only after every guide acceptance item and starred mutation check has recorded evidence, the Action has a real run, the user confirms the shared AI key on their machine, and the user agrees to the MCP real-world check.
 - Do not start Phase 13.
+
+
+## 5.7 12.B design addendum (2026-11-21)
+
+The user resumed Phase 12.B after PR #14 was merged. The following 12.B choices resolve guide §9a:
+
+- **CLI placement:** keep one installed binary. The existing `ummp` CLI depends on the `ummp-server` library and exposes `ummp serve`; Tokio remains a dependency of `server/` only.
+- **Token rotation:** no `--rotate-token` option in this milestone. Stop the server, delete `server-token`, and restart to create a new token.
+- **Allowed roots:** `allowed_roots` in `ummp.toml`; default to the current user's home directory. Canonicalize roots and candidates, resolve symlinks, compare Windows paths case-insensitively, and reject paths outside the configured roots.
+- **Job retention:** finished jobs remain queryable for the lifetime already provided by `jobs.db`; no second retention store.
+- **OpenAPI:** committed `docs/openapi.json` plus an integration test asserting that every router path is documented.
+- **Security:** localhost by default, remote bind requires explicit acknowledgement, bearer token file mode 0600 on Unix, constant-time comparison of token digests, 1 MiB body cap, CORS off, and no AI routes.
+
+These decisions are recorded in ADR 0016. MCP and later Phase 12 decisions remain out of scope for this 12.B implementation.

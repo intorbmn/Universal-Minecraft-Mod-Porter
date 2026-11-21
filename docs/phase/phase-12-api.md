@@ -1,10 +1,10 @@
 # Phase 12 — CLI, API & Integration
 
 **Status:** IN PROGRESS  
-**Branch:** `phase-12-api` (based on merged Phase 11 `master`)  
+**Branch:** `phase-12b-rest` (based on PR #14 merge commit)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); REST 0016, MCP 0017 and plugins 0018 are planned  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); MCP 0017 and plugins 0018 are planned  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -28,7 +28,7 @@ remain outside `core`.
 |---|---|---|
 | 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
-| 12.B REST API | NOT STARTED; GATED | Separate `server/` workspace member; localhost + bearer token. Start only after PR 1 is reviewed and merged. |
+| 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
 | 12.C MCP server | NOT STARTED; GATED | stdio transport; every write must use safe application services and explicit approval. |
 | 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
@@ -72,7 +72,7 @@ remain outside `core`.
 2. Verify completion installation/behavior in real bash, zsh, fish and PowerShell sessions.
 3. Have the user confirm on their machine that a key saved in desktop appears as masked status in CLI, and vice versa.
 4. Run and record mutation checks for the starred credential, leak, JSON and exit-code tests.
-5. Review and merge PR 1 before starting 12.B or 12.C.
+5. PR #14 was reviewed and merged; 12.B implementation is now in progress.
 
 ## 12.A JSON coverage follow-up
 
@@ -185,7 +185,7 @@ remain outside `core`.
   completion behavior, and mutation-check evidence for starred tests. Do not mark Phase 12
   complete until these and the later PR batches satisfy the guide's definition of done.
 
-- Opened [PR #14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) for review on 2026-11-21. It is mergeable and remains unmerged; wait for the user's review and merge before starting PR 2.
+- Opened [PR #14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) for review on 2026-11-21; it was merged at `e86a914e2926060aecc8c65dcfba652f0d11b3a1`.
 
 ## Latest PR 1 checkpoint — 2026-11-21
 
@@ -233,10 +233,9 @@ remain outside `core`.
      generation/registration.
   2. Save a key in Desktop, confirm `ummp ai-key status` shows the same masked key; then
      save from CLI and confirm Desktop shows it masked. Do not send a real AI request.
-- PR [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) remains open
-  and unmerged. It covers 12.0 + 12.A only.
-- **Gate:** do not begin 12.B/12.C until the user reviews and merges PR #14. Never merge
-  automatically, rebase, force-push or rewrite existing history.
+- PR [#14](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/pull/14) was merged at
+  `e86a914e2926060aecc8c65dcfba652f0d11b3a1`; it covers 12.0 + 12.A only.
+- **Gate cleared:** 12.B may proceed. Never merge automatically, rebase, force-push or rewrite existing history.
 
 ## 12.A latest verification — 2026-11-21
 
@@ -254,5 +253,31 @@ remain outside `core`.
   2. Save a key in Desktop and confirm CLI status shows the same mask; then save through CLI
      and confirm Desktop shows the same mask. Use synthetic keys if preferred; do not send
      an AI request.
-- PR #14 remains open and unmerged. Phase 12.B/12.C stay gated until the user reviews and
-  merges PR #14. No merge, rebase, force-push or history rewrite was performed.
+- PR #14 merged at `e86a914e2926060aecc8c65dcfba652f0d11b3a1`; Phase 12.B gate is cleared.
+
+
+## 12.B implementation record — 2026-11-21
+
+- Confirmed PR #14 merge commit: `e86a914e2926060aecc8c65dcfba652f0d11b3a1`.
+- Created implementation branch `phase-12b-rest` from that merge commit.
+- Added `server/` as the `ummp-server` workspace crate. Axum and Tokio remain outside `core`; the CLI exposes `ummp serve` through the server library.
+- Added REST routes for health, analyze, scan, plan, port, reviewed migrate, pack, build, job state, SSE job events, cancellation, rollback and OpenAPI.
+- Added bearer-token persistence, Unix mode 0600, constant-time digest comparison, localhost default, explicit remote-bind acknowledgement, 1 MiB body limit, disabled CORS, canonical allowed-root checks and symlink resolution.
+- SSE uses a bounded event replay buffer so a client that connects immediately after job creation does not miss initial job events. Events retain the desktop event payload format and per-job order.
+- Added `allowed_roots` to the strict `ummp.toml` config contract; absent configuration defaults to the user's home directory.
+- Added ADR 0016, `docs/API.md`, `docs/openapi.json`, and real-TCP integration tests on ephemeral ports for auth, path containment, read-only planning, review refusal, job/SSE ordering, cancellation, request size and OpenAPI route coverage; added tracing-capture coverage for token non-disclosure.
+- Manual security review: no route exposes credentials; all request paths are checked before reaching `AppServices`; writes use existing service methods and the reviewed migration gate; synchronous work is isolated with `spawn_blocking`. Full automated verification is pending CI.
+
+### 12.B verification and mutation evidence — 2026-11-21
+
+- Re-run locally on `480c356`: `cargo test --all` 329 passed / 0 failed, `cargo clippy --all --all-targets -- -D warnings` clean, `cargo fmt --all -- --check` clean. CI: both jobs green.
+- Mutation checks of the starred REST tests (each applied, marker confirmed with grep, test went RED, change restored, `ummp-server` tests 10/10 green again):
+
+| Test | Mutation | Result |
+|---|---|---|
+| `requires_token` | `authorize` accepts every request (`if true \|\| ...`) | RED |
+| `rejects_path_outside_allowed_roots` | `path_is_within` always returns true | RED |
+| `plan_does_not_write` | the plan handler writes `injected.txt` into the source folder | RED |
+
+- Security review of `server/` was done by hand (no security-review skill in this session): token is 244 random bits, file mode 0600, constant-time digest compare; loopback by default, remote bind needs `--i-understand-remote`; every request path is canonicalised and checked against `allowed_roots` (symlink-escape test present); 1 MiB body limit; CORS off; writes only through `AppServices`; the token is printed once to stdout and never logged (`token_never_logged`). Residual risks: a time-of-check/time-of-use gap between path check and use, and the token printed to the terminal. Both go to KNOWN_LIMITATIONS.
+- Existing tests also cover `port_job_completes_and_sse_events_are_ordered`, `cancel_works`, `rejects_symlink_escape`, `core_remains_free_of_tokio` and `token_file_is_private`.

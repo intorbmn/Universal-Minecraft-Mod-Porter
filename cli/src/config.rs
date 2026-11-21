@@ -11,6 +11,7 @@ pub struct CliConfig {
     pub sandbox_repo: Option<String>,
     pub ai_provider: Option<String>,
     pub openai_base_url: Option<String>,
+    pub allowed_roots: Option<Vec<PathBuf>>,
 }
 
 impl CliConfig {
@@ -89,6 +90,18 @@ impl CliConfig {
     #[must_use]
     pub fn openai_base_url(&self, cli: Option<String>) -> Option<String> {
         cli.or_else(|| self.openai_base_url.clone())
+    }
+
+    /// Roots the local REST API may access; defaults to the current user home folder.
+    #[must_use]
+    pub fn allowed_roots(&self) -> Vec<PathBuf> {
+        self.allowed_roots.clone().unwrap_or_else(|| {
+            std::env::var_os("HOME")
+                .or_else(|| std::env::var_os("USERPROFILE"))
+                .map(PathBuf::from)
+                .into_iter()
+                .collect()
+        })
     }
 }
 
@@ -223,6 +236,7 @@ kb = "mappings.db"
 sandbox_repo = "owner/repo"
 ai_provider = "openai"
 openai_base_url = "http://localhost:11434/v1"
+allowed_roots = ["D:/Minecraft/mods"]
 "#,
         )
         .unwrap();
@@ -233,6 +247,10 @@ openai_base_url = "http://localhost:11434/v1"
         assert_eq!(
             config.openai_base_url.as_deref(),
             Some("http://localhost:11434/v1")
+        );
+        assert_eq!(
+            config.allowed_roots,
+            Some(vec![PathBuf::from("D:/Minecraft/mods")])
         );
     }
 

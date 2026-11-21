@@ -25,6 +25,10 @@ Modular monolith. Layers: Domain → Application → Infrastructure/Presentation
 ## Desktop presentation (Phase 11)
 The Tauri 2 desktop shell in `ui/` is a presentation adapter, not a second application layer. Svelte screens call typed commands through `ui/src/lib/api.ts`; Tauri commands forward to `core/src/app/` and return `UiError` values. Core job events are forwarded to the window as `ummp://event`. GitHub credentials are accessed through the OS `SecretStore`; AI provider keys use the shared interim `AiKeyStore` file implementation (ADR 0015). Neither is serialized into settings or returned raw to the web view. Rust and TypeScript view/event contracts share JSON golden fixtures.
 
+## Local REST presentation (Phase 12.B, ADR 0016)
+
+The `server/` crate is a thin Axum adapter over `core/src/app::AppServices`. It owns the Tokio runtime and uses `spawn_blocking` for synchronous use cases; `core` and the CLI do not depend on Tokio. The API binds to loopback by default, requires a per-user bearer token, enforces configured canonical path roots and a 1 MiB request limit, and streams the existing job event contract through SSE. CORS is disabled and no AI credentials are exposed.
+
 ## Key patterns
 - **Adapter**: wraps a specific loader/build/ai technology behind an interface.
 - **Strategy**: interchangeable implementations (e.g. Gradle vs Maven runner).
