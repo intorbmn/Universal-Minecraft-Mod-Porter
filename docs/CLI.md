@@ -70,9 +70,9 @@ ummp --json scan ./my-mod
 ummp analyze ./my-mod --json
 ```
 
-`analyze` and `scan` return their application `*View` result objects. Other commands
-currently return an envelope containing the process `exit_code` while their detailed
-result views are being migrated. Errors use:
+`analyze` and `scan` return their application `*View` result objects. `adapters`,
+`remap-jar`, and `rollback` also return structured command-specific results. Remaining
+commands are still being migrated and may return an envelope containing only `exit_code`. Errors use:
 
 ```json
 {"schema":1,"error":{"kind":"invalid_input","message":"..."}}
