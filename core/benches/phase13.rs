@@ -210,7 +210,7 @@ fn bench_remap_5mb(c: &mut Criterion) {
                 black_box(result.classes_changed)
             },
             BatchSize::SmallInput,
-        )
+        );
     });
     group.finish();
 }
