@@ -22,7 +22,7 @@ use ummp_core::analyzer::AnalyzerEngine;
 use ummp_core::app::credentials::{
     default_data_dir, resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore,
 };
-use ummp_core::app::helpers::{detected_loader, open_kb, pack_format, side, NoIndex};
+use ummp_core::app::helpers::{open_kb, pack_format, NoIndex};
 use ummp_core::app::snapshots::{default_snapshots, load_store, save_store};
 use ummp_core::app::{AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest};
 use ummp_core::build::local::default_workdir;
@@ -692,7 +692,6 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
     }
     Ok(())
 }
-
 
 /// Formats the application plan view for the human-readable CLI.
 fn plan_markdown(plan: &ummp_core::app::views::PlanView) -> String {
