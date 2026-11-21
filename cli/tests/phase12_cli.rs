@@ -308,6 +308,48 @@ fn adapters_json_has_stable_versioned_result() {
 }
 
 #[test]
+fn migrate_json_matches_plan_view_golden_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let mappings = dir.path().join("mappings.json");
+    std::fs::write(&mappings, "[]").unwrap();
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/loader/fabric-src");
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "migrate",
+            fixture.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+            "--mappings",
+            mappings.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .current_dir(data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/migrate-plan-result.json"
+    ))
+    .unwrap();
+    assert_eq!(actual["schema"], 1);
+    assert_eq!(actual["command"], "migrate");
+    assert_json_shape(&actual["result"], &golden);
+}
+
+#[test]
 fn port_json_missing_input_uses_invalid_input_envelope() {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
