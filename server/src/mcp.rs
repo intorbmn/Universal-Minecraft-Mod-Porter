@@ -434,7 +434,7 @@ mod tests {
             }))
             .unwrap();
         let value = serde_json::to_value(response).unwrap();
-        assert_eq!(value["isError"], true);
+        assert!(value["isError"].as_bool().unwrap());
     }
 
     #[test]
