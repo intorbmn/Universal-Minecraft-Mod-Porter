@@ -29,7 +29,7 @@ remain outside `core`.
 | 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
 | 12.B REST API | IMPLEMENTATION COMPLETE; ACCEPTANCE IN SECTION 15 | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
-| 12.C MCP server | NOT STARTED; GATED | stdio transport; every write must use safe application services and explicit approval. |
+| 12.C MCP server | IMPLEMENTED; CI VERIFICATION PENDING | Official rmcp stdio server, eight AppServices tools, report resource, shared canonical path policy, port/rollback approval gates, and `ummp mcp`. |
 | 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
 
@@ -290,3 +290,14 @@ remain outside `core`.
 - Chose `server/src/mcp.rs` to share the REST crate, runtime and path policy.
 - Checked official `rmcp 3.10.0`: its declared MSRV is Rust 1.88, compatible with the repository's pinned Rust 1.97.0. Stdio/server transport is supported.
 - Added ADR 0017 and the 12.C design addendum. Implementation and verification are next; 12.C is not marked complete.
+
+
+## 12.C implementation checkpoint — 2026-11-21
+
+- Added `server/src/mcp.rs` using official `rmcp = 3.10.0` stdio transport. Exposes `ummp_analyze`, `ummp_scan`, `ummp_plan`, `ummp_port`, `ummp_build`, `ummp_job`, `ummp_cancel`, and `ummp_rollback`.
+- Added the `ummp://report/{job}` Markdown resource template. Job state and reports are sourced from `AppServices` only.
+- Reused the REST crate's canonical candidate resolution, root canonicalization and path containment helpers for MCP path checks.
+- Port is read-only unless `approve=true`; rollback requires `confirm=true`; local build requests are gated by `AppServices::check_build_risk` and require Low risk. GitHub is the default build backend.
+- Added `ummp mcp`, MCP client/setup documentation, README and CLI references, and CI push trigger for `phase-12c-mcp`.
+- Tests added for report formatting and credential/settings non-disclosure. End-to-end stdio initialize/tools/resource, approval and path-boundary tests still need CI verification and follow-up hardening.
+- No PR opened yet. Do not mark 12.C complete until CI passes and the stdio integration checks are covered.
