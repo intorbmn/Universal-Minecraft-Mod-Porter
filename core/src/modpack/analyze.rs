@@ -221,6 +221,7 @@ pub fn analyze_pack_cached(
             technologies: technologies(jar),
             warning: None,
         };
+        let scan_failed = scan.is_none();
         if let Some(value) = scan {
             result.risk = value.risk();
             result.findings = value.findings;
@@ -228,7 +229,7 @@ pub fn analyze_pack_cached(
         if result.mod_info.is_none() {
             result.warning = Some(format!("{}: descriptor unreadable", entry.path));
         }
-        if result.risk.is_none() && result.findings.is_empty() && scan.is_none() {
+        if scan_failed {
             let warning = format!("{}: scan failed", entry.path);
             result.warning = Some(result.warning.map_or(warning.clone(), |prior| format!("{prior}; {warning}")));
         }
