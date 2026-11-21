@@ -373,6 +373,26 @@ mod cache_tests {
 
         let mut first = make_pack();
         analyze_pack_cached(&mut first, &AnalyzeOptions::default(), &kb).unwrap();
+        let bytes = std::fs::read(&jar).unwrap();
+        let analysis_key = CacheKey::new(
+            CacheKind::Analysis,
+            &bytes,
+            rules_sha256(
+                "jar-descriptor-and-adapters-v1",
+                [("descriptor-parser", b"v1".as_slice())],
+            ),
+        );
+        let scan_key = CacheKey::new(
+            CacheKind::Scan,
+            &bytes,
+            rules_sha256(
+                "static-scan-engine-v1",
+                [("scan_rules.toml", include_bytes!("../scan_rules.toml").as_slice())],
+            ),
+        );
+        assert!(kb.cache_get::<CachedJarAnalysis>(&analysis_key).unwrap().is_some());
+        assert!(kb.cache_get::<crate::scan::ScanReport>(&scan_key).unwrap().is_some());
+
         let expected = serde_json::to_value(&first.entries[0]).unwrap();
 
         let mut second = make_pack();
