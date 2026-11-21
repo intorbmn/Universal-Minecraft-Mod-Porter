@@ -200,7 +200,19 @@ fn plan_req(input: PathBuf) -> PlanRequest {
         to: "1.21.1".into(),
         loader: Some("neoforge".into()),
         min_confidence: 0.8,
+        source_loader: None,
+        kb: None,
+        mappings: None,
+        snapshots: None,
     }
+}
+
+#[test]
+fn plan_uses_request_level_mappings_override() {
+    let d = tempdir().unwrap();
+    let mut request = plan_req(fixture("loader/fabric-src"));
+    request.mappings = Some(d.path().join("missing-mappings.json"));
+    assert!(services(d.path()).plan(&request).is_err());
 }
 
 #[test]
@@ -375,6 +387,8 @@ fn port_req(input: PathBuf, output: PathBuf) -> PortRequest {
         loader: Some("neoforge".into()),
         zip: false,
         min_confidence: 0.8,
+        kb: None,
+        mappings: None,
     }
 }
 
@@ -765,6 +779,10 @@ fn ai_req(input: PathBuf) -> PlanRequest {
         to: "1.21".into(),
         loader: Some("fabric".into()),
         min_confidence: 0.8,
+        source_loader: None,
+        kb: None,
+        mappings: None,
+        snapshots: None,
     }
 }
 
@@ -1151,4 +1169,88 @@ fn view_shapes_match_golden_json() {
         serde_json::to_value(&targets).unwrap(),
         view_golden("targets")
     );
+}
+
+// A provider holds the resolved secret just as a real HTTP provider does.
+struct KeyedScripted {
+    key: Secret,
+    inner: Arc<Scripted>,
+}
+
+impl AiProvider for KeyedScripted {
+    fn name(&self) -> &'static str {
+        "scripted"
+    }
+
+    fn complete(&self, req: &AiRequest) -> Result<AiResponse, AiError> {
+        assert!(!req.system.contains(self.key.expose()));
+        assert!(!req.user.contains(self.key.expose()));
+        self.inner.complete(req)
+    }
+}
+
+#[test]
+fn file_resolved_ai_key_never_enters_settings_jobs_logs_or_events() {
+    use ummp_core::app::credentials::{resolve_ai_key, AiKeyStore, AiProviderKind, FileKeyStore};
+
+    let dir = tempdir().unwrap();
+    let data_dir = dir.path().join("data");
+    let store = FileKeyStore::in_dir(&data_dir);
+    let raw_key = "sk-ant-synthetic-never-log-this-000000";
+    store
+        .set(AiProviderKind::Anthropic, &Secret::new(raw_key))
+        .unwrap();
+    let key = resolve_ai_key(&data_dir, AiProviderKind::Anthropic)
+        .unwrap()
+        .unwrap();
+
+    let svc = services(dir.path());
+    svc.save_settings(svc.settings()).unwrap();
+    let project = ai_project(dir.path());
+    let rx = collect(&svc);
+    let provider = Arc::new(KeyedScripted {
+        key,
+        inner: scripted_edit(),
+    });
+    let job = svc
+        .start_ai_assist(ai_req(project), provider, ai_config())
+        .unwrap();
+
+    let mut events = Vec::new();
+    loop {
+        let event = rx
+            .recv_timeout(Duration::from_secs(30))
+            .expect("AI job did not finish");
+        if event.payload["job"] != job.to_string() {
+            continue;
+        }
+        if event.kind == "job.approval" {
+            let approval: Uuid = event.payload["approval"].as_str().unwrap().parse().unwrap();
+            svc.decide(approval, true).unwrap();
+        }
+        let finished = event.kind == "job.finished";
+        events.push(event);
+        if finished {
+            break;
+        }
+    }
+
+    let settings = std::fs::read_to_string(data_dir.join("settings.json")).unwrap();
+    let database =
+        String::from_utf8_lossy(&std::fs::read(data_dir.join("jobs.db")).unwrap()).into_owned();
+    let event_json = serde_json::to_string(&events).unwrap();
+    let job_view = svc.job(job).unwrap();
+    assert_eq!(job_view.state, JobState::Succeeded);
+    let job_json = serde_json::to_string(&job_view).unwrap();
+    let logs = job_view.log.join("\n");
+
+    for (name, content) in [
+        ("settings", settings),
+        ("jobs database", database),
+        ("events", event_json),
+        ("job view", job_json),
+        ("job logs", logs),
+    ] {
+        assert!(!content.contains(raw_key), "raw AI key leaked into {name}");
+    }
 }

@@ -10,6 +10,7 @@ use std::sync::Arc;
 use commands::UiError;
 use secrets::{OsKeyring, SecretStore};
 use tauri::{AppHandle, Emitter, Manager, State};
+use ummp_core::app::credentials::{AiKeyStore, FileKeyStore, default_data_dir};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
@@ -34,6 +35,7 @@ impl EventHandler for WindowForwarder {
 
 type Svc<'a> = State<'a, Arc<AppServices>>;
 type Secrets<'a> = State<'a, Arc<dyn SecretStore>>;
+type AiKeys<'a> = State<'a, Arc<dyn AiKeyStore>>;
 
 async fn blocking<T, F>(svc: &Svc<'_>, f: F) -> Result<T, UiError>
 where
@@ -160,6 +162,29 @@ async fn delete_secret(store: Secrets<'_>, name: String) -> Result<(), UiError> 
     secret_blocking(&store, move |s| commands::delete_secret(s, &name)).await
 }
 
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+fn ai_key_status(keys: AiKeys<'_>, provider: String) -> Result<commands::AiKeyStatus, UiError> {
+    commands::ai_key_status(keys.inner().as_ref(), &provider)
+}
+
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+fn ai_key_save(
+    keys: AiKeys<'_>,
+    provider: String,
+    key: String,
+    base_url: Option<String>,
+) -> Result<commands::AiKeySaved, UiError> {
+    commands::ai_key_save(keys.inner().as_ref(), &provider, &key, base_url.as_deref())
+}
+
+#[allow(clippy::needless_pass_by_value)]
+#[tauri::command]
+fn ai_key_delete(keys: AiKeys<'_>, provider: String) -> Result<(), UiError> {
+    commands::ai_key_delete(keys.inner().as_ref(), &provider)
+}
+
 #[tauri::command]
 async fn check_build_risk(
     svc: Svc<'_>,
@@ -196,13 +221,13 @@ fn start_pack(svc: Svc<'_>, request: PackRequest) -> Result<Uuid, UiError> {
 #[tauri::command]
 async fn start_ai_assist(
     svc: Svc<'_>,
-    store: Secrets<'_>,
+    keys: AiKeys<'_>,
     request: PlanRequest,
 ) -> Result<Uuid, UiError> {
     let svc = Arc::clone(svc.inner());
-    let store = Arc::clone(store.inner());
+    let keys = Arc::clone(keys.inner());
     tauri::async_runtime::spawn_blocking(move || {
-        commands::start_ai_assist(&svc, store.as_ref(), request)
+        commands::start_ai_assist(&svc, keys.as_ref(), request)
     })
     .await
     .map_err(|e| UiError {
@@ -220,11 +245,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let dir = app.path().app_data_dir()?;
-            let svc = Arc::new(AppServices::open(Settings::new(dir))?);
+            let dir = default_data_dir()?;
+            let svc = Arc::new(AppServices::open(Settings::new(dir.clone()))?);
+            let legacy = Arc::new(OsKeyring);
+            let keys = Arc::new(FileKeyStore::in_dir(&dir));
+            commands::migrate_legacy_ai_keys(legacy.as_ref(), keys.as_ref());
             svc.subscribe(Arc::new(WindowForwarder(app.handle().clone())));
             app.manage(svc);
-            app.manage(Arc::new(OsKeyring) as Arc<dyn SecretStore>);
+            app.manage(legacy as Arc<dyn SecretStore>);
+            app.manage(keys as Arc<dyn AiKeyStore>);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -245,6 +274,9 @@ pub fn run() {
             set_secret,
             has_secret,
             delete_secret,
+            ai_key_status,
+            ai_key_save,
+            ai_key_delete,
             check_build_risk,
             start_build,
             start_pack,

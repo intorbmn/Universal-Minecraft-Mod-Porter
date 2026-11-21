@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2026-11-20  
-**Supersedes:** None  
+**Supersedes:** Partly superseded by ADR 0015 for AI-provider key storage only  
 **Related:** ADR 0004, 0005, 0006, 0010, 0011, 0013
 
 ## Context
@@ -38,7 +38,7 @@ A desktop shell needs to:
 - Long-running scans, planning, build setup, AI setup, and rollback work use Tauri's
   blocking worker pool. Jobs emit the existing core event envelope through
   `ummp://event`; job state remains persisted by the core.
-- The OS keyring is the only persistent secret store. The desktop uses keyring-rs with
+- The OS keyring is the persistent store for GitHub credentials. AI-provider keys use the interim shared store described in ADR 0015. The desktop uses keyring-rs with
   Windows Credential Manager, macOS Keychain, and Linux Secret Service backends. Settings
   contain only non-secret preferences. The UI has set/delete/has operations but no
   get-secret command.

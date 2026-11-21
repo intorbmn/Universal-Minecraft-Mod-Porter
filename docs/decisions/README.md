@@ -21,4 +21,5 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0011](0011-build-isolation-and-risk-gate.md) | Build on disposable GitHub runners by default; gate local builds on a static risk scan | Accepted |
 | [0012](0012-technology-adapters-and-loader-conversion.md) | Technology adapters (data rules + trait) and structural loader conversion | Accepted |
 | [0013](0013-modpack-model-online-index-hashing.md) | Modpack model, online index, and content hashing | Accepted |
-| [0014](0014-desktop-ui-boundary-and-keyring.md) | Desktop UI boundary, credential storage, and workflow UI | Accepted |
+| [0014](0014-desktop-ui-boundary-and-keyring.md) | Desktop UI boundary, credential storage, and workflow UI | Accepted (partly superseded by 0015) |
+| [0015](0015-ai-key-file-storage.md) | Interim file-backed AI API key storage | Accepted (interim) |

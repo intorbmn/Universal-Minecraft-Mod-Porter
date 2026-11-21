@@ -6,6 +6,9 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use ummp_core::ai::{AgentKind, AgentModel, AiConfig, AiProvider};
+use ummp_core::app::credentials::{
+    AiKeyStore, AiProviderKind, resolve_ai_key_from_store, validate_openai_base_url,
+};
 use ummp_core::app::views::{
     AnalysisView, JobView, PlanView, RiskLevel, RiskView, SessionView, TargetsView,
 };
@@ -195,58 +198,149 @@ pub fn start_pack(svc: &AppServices, request: PackRequest) -> Result<Uuid, UiErr
     Ok(svc.start_pack(request, index)?)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AiKeyStatus {
+    pub saved: bool,
+    pub masked: Option<String>,
+    pub base_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AiKeySaved {
+    pub masked: String,
+    pub warning: Option<String>,
+}
+
+fn ai_provider(value: &str) -> Result<AiProviderKind, UiError> {
+    match value {
+        "anthropic" => Ok(AiProviderKind::Anthropic),
+        "openai" => Ok(AiProviderKind::Openai),
+        _ => Err(UiError {
+            kind: "input",
+            message: "Choose Anthropic or OpenAI.".into(),
+        }),
+    }
+}
+
+pub fn ai_key_status(store: &dyn AiKeyStore, provider: &str) -> Result<AiKeyStatus, UiError> {
+    let masked = store
+        .masked(ai_provider(provider)?)
+        .map_err(UiError::from)?;
+    Ok(AiKeyStatus {
+        saved: masked.is_some(),
+        masked,
+        base_url: store.openai_base_url().map_err(UiError::from)?,
+    })
+}
+
+pub fn ai_key_save(
+    store: &dyn AiKeyStore,
+    provider: &str,
+    key: &str,
+    base_url: Option<&str>,
+) -> Result<AiKeySaved, UiError> {
+    let provider = ai_provider(provider)?;
+    if provider == AiProviderKind::Openai {
+        validate_openai_base_url(base_url).map_err(UiError::from)?;
+    }
+    let secret = Secret::new(key);
+    let warning = store.set(provider, &secret).map_err(UiError::from)?;
+    if provider == AiProviderKind::Openai {
+        store.set_openai_base_url(base_url).map_err(UiError::from)?;
+    }
+    let masked = store
+        .masked(provider)
+        .map_err(UiError::from)?
+        .ok_or_else(|| UiError {
+            kind: "internal",
+            message: "credential was not available after saving".into(),
+        })?;
+    Ok(AiKeySaved { masked, warning })
+}
+
+pub fn ai_key_delete(store: &dyn AiKeyStore, provider: &str) -> Result<(), UiError> {
+    let provider = ai_provider(provider)?;
+    store.delete(provider).map_err(UiError::from)?;
+    if provider == AiProviderKind::Openai {
+        store.set_openai_base_url(None).map_err(UiError::from)?;
+    }
+    Ok(())
+}
+
+/// Moves legacy AI keys once. A failed keyring operation never prevents app startup.
+pub fn migrate_legacy_ai_keys(legacy: &dyn SecretStore, keys: &dyn AiKeyStore) {
+    for (name, provider, label) in [
+        ("anthropic_api_key", AiProviderKind::Anthropic, "Anthropic"),
+        ("openai_api_key", AiProviderKind::Openai, "OpenAI"),
+    ] {
+        let value = match legacy.get(name) {
+            Ok(Some(value)) => value,
+            Ok(None) => continue,
+            Err(_) => {
+                eprintln!("could not read legacy {label} keyring entry; continuing");
+                continue;
+            }
+        };
+        match keys.get(provider) {
+            Ok(None) => {}
+            Ok(Some(_)) => continue,
+            Err(_) => {
+                eprintln!("could not read saved {label} key; continuing");
+                continue;
+            }
+        }
+        if keys.set(provider, &Secret::new(value)).is_err() {
+            eprintln!("could not migrate legacy {label} key; continuing");
+            continue;
+        }
+        if legacy.delete(name).is_ok() {
+            eprintln!("moved {label} key from keyring to shared credentials");
+        } else {
+            eprintln!("migrated {label} key but could not remove its old keyring entry");
+        }
+    }
+}
+
 pub fn start_ai_assist(
     svc: &AppServices,
-    store: &dyn SecretStore,
+    keys: &dyn AiKeyStore,
     request: PlanRequest,
 ) -> Result<Uuid, UiError> {
     let provider_name = svc
         .settings()
         .ai_provider
         .unwrap_or_else(|| "anthropic".into());
-    let provider: Arc<dyn AiProvider> = match provider_name.as_str() {
-        "anthropic" => {
-            let key = store
-                .get("anthropic_api_key")
-                .map_err(|message| UiError {
-                    kind: "internal",
-                    message,
-                })?
-                .ok_or_else(|| UiError {
-                    kind: "refused",
-                    message: "Save an Anthropic API key in Settings before starting AI assist."
-                        .into(),
-                })?;
-            Arc::new(AnthropicProvider::with_api_key(
-                key,
-                "https://api.anthropic.com",
-            ))
-        }
-        "openai" => {
-            let key = store
-                .get("openai_api_key")
-                .map_err(|message| UiError {
-                    kind: "internal",
-                    message,
-                })?
-                .ok_or_else(|| UiError {
-                    kind: "refused",
-                    message: "Save an OpenAI API key in Settings before starting AI assist.".into(),
-                })?;
+    let kind = ai_provider(&provider_name)?;
+    let key = resolve_ai_key_from_store(
+        keys,
+        kind,
+        std::env::var(kind.env_name()).ok(),
+    )
+    .map_err(UiError::from)?
+    .ok_or_else(|| UiError {
+        kind: "refused",
+        message: format!(
+            "No {provider_name} API key is saved. Enter it in the AI screen or save it with `ummp ai-key set`."
+        ),
+    })?;
+    let provider: Arc<dyn AiProvider> = match kind {
+        AiProviderKind::Anthropic => Arc::new(AnthropicProvider::with_api_key(
+            key.expose().to_owned(),
+            "https://api.anthropic.com",
+        )),
+        AiProviderKind::Openai => {
+            let url = keys
+                .openai_base_url()
+                .map_err(UiError::from)?
+                .unwrap_or_else(|| "https://api.openai.com/v1".into());
             Arc::new(OpenAiCompatibleProvider::with_api_key(
-                "https://api.openai.com/v1",
-                key,
+                &url,
+                key.expose().to_owned(),
             ))
-        }
-        _ => {
-            return Err(UiError {
-                kind: "input",
-                message: "Unsupported AI provider. Choose Anthropic or OpenAI in Settings.".into(),
-            });
         }
     };
     let mut config = AiConfig::default();
-    if provider_name == "openai" {
+    if kind == AiProviderKind::Openai {
         for agent in [
             AgentKind::Analysis,
             AgentKind::Migration,
@@ -271,6 +365,7 @@ mod tests {
     use super::*;
     use crate::secrets::MemorySecretStore;
     use tempfile::tempdir;
+    use ummp_core::app::credentials::FileKeyStore;
 
     fn services(dir: &Path) -> AppServices {
         AppServices::open(Settings::new(dir.to_path_buf())).unwrap()
@@ -317,6 +412,10 @@ mod tests {
             to: "1.21.1".into(),
             loader: Some("neoforge".into()),
             min_confidence: 0.8,
+            source_loader: None,
+            kb: None,
+            mappings: None,
+            snapshots: None,
         };
         let view = plan(&svc, &request).unwrap();
         assert_eq!(view.target_minecraft, "1.21.1");
@@ -334,6 +433,10 @@ mod tests {
             to: "1.21.1".into(),
             loader: Some("neoforge".into()),
             min_confidence: 0.8,
+            source_loader: None,
+            kb: None,
+            mappings: None,
+            snapshots: None,
         };
         let err = start_migrate_in_place(&svc, request, false).unwrap_err();
         assert_eq!(err.kind, "refused");
@@ -344,12 +447,82 @@ mod tests {
         let d = tempdir().unwrap();
         let svc = services(d.path());
         let store = MemorySecretStore::default();
-        set_secret(&store, "anthropic_api_key", "test-secret-value").unwrap();
-        assert!(has_secret(&store, "anthropic_api_key").unwrap());
+        set_secret(&store, "github_token", "test-secret-value").unwrap();
+        assert!(has_secret(&store, "github_token").unwrap());
         let returned_settings = serde_json::to_string(&settings(&svc)).unwrap();
         assert!(!returned_settings.contains("test-secret-value"));
-        delete_secret(&store, "anthropic_api_key").unwrap();
-        assert!(!has_secret(&store, "anthropic_api_key").unwrap());
+        delete_secret(&store, "github_token").unwrap();
+        assert!(!has_secret(&store, "github_token").unwrap());
+    }
+
+    #[test]
+    fn ai_key_commands_return_only_masked_credentials() {
+        let dir = tempdir().unwrap();
+        let keys = FileKeyStore::in_dir(dir.path());
+        let saved = ai_key_save(&keys, "anthropic", "sk-ant-test-0000000000000000", None).unwrap();
+        assert_eq!(saved.masked, "sk-ant-…0000");
+        let status = ai_key_status(&keys, "anthropic").unwrap();
+        assert!(status.saved);
+        assert_eq!(status.masked.as_deref(), Some("sk-ant-…0000"));
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(!json.contains("sk-ant-test-0000000000000000"));
+        assert!(!json.contains("credentials.json"));
+    }
+
+    #[test]
+    fn invalid_openai_base_url_does_not_save_the_api_key() {
+        let dir = tempdir().unwrap();
+        let keys = FileKeyStore::in_dir(dir.path());
+
+        let error = ai_key_save(
+            &keys,
+            "openai",
+            "sk-openai-test-0000000000000000",
+            Some("file:///tmp/invalid"),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.kind, "input");
+        assert!(keys.get(AiProviderKind::Openai).unwrap().is_none());
+        assert!(keys.openai_base_url().unwrap().is_none());
+    }
+
+    #[test]
+    fn legacy_ai_keyring_entry_moves_to_shared_store_once() {
+        let dir = tempdir().unwrap();
+        let legacy = MemorySecretStore::default();
+        let keys = FileKeyStore::in_dir(dir.path());
+        legacy.set_legacy("anthropic_api_key", "sk-ant-test-0000000000000000");
+
+        migrate_legacy_ai_keys(&legacy, &keys);
+
+        assert_eq!(
+            keys.get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
+            "sk-ant-test-0000000000000000"
+        );
+        assert_eq!(legacy.get("anthropic_api_key").unwrap(), None);
+
+        keys.set(
+            AiProviderKind::Anthropic,
+            &Secret::new("new-key-1234567890"),
+        )
+        .unwrap();
+        legacy.set_legacy("anthropic_api_key", "old-key-1234567890");
+        migrate_legacy_ai_keys(&legacy, &keys);
+        assert_eq!(
+            keys.get(AiProviderKind::Anthropic)
+                .unwrap()
+                .unwrap()
+                .expose(),
+            "new-key-1234567890"
+        );
+        assert_eq!(
+            legacy.get("anthropic_api_key").unwrap().as_deref(),
+            Some("old-key-1234567890")
+        );
     }
 
     #[test]

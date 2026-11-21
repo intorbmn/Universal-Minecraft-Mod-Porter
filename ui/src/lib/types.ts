@@ -207,3 +207,15 @@ export interface CoreEvent {
   payload: Record<string, unknown>;
   timestamp: string;
 }
+
+
+export interface AiKeyStatus {
+  saved: boolean;
+  masked: string | null;
+  base_url: string | null;
+}
+
+export interface AiKeySaved {
+  masked: string;
+  warning: string | null;
+}

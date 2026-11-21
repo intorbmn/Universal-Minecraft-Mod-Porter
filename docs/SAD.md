@@ -23,7 +23,7 @@ Modular monolith. Layers: Domain → Application → Infrastructure/Presentation
 | Plugin System | registry, loader, lifecycle, capability discovery, sandbox |
 
 ## Desktop presentation (Phase 11)
-The Tauri 2 desktop shell in `ui/` is a presentation adapter, not a second application layer. Svelte screens call typed commands through `ui/src/lib/api.ts`; Tauri commands forward to `core/src/app/` and return `UiError` values. Core job events are forwarded to the window as `ummp://event`. OS credentials are accessed through the `SecretStore` trait and are never serialized into settings or returned to the web view. Rust and TypeScript view/event contracts share JSON golden fixtures.
+The Tauri 2 desktop shell in `ui/` is a presentation adapter, not a second application layer. Svelte screens call typed commands through `ui/src/lib/api.ts`; Tauri commands forward to `core/src/app/` and return `UiError` values. Core job events are forwarded to the window as `ummp://event`. GitHub credentials are accessed through the OS `SecretStore`; AI provider keys use the shared interim `AiKeyStore` file implementation (ADR 0015). Neither is serialized into settings or returned raw to the web view. Rust and TypeScript view/event contracts share JSON golden fixtures.
 
 ## Key patterns
 - **Adapter**: wraps a specific loader/build/ai technology behind an interface.
@@ -42,9 +42,10 @@ Import → Detect → Analyze → Plan → Transform → Build → Test → Revi
   modpack business logic.
 - Long-running work uses Tauri's blocking worker pool and the core job/event model. Events
   are forwarded to the window as `ummp://event`; persisted job/session state remains in core.
-- OS credentials live in keyring-rs (Windows Credential Manager, macOS Keychain, Linux
-  Secret Service). Settings contain only non-secret preferences. The UI has no command that
-  returns a credential.
+- GitHub credentials live in keyring-rs (Windows Credential Manager, macOS Keychain, Linux
+  Secret Service). AI provider keys use the interim shared `FileKeyStore` behind
+  `AiKeyStore`, shared with the CLI until the user selects a final backend (ADR 0015).
+  Settings contain only non-secret preferences. No UI command returns a raw credential.
 - AI proposals and in-place migration remain behind explicit user review; local builds repeat
   the core risk gate before execution. Output-folder opening is limited to paths stored in a
   completed job result.

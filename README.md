@@ -3,7 +3,7 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-10 complete; Phase 11 (desktop UI) is implemented on `phase-11-ui`; automated CI is green. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
+Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress on `phase-12-api`. Windows installer/runtime validation and native desktop screenshots remain pending. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
 [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Documentation
@@ -23,6 +23,7 @@ Phases 0-10 complete; Phase 11 (desktop UI) is implemented on `phase-11-ui`; aut
 | [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) | Testing strategy |
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
+| [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [phase-11-ui.md](docs/phase/phase-11-ui.md) | Phase 11 implementation and verification record |
 | [ui/README.md](ui/README.md) | Desktop app setup and developer workflow |
 | [guides/](docs/guides/README.md) | Step-by-step guides for the remaining phases (10–14) |
@@ -75,7 +76,10 @@ ummp rollback path/to/mod
 # JAR-only mod: remap class names into a new JAR (input is not modified)
 ummp remap-jar mod.jar mod-1.17.jar --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 
-# AI assistance (needs ANTHROPIC_API_KEY; proposals are reviewed, approved, then applied with a checkpoint)
+# AI assistance (save a key once; proposals are reviewed, approved, then applied with a checkpoint)
+ummp ai-key set --provider anthropic
+ummp ai-key status
+ummp ai-key delete --provider anthropic
 ummp ai-assist path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
 ummp ai-debug path/to/mod --log build.log --from 1.16.5 --to 1.17.1 --loader forge
 
@@ -96,8 +100,14 @@ ummp pack migrate path/to/pack.mrpack --to 1.21.1 --loader neoforge [--online] [
 ummp pack export path/to/instance --to-format mrpack
 # exit codes: 0 done, 2 refused (High-risk JAR; review it, then --allow-risk), 3 done, mods left to you
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
-# local model: --provider openai --base-url http://localhost:11434/v1 ; settings: --ai-config ai.json
+ummp completions bash # also: zsh, fish, powershell
+# OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
 ```
+`ummp.toml` supports `output_root`, `kb`, `sandbox_repo`, `ai_provider` and
+`openai_base_url`; precedence is CLI flags > `UMMP_*` environment > TOML > built-ins.
+AI keys are stored in the interim shared credential file via `ummp ai-key set`, not TOML.
+See [docs/CLI.md](docs/CLI.md).
+
 `--mappings` takes a JSON list of `{version, loader, from_api, to_api, kind, source, confidence}`
 (the knowledge-base export format); `--kb` takes a knowledge-base SQLite file instead.
 Checkpoints go to `<project>.ummp-snapshots/` next to the project unless `--snapshots` is set.

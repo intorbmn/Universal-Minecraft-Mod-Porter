@@ -10,8 +10,8 @@ use super::jobs::{CancelToken, Shared};
 use super::snapshots::{default_snapshots, load_store, save_store};
 use super::views::JobApproval;
 use super::{
-    check_input, input_err, resolve_plan, slash, AppError, AppServices, InputKind, PlanRequest,
-    EVENT_JOB_APPROVAL,
+    check_input, input_err, plan_kb_path, resolve_plan, slash, AppError, AppServices, InputKind,
+    PlanRequest, EVENT_JOB_APPROVAL,
 };
 use crate::ai::orchestrator::{ApplyTarget, Orchestrator};
 use crate::ai::{AiConfig, AiProvider, ApprovalGate, AuditLog};
@@ -117,14 +117,17 @@ impl AppServices {
                 "AI assist needs a mod folder, not a .zip file".into(),
             ));
         }
-        let kb_path = self.settings().kb_path;
+        let settings = self.settings();
+        let kb_path = plan_kb_path(&settings, &req);
+        let mappings = req.mappings.clone();
+        let snapshots = req.snapshots.clone();
         let shared = Arc::clone(&self.shared);
         self.start_job("ai-assist", move |ctx| {
             ctx.step("validate", 1, 4)?;
             let project = DefaultProjectManager.open(&req.input).map_err(input_err)?;
             ctx.step("analysing", 2, 4)?;
-            let resolved = resolve_plan(kb_path, &project, &req)?;
-            let snap_dir = default_snapshots(&project.root);
+            let resolved = resolve_plan(kb_path, mappings, &project, &req)?;
+            let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
             let mut store = load_store(&snap_dir)?;
             let engine = MigrationEngine::default();
             // The rule-based dry run and the analysis are the agents' input.

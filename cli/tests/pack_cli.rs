@@ -80,6 +80,53 @@ fn ummp(args: &[&str]) -> Output {
         .unwrap()
 }
 
+fn assert_json_shape(actual: &serde_json::Value, expected: &serde_json::Value) {
+    match (actual, expected) {
+        (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
+            let mut actual_keys = actual.keys().collect::<Vec<_>>();
+            let mut expected_keys = expected.keys().collect::<Vec<_>>();
+            actual_keys.sort();
+            expected_keys.sort();
+            assert_eq!(actual_keys, expected_keys);
+            for (key, value) in expected {
+                assert_json_shape(&actual[key], value);
+            }
+        }
+        (serde_json::Value::Array(actual), serde_json::Value::Array(expected)) => {
+            if let Some(sample) = expected.first() {
+                for value in actual {
+                    assert_json_shape(value, sample);
+                }
+            }
+        }
+        (serde_json::Value::String(_), serde_json::Value::String(_))
+        | (serde_json::Value::Number(_), serde_json::Value::Number(_))
+        | (serde_json::Value::Bool(_), serde_json::Value::Bool(_))
+        | (serde_json::Value::Null, serde_json::Value::Null) => {}
+        _ => panic!("JSON shape mismatch: actual {actual}, expected schema {expected}"),
+    }
+}
+
+fn migrate_json(pack: &Path, out: &Path) -> Output {
+    let data = tempfile::tempdir().unwrap();
+    Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "pack",
+            "migrate",
+            pack.to_str().unwrap(),
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+            "--output",
+            out.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap()
+}
+
 fn migrate(pack: &Path, out: &Path, extra: &[&str]) -> Output {
     let mut a = vec![
         "pack",
@@ -111,6 +158,65 @@ fn inspect_lists_mods_and_writes_nothing() {
     let out = String::from_utf8_lossy(&o.stdout);
     assert!(out.contains("mods/a.jar") && out.contains("[a]"), "{out}");
     assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), before);
+}
+
+#[test]
+fn migrate_json_matches_golden_result_shape() {
+    let tmp = tempfile::tempdir().unwrap();
+    let pack = pack_dir(tmp.path(), &[("a.jar", fabric_jar("a", "1.21.1"))]);
+    let out = tmp.path().join("json-out");
+    let output = migrate_json(&pack, &out);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "pack");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/pack-migrate-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
+    assert_eq!(envelope["result"]["items"][0]["action"]["action"], "keep");
+}
+
+#[test]
+fn export_json_matches_golden_result_shape() {
+    let tmp = tempfile::tempdir().unwrap();
+    let pack = pack_dir(tmp.path(), &[("a.jar", fabric_jar("a", "1.21.1"))]);
+    let out = tmp.path().join("export-json");
+    let data = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "pack",
+            "export",
+            pack.to_str().unwrap(),
+            "--to-format",
+            "mrpack",
+            "--output",
+            out.to_str().unwrap(),
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["schema"], 1);
+    assert_eq!(envelope["command"], "pack");
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../tests/fixtures/golden/cli/pack-export-result.json"
+    ))
+    .unwrap();
+    assert_json_shape(&envelope["result"], &golden);
 }
 
 #[test]

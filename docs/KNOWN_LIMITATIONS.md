@@ -123,5 +123,13 @@ Each entry names the module and the phase expected to address it.
 - Build cancellation is cooperative between pipeline steps. A currently running Gradle or GitHub Actions build is not interrupted.
 - The first implementation uses the default Tauri icons. Branding and screenshots remain follow-up work.
 
+## Phase 12 (in progress)
+- **Interim AI credential storage is plaintext.** `credentials.json` is shared by desktop and
+  CLI. Unix mode 0600 and the per-user application-data directory reduce exposure, but any
+  process running as the same user can read the key. This is temporary and must not be
+  described as encrypted or equivalent to an OS keyring. The final storage backend remains
+  a user decision (ADR 0015).
+- REST, MCP, GitHub Action and out-of-process plugin milestones are not implemented yet.
+
 ## Not started
-Phases 12-14 (REST/MCP API, production readiness, community) have no code yet.
+Phases 13-14 (production readiness, community) have no code yet.

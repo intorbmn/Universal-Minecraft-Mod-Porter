@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, phase-11-ui]
+    branches: [main, master, phase-11-ui, phase-12-api]
   pull_request:
     branches: [main, master]
 
@@ -46,6 +46,14 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
+      - name: Upload resolved root Cargo.lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ummp-phase12-cargo-lockfile
+          path: Cargo.lock
+          if-no-files-found: error
+
   desktop:
     runs-on: ubuntu-latest
     defaults:
@@ -61,6 +69,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libxdo-dev libdbus-1-dev patchelf
         working-directory: .
+      - name: Cache desktop Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ui/src-tauri/target/
+          key: ${{ runner.os }}-desktop-cargo-${{ hashFiles('rust-toolchain.toml', 'ui/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-desktop-cargo-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -71,7 +91,7 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev || echo "npm audit reported advisories; review before release"
       - run: npx vitest run
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: npx playwright test
       - name: Upload Playwright screenshots and traces
         if: always()

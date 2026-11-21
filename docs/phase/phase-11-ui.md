@@ -120,7 +120,7 @@ The root Rust toolchain must not be changed to bypass the pin. The desktop Linux
 3. AI: NOT TESTED by the user yet. Verify provider/key configuration, request execution, proposal rendering, explicit approve/reject, and resulting job/report before marking accepted.
 4. Cancellation: DEFERRED. The sample job completes too quickly to exercise the cancel path; do not count this as passed or failed. Add a deliberately long-running/cancellable test case before closing this gate.
 5. Commit 2–3 screenshots from the real Windows app under `docs/screenshots/phase-11/`. The three Playwright screenshots are already captured in the CI artifact; they are browser evidence, not a replacement for Windows runtime screenshots.
-6. Record installer hashes and the remaining Windows smoke-test results in this file and the draft PR. Do not merge and do not start Phase 12.
+6. Record installer hashes and the remaining Windows smoke-test results in this file. PR #11 was merged on 2026-11-20 so the `AppServices` facade is available on `master`; this does not waive the remaining Phase 11 acceptance gates.
 
 ## Known limitations
 

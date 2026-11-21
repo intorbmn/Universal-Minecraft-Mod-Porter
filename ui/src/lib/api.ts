@@ -2,6 +2,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   AnalysisView,
+  AiKeySaved,
+  AiKeyStatus,
   BuildJobRequest,
   JobView,
   PackRequest,
@@ -56,5 +58,9 @@ export const api = {
   startBuild: (request: BuildJobRequest) => call<string>('start_build', { request }),
   startPack: (request: PackRequest) => call<string>('start_pack', { request }),
   startAiAssist: (request: PlanRequest) => call<string>('start_ai_assist', { request }),
+  aiKeyStatus: (provider: string) => call<AiKeyStatus>('ai_key_status', { provider }),
+  aiKeySave: (provider: string, key: string, baseUrl: string | null) =>
+    call<AiKeySaved>('ai_key_save', { provider, key, baseUrl }),
+  aiKeyDelete: (provider: string) => call<void>('ai_key_delete', { provider }),
   decide: (approval: string, approve: boolean) => call<void>('decide', { approval, approve }),
 };
