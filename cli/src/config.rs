@@ -188,6 +188,7 @@ mod tests {
     fn cli_values_override_config_values() {
         let config = CliConfig {
             output_root: Some(PathBuf::from("from-file")),
+            kb: Some(PathBuf::from("file-mappings.db")),
             sandbox_repo: Some("file/repo".into()),
             ai_provider: Some("openai".into()),
             ..CliConfig::default()
@@ -199,6 +200,10 @@ mod tests {
         assert_eq!(
             config.kb_path(Some("cli-mappings.db".into())),
             Some(PathBuf::from("cli-mappings.db"))
+        );
+        assert_eq!(
+            config.kb_path(None),
+            Some(PathBuf::from("file-mappings.db"))
         );
         assert_eq!(
             config.sandbox_repo(Some("cli/repo".into())).as_deref(),
