@@ -4,7 +4,7 @@
 **Branch:** `phase-12-api` (based on merged Phase 11 `master`)  
 **Guide:** [Phase 12 API guide](../guides/phase-12-api.md)  
 **Design history:** [Phase 12 draft](../drafts/phase-12-api.md)  
-**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); REST 0016, MCP 0017 and plugins 0018 are planned  
+**ADRs:** [0015 — interim AI key storage](../decisions/0015-ai-key-file-storage.md); [0016 — local REST API](../decisions/0016-local-rest-api.md); MCP 0017 and plugins 0018 are planned  
 **Design:** [approved specification](../superpowers/specs/2026-11-20-phase12-api-design.md)  
 **Plan:** [implementation plan](../superpowers/plans/2026-11-20-phase12-api.md)
 
@@ -28,7 +28,7 @@ remain outside `core`.
 |---|---|---|
 | 12.0 AI credentials | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | File store, desktop UI, CLI commands, legacy keyring migration and automated leak/write-failure tests. CI #288 green; real-machine sharing check remains. |
 | 12.A CLI polish | IMPLEMENTATION COMPLETE; ACCEPTANCE PENDING | Exit codes, global JSON envelopes, strict config precedence, completions and AppServices routing for core workflows. CI #288 green; golden/mutation and real-shell checks remain. |
-| 12.B REST API | NOT STARTED; GATED | Separate `server/` workspace member; localhost + bearer token. Start only after PR 1 is reviewed and merged. |
+| 12.B REST API | IMPLEMENTATION IN PROGRESS | `server/` crate, Axum + Tokio, localhost + bearer token, path allow-list and SSE. PR #14 is merged. |
 | 12.C MCP server | NOT STARTED; GATED | stdio transport; every write must use safe application services and explicit approval. |
 | 12.D GitHub Action | NOT STARTED; GATED | Composite action; build from source until Phase 13 release binaries exist. |
 | 12.E Plugin interface | NOT STARTED; GATED | Out-of-process JSON-lines protocol; plugins return edits and never write project files. |
@@ -256,3 +256,16 @@ remain outside `core`.
      an AI request.
 - PR #14 remains open and unmerged. Phase 12.B/12.C stay gated until the user reviews and
   merges PR #14. No merge, rebase, force-push or history rewrite was performed.
+
+
+## 12.B implementation record — 2026-11-21
+
+- Confirmed PR #14 merge commit: `e86a914e2926060aecc8c65dcfba652f0d11b3a1`.
+- Created implementation branch `phase-12b-rest` from that merge commit.
+- Added `server/` as the `ummp-server` workspace crate. Axum and Tokio remain outside `core`; the CLI exposes `ummp serve` through the server library.
+- Added REST routes for health, analyze, scan, plan, port, reviewed migrate, pack, build, job state, SSE job events, cancellation, rollback and OpenAPI.
+- Added bearer-token persistence, Unix mode 0600, constant-time digest comparison, localhost default, explicit remote-bind acknowledgement, 1 MiB body limit, disabled CORS, canonical allowed-root checks and symlink resolution.
+- SSE uses a bounded event replay buffer so a client that connects immediately after job creation does not miss initial job events. Events retain the desktop event payload format and per-job order.
+- Added `allowed_roots` to the strict `ummp.toml` config contract; absent configuration defaults to the user's home directory.
+- Added ADR 0016, `docs/API.md`, `docs/openapi.json`, and initial API integration tests for auth, path containment, request size and OpenAPI route coverage.
+- Manual security review: no route exposes credentials; all request paths are checked before reaching `AppServices`; writes use existing service methods and the reviewed migration gate; synchronous work is isolated with `spawn_blocking`. Full automated verification is pending CI.
