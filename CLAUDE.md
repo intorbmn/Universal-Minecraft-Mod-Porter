@@ -37,7 +37,7 @@ CI has two independent jobs: the root Rust workspace and the desktop workspace (
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
   milestone, report it, and wait for the user to review.
-- Every significant decision gets an ADR in `docs/decisions/` (next number: 0016).
+- Every significant decision gets an ADR in `docs/decisions/` (next number: 0017).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
 - Edits are applied only by `MigrationEngine` after a checkpoint (ADR 0005/0006). This
@@ -82,5 +82,6 @@ skip the practice.
 | `core/tests/` | Integration tests (`integration.rs` for Phase 3, `migration.rs` and `bytecode_jvm.rs` for Phase 6, `ai_eval.rs` for Phase 7, `scan.rs`, `build_local.rs`, `build_github.rs` for Phase 8, `adapters.rs`, `loader.rs`, `port.rs` for Phase 9, `modpack.rs` for Phase 10, `app.rs` for AppServices/golden views; `cli/tests/pack_cli.rs` runs the real binary) |
 | `cli/src/` | CLI entry point plus `args.rs`, `config.rs`, `exit.rs`, and `output.rs`; shared AI key commands and provider resolution |
 | `providers/` | HTTP AI providers (Anthropic, OpenAI-compatible); the only crate that talks to model APIs |
+| `server/` | Axum + Tokio local REST adapter; all application work is dispatched through `AppServices` on the blocking pool |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |
 | `docs/` | PRD, SAD, ROADMAP, phase files, ADRs, KNOWN_LIMITATIONS, PROJECT_STATUS |
