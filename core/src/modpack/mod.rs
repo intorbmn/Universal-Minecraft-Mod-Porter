@@ -202,7 +202,9 @@ pub fn import_with(path: &Path, work: &Path, opts: &ImportOptions) -> Result<Pac
         };
     }
     let mut archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
-    let names: Vec<String> = archive.file_names().collect::<Result<_, _>>()?;
+    let names: Vec<String> = archive.file_names()
+        .map(|name| name.map(|name| name.into_owned()))
+        .collect::<Result<_, _>>()?;
     if names.iter().any(|name| name == "modrinth.index.json") {
         formats::read_mrpack(archive, work, opts)
     } else if names.iter().any(|name| name == "manifest.json") {
