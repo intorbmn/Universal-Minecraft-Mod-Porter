@@ -6,6 +6,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const FAKE_KEY: &str = "sk-ant-mcp-leak-test-0123456789";
+
 fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/demo-fabric-mod")
 }
@@ -30,9 +32,9 @@ fn start_server(root: &Path, data: &Path) -> (Child, BufReader<ChildStdout>) {
     (child, stdout)
 }
 
-fn send(child: &mut Child, message: serde_json::Value) {
+fn send(child: &mut Child, message: &serde_json::Value) {
     let input = child.stdin.as_mut().unwrap();
-    serde_json::to_writer(&mut *input, &message).unwrap();
+    serde_json::to_writer(&mut *input, message).unwrap();
     input.write_all(b"\n").unwrap();
     input.flush().unwrap();
 }
@@ -42,11 +44,11 @@ fn response(
     stdout: &mut BufReader<ChildStdout>,
     id: u64,
     method: &str,
-    params: serde_json::Value,
+    params: &serde_json::Value,
 ) -> serde_json::Value {
     send(
         child,
-        serde_json::json!({
+        &serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
             "method": method,
@@ -70,14 +72,14 @@ fn call_tool(
     stdout: &mut BufReader<ChildStdout>,
     id: u64,
     name: &str,
-    arguments: serde_json::Value,
+    arguments: &serde_json::Value,
 ) -> serde_json::Value {
     response(
         child,
         stdout,
         id,
         "tools/call",
-        serde_json::json!({ "name": name, "arguments": arguments }),
+        &serde_json::json!({ "name": name, "arguments": arguments }),
     )
 }
 
@@ -96,7 +98,6 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
     let output = root.path().join("ported");
     copy_fixture(&fixture(), &input);
 
-    const FAKE_KEY: &str = "sk-ant-mcp-leak-test-0123456789";
     std::fs::write(
         data.path().join("credentials.json"),
         serde_json::json!({
@@ -113,7 +114,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         1,
         "initialize",
-        serde_json::json!({
+        &serde_json::json!({
             "protocolVersion": "2025-06-18",
             "capabilities": {},
             "clientInfo": { "name": "ummp-integration-test", "version": "0.1.0" }
@@ -122,13 +123,13 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
     assert!(initialized.get("result").is_some());
     send(
         &mut child,
-        serde_json::json!({
+        &serde_json::json!({
             "jsonrpc": "2.0",
             "method": "notifications/initialized"
         }),
     );
 
-    let listed = response(&mut child, &mut stdout, 2, "tools/list", serde_json::json!({}));
+    let listed = response(&mut child, &mut stdout, 2, "tools/list", &serde_json::json!({}));
     let names = listed["result"]["tools"]
         .as_array()
         .unwrap()
@@ -153,7 +154,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         3,
         "ummp_analyze",
-        serde_json::json!({ "path": input }),
+        &serde_json::json!({ "path": input }),
     );
     assert_no_secret(&analyze, FAKE_KEY);
 
@@ -171,7 +172,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         5,
         "ummp_plan",
-        serde_json::json!({ "path": input, "to": "1.21.1", "loader": "fabric" }),
+        &serde_json::json!({ "path": input, "to": "1.21.1", "loader": "fabric" }),
     );
     assert_no_secret(&plan, FAKE_KEY);
 
@@ -181,7 +182,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         6,
         "ummp_port",
-        serde_json::json!({
+        &serde_json::json!({
             "path": input,
             "to": "1.21.1",
             "loader": "fabric",
@@ -223,7 +224,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         8,
         "ummp_build",
-        serde_json::json!({ "path": input, "backend": "unsupported" }),
+        &serde_json::json!({ "path": input, "backend": "unsupported" }),
     );
     assert_eq!(build["result"]["isError"], true);
     assert_no_secret(&build, FAKE_KEY);
@@ -233,7 +234,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         9,
         "ummp_job",
-        serde_json::json!({ "id": job_id }),
+        &serde_json::json!({ "id": job_id }),
     );
     assert_no_secret(&job, FAKE_KEY);
 
@@ -242,7 +243,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         10,
         "ummp_cancel",
-        serde_json::json!({ "id": "00000000-0000-0000-0000-000000000000" }),
+        &serde_json::json!({ "id": "00000000-0000-0000-0000-000000000000" }),
     );
     assert_no_secret(&cancel, FAKE_KEY);
 
@@ -251,7 +252,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         11,
         "ummp_rollback",
-        serde_json::json!({ "project": input, "confirm": false }),
+        &serde_json::json!({ "project": input, "confirm": false }),
     );
     assert_eq!(rollback["result"]["isError"], true);
     assert_no_secret(&rollback, FAKE_KEY);
@@ -265,7 +266,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
     );
     assert_eq!(
         templates["result"]["resourceTemplates"][0]["uriTemplate"],
-        "ummp://report/{job}"
+        concat!("ummp://report/{", "job}")
     );
     assert_no_secret(&templates, FAKE_KEY);
 
@@ -291,7 +292,7 @@ fn stdio_protocol_exercises_tools_approval_and_secret_boundary() {
         &mut stdout,
         14,
         "resources/read",
-        serde_json::json!({ "uri": format!("ummp://report/{job_id}") }),
+        &serde_json::json!({ "uri": format!("ummp://report/{job_id}") }),
     );
     assert_no_secret(&report, FAKE_KEY);
 
