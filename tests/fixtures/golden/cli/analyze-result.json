@@ -10,7 +10,7 @@
       "java": null
     }
   ],
-  "build_system": null,
+  "build_system": "Gradle",
   "languages": [],
   "technologies": []
 }
