@@ -671,4 +671,18 @@ fn invalid_openai_base_url_does_not_save_cli_key() {
         !credentials.exists(),
         "invalid base URL must not persist the API key"
     );
+    for entry in std::fs::read_dir(data.path()).unwrap() {
+        let entry = entry.unwrap();
+        if entry.path() == key_input {
+            continue;
+        }
+        if entry.file_type().unwrap().is_file() {
+            let contents = std::fs::read(entry.path()).unwrap();
+            assert!(
+                !String::from_utf8_lossy(&contents).contains("sk-openai-test-0000000000000000"),
+                "API key leaked into {}",
+                entry.path().display()
+            );
+        }
+    }
 }
