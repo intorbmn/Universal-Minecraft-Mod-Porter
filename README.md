@@ -26,6 +26,7 @@ Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. P
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [API.md](docs/API.md) | Local REST API, authentication and routes |
 | [MCP.md](docs/MCP.md) | MCP tools, resources and client setup |
+| [PLUGIN_PROTOCOL.md](docs/PLUGIN_PROTOCOL.md) | Plugin manifest, JSON Lines protocol and security limits |
 | [phase-11-ui.md](docs/phase/phase-11-ui.md) | Phase 11 implementation and verification record |
 | [ui/README.md](ui/README.md) | Desktop app setup and developer workflow |
 | [guides/](docs/guides/README.md) | Step-by-step guides for the remaining phases (10–14) |
@@ -104,6 +105,8 @@ ummp pack export path/to/instance --to-format mrpack
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 ummp completions bash # also: zsh, fish, powershell
 ummp serve # local REST API at 127.0.0.1:7432\nummp mcp # MCP stdio server for a connected assistant
+ummp plugins list # installed plugins
+ummp plugins check ./plugins/my-plugin
 # OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
 ```
 `ummp.toml` supports `output_root`, `kb`, `sandbox_repo`, `ai_provider` and
@@ -135,5 +138,5 @@ Use UMMP from another repository's CI workflow:
     fail-on-risk: high
 ```
 
-The composite action also supports `analyze`, `port` and `build`. See
+The composite action also supports `analyze`, `port` and `build`. Plugins are discovered in `<data_dir>/plugins/`; validate an executable with `ummp plugins check DIR`. See
 [docs/CLI.md](docs/CLI.md#github-action-phase-12d) for inputs, risk thresholds and outputs.
