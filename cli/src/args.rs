@@ -86,6 +86,14 @@ pub struct Cli {
 }
 
 #[derive(Subcommand)]
+pub enum PluginsCmd {
+    /// List installed plugins in the UMMP data directory.
+    List,
+    /// Validate a plugin manifest, executable and hello handshake.
+    Check { dir: PathBuf },
+}
+
+#[derive(Subcommand)]
 pub enum AiKeyCmd {
     /// Read a key without echoing it and save it for both CLI and desktop.
     Set {
@@ -128,6 +136,8 @@ pub enum Commands {
     },
     /// Start the local MCP server over stdio for an MCP-compatible assistant.
     Mcp,
+    /// List and validate out-of-process plugins.
+    Plugins { #[command(subcommand)] cmd: PluginsCmd },
     /// Detect loader, Minecraft/Java versions, dependencies and build system.
     Analyze {
         /// Project root path (source tree or a folder of JARs).

@@ -163,7 +163,7 @@ pub fn run_with_input(
         Ok::<_, io::Error>(bytes)
     });
     let stderr = child.stderr.take().expect("piped stderr");
-    let stderr_reader = std::thread::spawn(move || io::copy(&mut &stderr[..], &mut io::sink()));
+    let stderr_reader = std::thread::spawn(move || { let mut stderr = stderr; io::copy(&mut stderr, &mut io::sink()) });
     let mut stdin = child.stdin.take().expect("piped stdin");
     let request = input.to_vec();
     let writer = std::thread::spawn(move || stdin.write_all(&request));
