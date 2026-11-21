@@ -293,11 +293,7 @@ pub fn migrate_legacy_ai_keys(legacy: &dyn SecretStore, keys: &dyn AiKeyStore) {
             eprintln!("could not migrate legacy {label} key; continuing");
             continue;
         }
-        if legacy.delete(name).is_ok() {
-            eprintln!("moved {label} key from keyring to shared credentials");
-        } else {
-            eprintln!("migrated {label} key but could not remove its old keyring entry");
-        }
+        eprintln!("moved {label} key from keyring to shared credentials");
     }
 }
 
