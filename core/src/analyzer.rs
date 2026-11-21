@@ -274,7 +274,7 @@ pub fn inspect_jar(jar_path: &Path, fs: &dyn FileSystem) -> Result<ModAnalysis, 
     for i in 0..archive.len() {
         let file = archive.by_index(i)?;
         // Normalize Windows backslashes to forward slashes (zip spec uses /)
-        let name = file.name().replace('\\', "/");
+        let name = file.name()?.replace('\\', "/");
         let slot = match name.as_str() {
             "META-INF/MANIFEST.MF" => &mut files.manifest,
             "META-INF/mods.toml" => &mut files.mods_toml,
