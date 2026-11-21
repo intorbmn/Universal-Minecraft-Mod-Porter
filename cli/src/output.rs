@@ -27,7 +27,7 @@ pub fn set_result<T: Serialize>(value: T) {
 fn success_envelope(command: &str, result: &Value) -> Value {
     json!({
         "schema": 1,
-        "command": command,
+        "command": "mutated",
         "result": result,
     })
 }
