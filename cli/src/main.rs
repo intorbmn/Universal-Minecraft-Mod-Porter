@@ -610,6 +610,9 @@ fn run_ai_key(cmd: AiKeyCmd, json_mode: bool) -> Result<(), Box<dyn std::error::
     match cmd {
         AiKeyCmd::Set { provider, base_url } => {
             let kind = parse_ai_provider(&provider)?;
+            if kind == AiProviderKind::Openai {
+                ummp_core::app::credentials::validate_openai_base_url(base_url.as_deref())?;
+            }
             let key = read_api_key()?;
             let warning = store.set(kind, &ummp_core::app::Secret::new(key))?;
             if kind == AiProviderKind::Openai {
