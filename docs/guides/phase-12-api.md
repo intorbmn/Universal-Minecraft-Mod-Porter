@@ -15,6 +15,28 @@ Status when this guide was written:
   `ui/src-tauri`).
 - Rough history of this phase: `docs/drafts/phase-12-api.md`.
 
+### Status update (after PR 2 = 12.B + 12.C, PRs #16 and #17)
+Read this block first. It is newer than the block below.
+- **Merged to `master`:** 12.0, 12.A (PR #14), 12.B local REST (PR #16), 12.C stdio MCP
+  server (PR #17, `server/src/mcp.rs`, `ummp mcp`, ADR 0017). CI was green on both jobs at
+  `6cba442`. The MCP gates `approve=true` (port writes), `confirm=true` (rollback) and
+  `allowed_roots` each have a test that fails when the gate is removed (mutation-checked).
+- **Still open for 12.C, user-side:** a real smoke test with Claude Code
+  (`claude mcp add ummp -- <path>\ummp.exe mcp`). The user will do it after testing the
+  desktop app. Do not mark 12.C "verified in practice" until the user reports the result.
+- **Next:** 12.D (GitHub Action) and 12.E (out-of-process plugins) are PR 3. Branch from
+  `master`, and wait for the user's go-ahead before starting.
+- **Known repo issue:** `Cargo.lock` is listed in `.gitignore` but is tracked, and the committed
+  copy lacks the `server/` dependencies (axum, rmcp, …). Local builds regenerate it. Do not
+  commit a regenerated lock by accident; ask the user whether to untrack it or commit an
+  updated one.
+- **Do not take from this phase** (user, 2026-11-21): supporting `.jar` input, downgrade,
+  more target versions, a heavy test mod, and more AI providers are in `docs/BACKLOG.md`
+  and wait until all phases are finished.
+- **Desktop fix in progress, not part of 12.D/12.E:** the AI assist tab gets its own
+  provider selector (branch `fix/ai-tab-provider-select`). Until it is merged, the provider
+  is chosen in Settings only; a key typed on the AI tab is saved for that provider.
+
 ### Status update (after PR 1 = 12.0 + 12.A, PR #14)
 Read this block first. Where it differs from the text below, this block wins.
 - **Done, CI green on both jobs at `d1e21fd`:** 12.0 shared AI key store
