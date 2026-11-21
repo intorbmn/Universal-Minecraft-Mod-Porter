@@ -26,9 +26,4 @@ locally on branch `phase-10-modpack`.
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Current milestone
-Phase 12 — CLI, API & Integration. PR 1 (12.0 shared AI credentials + 12.A CLI contract)
-is implemented, CI-green and open as PR #14 for review. Real-machine credential sharing,
-real shell-completion behavior and mutation-check evidence remain acceptance gates.
-The approved delivery sequence is PR 1 (12.0 + 12.A), PR 2 (12.B + 12.C), and PR 3
-(12.D + 12.E); each PR must be reviewed and merged by the user before starting the next.
-Follow [`docs/guides/phase-12-api.md`](guides/phase-12-api.md).
+Phase 12 — CLI, API & Integration. PR #14 (12.0 + 12.A) is merged at `e86a914`. Phase 12.B REST is being implemented on `phase-12b-rest`; 12.C and later integrations remain pending. The delivery sequence remains PR 1 (12.0 + 12.A), PR 2 (12.B + 12.C), and PR 3 (12.D + 12.E), with user review required before merge. Follow [`docs/guides/phase-12-api.md`](guides/phase-12-api.md).
