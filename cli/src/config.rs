@@ -236,6 +236,7 @@ kb = "mappings.db"
 sandbox_repo = "owner/repo"
 ai_provider = "openai"
 openai_base_url = "http://localhost:11434/v1"
+allowed_roots = ["D:/Minecraft/mods"]
 "#,
         )
         .unwrap();
@@ -247,6 +248,7 @@ openai_base_url = "http://localhost:11434/v1"
             config.openai_base_url.as_deref(),
             Some("http://localhost:11434/v1")
         );
+        assert_eq!(config.allowed_roots, Some(vec![PathBuf::from("D:/Minecraft/mods")]));
     }
 
     #[test]
