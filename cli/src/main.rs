@@ -422,7 +422,7 @@ fn run_pack(cmd: PackCmd, config: &CliConfig) -> Result<i32, Box<dyn std::error:
             )?;
             analyze_pack(&mut p, &AnalyzeOptions { threads: 4 })?;
             let g = PackGraph::build(&p.entries);
-            if json_mode {
+            if output::is_json_mode() {
                 output::set_result(serde_json::json!({
                     "pack": &p,
                     "issues": g.issues.iter().map(|issue| format!("{issue:?}")).collect::<Vec<_>>(),

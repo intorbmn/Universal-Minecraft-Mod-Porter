@@ -287,7 +287,6 @@ fn migrate_json_missing_input_uses_invalid_input_envelope() {
     assert_eq!(value["error"]["kind"], "invalid_input");
 }
 
-
 #[test]
 fn pack_inspect_json_returns_a_structured_pack_result() {
     let pack = tempfile::tempdir().unwrap();
@@ -321,9 +320,17 @@ fn ai_assist_missing_key_is_a_json_refusal() {
         .join("../../tests/fixtures/loader/fabric-src");
     let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
         .args([
-            "--json", "ai-assist", fixture.to_str().unwrap(),
-            "--from", "1.20.1", "--to", "1.21.1", "--loader", "fabric",
-            "--mappings", mappings.to_str().unwrap(),
+            "--json",
+            "ai-assist",
+            fixture.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+            "--mappings",
+            mappings.to_str().unwrap(),
         ])
         .env("UMMP_DATA_DIR", data.path())
         .output()
@@ -332,5 +339,10 @@ fn ai_assist_missing_key_is_a_json_refusal() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], 1);
     assert_eq!(value["error"]["kind"], "refused");
-    assert!(value["error"]["message"].as_str().unwrap().contains("ai-key set"));
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("ai-key set")
+    );
 }
