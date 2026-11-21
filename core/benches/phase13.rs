@@ -161,9 +161,10 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
     let class_name = class_name.expect("fixture contains a class");
     let from = class_name.trim_end_matches(".class").replace('/', ".");
     let simple = from.rsplit('.').next().expect("class name");
+    let to = format!("benchmark.ported.{simple}");
     let rule = RenameRule {
         from,
-        to: format!("benchmark.ported.{simple}"),
+        to,
         kind: "class".into(),
         confidence: 1.0,
         version: "1.20.1".into(),
