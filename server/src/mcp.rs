@@ -448,8 +448,8 @@ mod tests {
 
     #[test]
     fn port_without_approval_returns_plan_and_writes_nothing() {
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../tests/fixtures/demo-fabric-mod");
+        let fixture =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/demo-fabric-mod");
         let fixtures_root = fixture.parent().unwrap();
         let descriptor = fixture.join("src/main/resources/fabric.mod.json");
         let before = std::fs::read(&descriptor).unwrap();
