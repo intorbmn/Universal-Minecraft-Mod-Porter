@@ -167,7 +167,7 @@ impl PluginAdapter {
         Ok(())
     }
 
-    fn files(&self, cx: &AdapterContext<'_>) -> Result<Vec<PluginFile>, PluginError> {
+    fn files(cx: &AdapterContext<'_>) -> Result<Vec<PluginFile>, PluginError> {
         let mut files = Vec::new();
         for rel in cx.files {
             if forbidden(rel) || sensitive(rel) { continue; }
@@ -182,7 +182,7 @@ impl PluginAdapter {
         Ok(files)
     }
 
-    fn validate_path(&self, root: &Path, rel: &Path, files: &[PathBuf]) -> Result<PathBuf, PluginError> {
+    fn validate_path(root: &Path, rel: &Path, files: &[PathBuf]) -> Result<PathBuf, PluginError> {
         if rel.as_os_str().is_empty() || rel.is_absolute() || forbidden(rel) || sensitive(rel)
             || !files.iter().any(|path| path == rel) {
             return Err(PluginError::Protocol(format!("plugin returned a disallowed path: {}", rel.display())));
@@ -217,12 +217,12 @@ impl TechAdapter for PluginAdapter {
 
     fn findings(&self, cx: &AdapterContext<'_>) -> Vec<TechFinding> {
         let result = (|| {
-            let files = self.files(cx)?;
+            let files = Self::files(cx)?;
             let value = self.invoke(&json!({"method":"findings","files":files}))?;
             let findings: Vec<TechFinding> = serde_json::from_value(value)
                 .map_err(|e| PluginError::Protocol(e.to_string()))?;
             for finding in &findings {
-                self.validate_path(cx.root, Path::new(&finding.file), cx.files)?;
+                Self::validate_path(cx.root, Path::new(&finding.file), cx.files)?;
             }
             Ok::<_, PluginError>(findings)
         })();
@@ -233,7 +233,7 @@ impl TechAdapter for PluginAdapter {
 
     fn edits(&self, cx: &AdapterContext<'_>) -> Result<EditSet, MigrationError> {
         let Some(plan) = cx.plan else { return Ok(EditSet::default()); };
-        let files = self.files(cx).map_err(|e| MigrationError::InvalidRequest(e.to_string()))?;
+        let files = Self::files(cx).map_err(|e| MigrationError::InvalidRequest(e.to_string()))?;
         let value = self.invoke(&json!({"method":"edits","files":files,"target":{
             "minecraft":plan.request.target_minecraft,"loader":plan.request.target_loader
         }})).map_err(|e| MigrationError::InvalidRequest(e.to_string()))?;
@@ -241,7 +241,7 @@ impl TechAdapter for PluginAdapter {
             .map_err(|e| MigrationError::InvalidRequest(format!("invalid plugin edits: {e}")))?;
         let mut set = EditSet::default();
         for edit in edits {
-            let path = self.validate_path(cx.root, &edit.path, cx.files)
+            let path = Self::validate_path(cx.root, &edit.path, cx.files)
                 .map_err(|e| MigrationError::InvalidRequest(e.to_string()))?;
             if std::fs::read_to_string(&path)? != edit.original {
                 return Err(MigrationError::InvalidRequest(format!("plugin edit for {} is stale", edit.path.display())));
