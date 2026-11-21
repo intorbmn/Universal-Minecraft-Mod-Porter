@@ -352,3 +352,115 @@ fn ai_debug_missing_key_is_a_json_refusal() {
         .unwrap()
         .contains("ai-key set"));
 }
+
+
+#[test]
+fn cli_and_environment_provider_values_override_toml() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let config = dir.path().join("ummp.toml");
+    let log = dir.path().join("build.log");
+    std::fs::write(&config, "ai_provider = \"anthropic\"").unwrap();
+    std::fs::write(&log, "synthetic failure").unwrap();
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/loader/fabric-src");
+
+    let run = |cli_provider: Option<&str>| {
+        let mut args = vec![
+            "--config",
+            config.to_str().unwrap(),
+            "--json",
+            "ai-debug",
+            fixture.to_str().unwrap(),
+            "--log",
+            log.to_str().unwrap(),
+            "--from",
+            "1.20.1",
+            "--to",
+            "1.21.1",
+            "--loader",
+            "fabric",
+        ];
+        if let Some(provider) = cli_provider {
+            args.extend(["--provider", provider]);
+        }
+        Command::new(env!("CARGO_BIN_EXE_ummp"))
+            .args(args)
+            .env("UMMP_DATA_DIR", data.path())
+            .env("UMMP_AI_PROVIDER", "openai")
+            .env_remove("ANTHROPIC_API_KEY")
+            .env_remove("OPENAI_API_KEY")
+            .output()
+            .unwrap()
+    };
+
+    // CLI flag overrides both the environment and TOML.
+    let cli = run(Some("anthropic"));
+    assert_eq!(cli.status.code(), Some(2));
+    let cli_error: serde_json::Value = serde_json::from_slice(&cli.stdout).unwrap();
+    assert!(
+        cli_error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("No anthropic API key")
+    );
+
+    // Environment overrides TOML when no explicit CLI value is present.
+    let env = run(None);
+    assert_eq!(env.status.code(), Some(2));
+    let env_error: serde_json::Value = serde_json::from_slice(&env.stdout).unwrap();
+    assert!(
+        env_error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("No openai API key")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_build_failure_uses_exit_code_four_and_json_result() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let project = dir.path().join("broken-gradle");
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::write(project.join("settings.gradle"), "rootProject.name = 'broken'").unwrap();
+    std::fs::write(
+        project.join("build.gradle"),
+        "throw new GradleException('intentional build failure')",
+    )
+    .unwrap();
+    let wrapper = project.join("gradlew");
+    std::fs::write(&wrapper, "#!/bin/sh\nexit 1\n").unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_ummp"))
+        .args([
+            "--json",
+            "build",
+            project.to_str().unwrap(),
+            "--local",
+            "--yes",
+            "--i-accept-risk",
+            "--stages",
+            "build",
+            "--timeout",
+            "10",
+        ])
+        .env("UMMP_DATA_DIR", data.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(4),
+        "stdout: {}\\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["command"], "build");
+    assert!(value["result"].is_object());
+}

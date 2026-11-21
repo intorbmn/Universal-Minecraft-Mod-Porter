@@ -68,10 +68,10 @@ remain outside `core`.
 
 ## Outstanding 12.A acceptance
 
-1. Add golden fixtures for the remaining command-specific result objects and exercise config-file values overridden by real CLI flags.
-2. Complete one integration case for each documented exit code, including a general unexpected error.
-3. Verify shell completion installation/behavior in a real shell, beyond checking generated scripts.
-4. Keep build, tests, Clippy and rustfmt green; complete manual acceptance before closing 12.A.
+1. Add golden fixtures for the remaining command-specific result objects.
+2. Verify shell completion installation/behavior in real bash, zsh, fish and PowerShell sessions, beyond checking generated scripts.
+3. Complete the real-machine desktop↔CLI credential-sharing acceptance before closing 12.0.
+4. Keep build, tests, Clippy and rustfmt green; complete PR review before starting 12.B.
 
 ## 12.A JSON coverage follow-up
 
@@ -154,3 +154,10 @@ remain outside `core`.
 - CI verification for this follow-up is pending. The only remaining PR 1 acceptance outside
   automation is the user's real-machine check that a key saved in desktop is visible as masked
   status to the CLI (and vice versa).
+
+
+## 12.A exit/config integration tests — pending CI
+
+- Added an integration test proving CLI provider flags override `UMMP_AI_PROVIDER` and
+  TOML, while the environment overrides TOML when no flag is supplied.
+- Added a local Gradle failure test for exit code 4 and the versioned JSON result envelope.
