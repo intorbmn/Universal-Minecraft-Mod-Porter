@@ -29,7 +29,7 @@ use ummp_core::{
     app::{
         helpers::NoIndex,
         views::JobView,
-        AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest, Settings,
+        AppError, AppServices, BuildJobRequest, PackRequest, PlanRequest, PortRequest,
     },
     events::{Event, EventHandler},
     filesystem::resolve_within,
