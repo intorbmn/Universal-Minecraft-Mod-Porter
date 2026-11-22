@@ -143,5 +143,14 @@ jobs:
         run: |
           cargo install cargo-dist --locked --version 0.34.0
           dist --version
+      - name: Regenerate cargo-dist workflow
+        run: dist generate-ci
+      - name: Upload generated release workflow
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ummp-generated-release-workflow
+          path: .github/workflows/release.yml
+          if-no-files-found: error
       - name: Validate release configuration
         run: dist plan --output-format=json
