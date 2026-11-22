@@ -60,7 +60,7 @@ fn test_remapped_jar_links_and_runs_on_jvm() {
         let mut w = zip::ZipWriter::new(fs::File::create(&input).unwrap());
         for rel in ummp_core::checkpoint::collect_files(&classes).unwrap() {
             let name = rel.to_string_lossy().replace('\\', "/");
-            w.start_file(name, zip::write::FileOptions::default())
+            w.start_file(name, zip::write::SimpleFileOptions::default())
                 .unwrap();
             w.write_all(&fs::read(classes.join(&rel)).unwrap()).unwrap();
         }
