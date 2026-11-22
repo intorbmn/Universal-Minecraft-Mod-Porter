@@ -11,7 +11,7 @@
 
 ## Recovery contract and limitation
 
-Recovery currently supports **rollback to the pre-transform snapshot only**. Continuing is intentionally not offered: UMMP does not persist a deterministic migration edit plan, so replaying after a crash could apply a different edit set. Recovery is explicit by session UUID; automatic stale-process detection is not yet implemented.
+Recovery currently supports **rollback to the pre-transform snapshot only**. Continuing is intentionally not offered: UMMP does not persist a deterministic migration edit plan, so replaying after a crash could apply a different edit set. `AppServices::open` automatically detects persisted jobs left in `Running` and marks them `Failed` with an interruption marker. The CLI recovery command still requires the session UUID printed before migration starts; it does not yet present an interactive recovery prompt or support continuation.
 
 The snapshot excludes the existing `SKIP_DIRS` (`.git`, build output, etc.), matching the established rollback contract. This is not a full-disk transaction and cannot restore files intentionally excluded from snapshots.
 
