@@ -14,7 +14,7 @@ TARGETS = (
     "zip_import",
     "gradle_log",
     "crash_report",
-    "plugin_protocol",
+    "plugin_protocol",\n    "rest_request",\n    "mcp_request",
 )
 
 
@@ -82,6 +82,20 @@ def seed_logs() -> None:
     )
 
 
+def seed_api_requests() -> None:
+    rest = corpus("rest_request")
+    mcp = corpus("mcp_request")
+    samples = {
+        "path.json": b'{"path":"/tmp/project"}',
+        "plan.json": b'{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
+        "port.json": b'{"path":"/tmp/project","to":"1.21.1","loader":"fabric","approve":false}',
+        "job.json": b'{"id":"00000000-0000-0000-0000-000000000000"}',
+    }
+    for name, data in samples.items():
+        (rest / name).write_bytes(data)
+        (mcp / name).write_bytes(data)
+
+
 def seed_plugin_protocol() -> None:
     output = corpus("plugin_protocol")
     (output / "hello.jsonl").write_text(
@@ -98,4 +112,4 @@ if __name__ == "__main__":
     seed_mrpack()
     seed_zip_import()
     seed_logs()
-    seed_plugin_protocol()
+    seed_plugin_protocol()\n    seed_api_requests()
