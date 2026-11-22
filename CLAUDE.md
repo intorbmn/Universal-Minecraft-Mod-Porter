@@ -37,7 +37,7 @@ CI has two independent jobs: the root Rust workspace and the desktop workspace (
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
   milestone, report it, and wait for the user's review.
-- Every significant decision gets an ADR in `docs/decisions/` (next number: 0020).
+- Every significant decision gets an ADR in `docs/decisions/` (next number: 0021).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
 - Edits are applied only by `MigrationEngine` after a checkpoint (ADR 0005/0006). This

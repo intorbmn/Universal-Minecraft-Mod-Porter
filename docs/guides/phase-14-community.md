@@ -2,6 +2,31 @@
 
 Read [README.md](README.md) first. Rough history: `docs/drafts/phase-14-community.md`.
 
+## Status update (2026-11-22) — read first, it wins where the text below differs
+- **Do not start Phase 14 yet.** §2 requires the Phase 13 releases. On `master`, Phase 13 is
+  IN_PROGRESS: 13.A–13.D are merged (PRs #23, #24, #25: benchmarks, SQLite analysis
+  cache ADR 0020, security audit + `security-audit` CI job, nightly fuzzing of 9 parsers).
+  13.E crash recovery, 13.F distribution (prebuilt `ummp` on GitHub Releases, decided by
+  the user), 13.G update check and 13.H RC docs are still open. Start only after Phase 13
+  is COMPLETED and the user says so.
+- **Next ADR number: 0021** (0018 license, 0019 plugin protocol, 0020 analysis cache).
+- **`Cargo.lock` is stale** (`cargo metadata --locked` fails on `master`). Phase 13.F must
+  commit a current lock before releases; Phase 14 must not work around it.
+- **Answers already given by the user:**
+  - Project code license is **Apache-2.0** (ADR 0018). Question 4 (license for community
+    data: CC0 or CC-BY-4.0) is still open; ask, do not choose.
+  - Monetization: voluntary support with early access, plus an open-source core with a
+    separate proprietary **Pro** edition (`docs/BACKLOG.md`). Keep Pro code out of this
+    repo. Community KB, recipes and the plugin index stay open and free; do not gate any
+    Phase 14 feature behind Pro without asking.
+- **Inputs from Phase 12:** the plugin SDK (14.B) builds on the out-of-process JSON Lines
+  protocol in `core/src/plugins.rs` and ADR 0019 (env scrub, 30 s timeout, 8 MiB output
+  cap, edits only through `MigrationEngine`). Plugins are not OS-sandboxed: the SDK docs and
+  the plugin index (14.E) must say so plainly, and indexed plugins need the same review as
+  community recipes.
+- **Not in this phase** (BACKLOG, after all phases): `.jar` port input, downgrade, more
+  target versions, more AI providers, final AI key storage, Pro features.
+
 ## 0. Skills
 - **Always:** the README §3 set.
 - **Phase-specific:**
