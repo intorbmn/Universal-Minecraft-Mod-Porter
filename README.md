@@ -26,7 +26,7 @@ Phase 14 (Community & Ecosystem) has not started.
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
 | [FUZZING.md](docs/FUZZING.md) | Fuzz targets, local runs and crash triage |
-| [phase-13e-crash-recovery.md](docs/phase/phase-13e-crash-recovery.md) | Crash recovery protocol and verification |\n| [phase-13f-distribution.md](docs/phase/phase-13f-distribution.md) | CLI release packaging and RC acceptance |
+| [phase-13e-crash-recovery.md](docs/phase/phase-13e-crash-recovery.md) | Crash recovery protocol and verification |\n| [phase-13f-distribution.md](docs/phase/phase-13f-distribution.md) | CLI release packaging and RC acceptance |\n| [phase-13g-update-check.md](docs/phase/phase-13g-update-check.md) | Explicit and opt-in release update checks |
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [API.md](docs/API.md) | Local REST API, authentication and routes |
 | [MCP.md](docs/MCP.md) | MCP tools, resources and client setup |
