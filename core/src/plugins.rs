@@ -120,6 +120,28 @@ impl PluginManager {
     }
 }
 
+/// Decode the plugin's single-line JSON response without starting a child process.
+///
+/// The output cap is checked here as well as by the process runner so callers that
+/// validate protocol bytes directly (including fuzzers) get the same bound.
+pub fn decode_plugin_response(output: &[u8]) -> Result<Value, PluginError> {
+    if output.len() > PLUGIN_STDOUT_LIMIT {
+        return Err(PluginError::OutputLimit(PLUGIN_STDOUT_LIMIT));
+    }
+    let text = std::str::from_utf8(output)
+        .map_err(|_| PluginError::Protocol("response is not UTF-8".into()))?;
+    let mut lines = text.lines().filter(|line| !line.trim().is_empty());
+    let line = lines
+        .next()
+        .ok_or_else(|| PluginError::Protocol("plugin returned no response".into()))?;
+    if lines.next().is_some() {
+        return Err(PluginError::Protocol(
+            "expected exactly one JSON response line".into(),
+        ));
+    }
+    serde_json::from_str(line).map_err(|e| PluginError::Protocol(e.to_string()))
+}
+
 #[derive(Debug)]
 struct PluginAdapter {
     info: PluginInfo,
@@ -225,18 +247,7 @@ impl PluginAdapter {
                 return Err(PluginError::Protocol("unexpected process status".into()))
             }
         }
-        let text = std::str::from_utf8(&output)
-            .map_err(|_| PluginError::Protocol("response is not UTF-8".into()))?;
-        let mut lines = text.lines().filter(|line| !line.trim().is_empty());
-        let line = lines
-            .next()
-            .ok_or_else(|| PluginError::Protocol("plugin returned no response".into()))?;
-        if lines.next().is_some() {
-            return Err(PluginError::Protocol(
-                "expected exactly one JSON response line".into(),
-            ));
-        }
-        serde_json::from_str(line).map_err(|e| PluginError::Protocol(e.to_string()))
+        decode_plugin_response(&output)
     }
 
     fn hello(&self) -> Result<(), PluginError> {
@@ -622,6 +633,20 @@ mod tests {
         assert!(
             PluginAdapter::validate_path(root.path(), Path::new("../../outside"), &files).is_err()
         );
+    }
+
+    #[test]
+    fn plugin_protocol_decoder_accepts_one_json_line() {
+        assert_eq!(
+            decode_plugin_response(b"{\"ok\":true}\n").unwrap(),
+            json!({"ok": true})
+        );
+    }
+
+    #[test]
+    fn plugin_protocol_decoder_rejects_multiple_lines_and_invalid_utf8() {
+        assert!(decode_plugin_response(b"{}\\n{}\\n").is_err());
+        assert!(decode_plugin_response(&[0xff]).is_err());
     }
 
     #[cfg(unix)]
