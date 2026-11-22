@@ -768,15 +768,10 @@ fn app_services(
         .map_err(|error| Box::new(map_app_error(&error)) as Box<dyn std::error::Error>)
 }
 
-
 /// Explicit, user-triggered update check. No download or install is ever performed.
 fn run_update_check(check: bool, json_mode: bool) -> Result<i32, Box<dyn std::error::Error>> {
     if !check {
-        return Err(CliFailure::new(
-            ExitCode::InvalidInput,
-            "use ummp update --check",
-        )
-        .into());
+        return Err(CliFailure::new(ExitCode::InvalidInput, "use ummp update --check").into());
     }
     match ummp_ai_providers::check_for_update(env!("CARGO_PKG_VERSION")) {
         Ok(Some(update)) => {
@@ -802,7 +797,7 @@ fn run_update_check(check: bool, json_mode: bool) -> Result<i32, Box<dyn std::er
             } else {
                 println!("UMMP is up to date ({})", env!("CARGO_PKG_VERSION"));
             }
-        },
+        }
         Err(error) => {
             return Err(CliFailure::new(ExitCode::Error, error).into());
         }
