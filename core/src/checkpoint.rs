@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use uuid::Uuid;
@@ -59,7 +60,6 @@ impl CheckpointStore {
         fs::create_dir_all(dir)?;
         let bytes = serde_json::to_vec_pretty(self)
             .map_err(|error| CheckpointError::Metadata(error.to_string()))?;
-        use std::io::Write as _;
         let destination = dir.join("checkpoints.json");
         let mut temporary = tempfile::NamedTempFile::new_in(dir)?;
         temporary.write_all(&bytes)?;
