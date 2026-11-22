@@ -146,7 +146,7 @@ Phase 13 is in progress; Phase 14 (community) has not started.
 - Local builds are permitted only when the application risk check allows Low risk, but build scripts still run with the user's OS permissions. Prefer GitHub Actions.
 - MCP uses the same canonical path validation as REST and therefore shares its time-of-check/time-of-use gap. No real Claude Code client smoke test has been recorded yet; see `docs/MCP.md`.
 
-## Phase 13 production readiness (in progress)\n- Phase 13F release packaging is configured for the 1.0.0-rc.1 candidate in the stacked PR. Artifacts have not yet been built or downloaded by a user; Windows binaries are unsigned and may trigger SmartScreen. The release workflow is tag-triggered and has not been exercised with a real tag.
+## Phase 13 production readiness (in progress)\n- Phase 13G update checks are implemented but pending CI verification. Automatic checks are disabled by default; users must opt in through `check_updates = true` or `UMMP_CHECK_UPDATES=true`.\n- Phase 13F release packaging is configured for the 1.0.0-rc.1 candidate in the stacked PR. Artifacts have not yet been built or downloaded by a user; Windows binaries are unsigned and may trigger SmartScreen. The release workflow is tag-triggered and has not been exercised with a real tag.
 - RustSec and cargo-deny checks are enabled in CI; the full repository security review is still reserved for the release-candidate commit.
 - The full repository security review is reserved for the release-candidate commit. No claim
   of a completed security audit is made before that review.
