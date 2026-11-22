@@ -9,7 +9,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-ummp-core = { path = "../core" }\nummp-server = { path = "../server", features = ["fuzzing"] }
+ummp-core = { path = "../core" }
+ummp-server = { path = "../server", features = ["fuzzing"] }
 tempfile = "3"
 zip = "9.0.5"
 serde_yaml = "0.9"
