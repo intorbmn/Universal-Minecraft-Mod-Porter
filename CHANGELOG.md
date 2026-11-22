@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Phase 13.F: cargo-dist 0.34.0 release configuration for Windows x64 (ZIP/MSI), Linux x64 and macOS ARM64 CLI archives/installers; 1.0.0-rc.1 crate versioning and release workflow.
+
 ## [1.0.0-rc.1] - 2026-11-22
 
 ### Added
