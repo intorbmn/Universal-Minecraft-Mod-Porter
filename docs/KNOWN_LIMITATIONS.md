@@ -136,7 +136,7 @@ Each entry names the module and the phase expected to address it.
 - **REST path checks have a time-of-check/time-of-use gap.** A path is canonicalised and checked against `allowed_roots` before use; a local process that swaps a directory for a symlink in between could escape. The bearer token is printed once to the terminal when `ummp serve` starts.
 
 ## Not started
-Phases 13-14 (production readiness, community) have no code yet.
+Phase 13 is in progress; Phase 14 (community) has not started.
 
 
 ## MCP server (Phase 12.C)
@@ -150,6 +150,6 @@ Phases 13-14 (production readiness, community) have no code yet.
 - The RustSec and cargo-deny checks are being added to CI; their first results are pending.
 - The full repository security review is reserved for the release-candidate commit. No claim
   of a completed security audit is made before that review.
-- Phase 13D adds seven fuzz targets (class files, descriptors/YAML, mrpack, ZIP source import, Gradle logs, crash reports, plugin protocol). They run for 10 minutes each in a separate scheduled nightly workflow; no fuzz campaign has completed yet, so coverage and crash-free status are not yet established. The `plugin.yml` arm currently exercises YAML decoding only; UMMP does not migrate Spigot/Paper descriptors.
+- Phase 13D adds nine fuzz targets (class files, descriptors/YAML, mrpack, ZIP source import, Gradle logs, crash reports, plugin protocol, REST request DTOs, MCP tool arguments). They run for 10 minutes each in a separate scheduled nightly workflow; no fuzz campaign has completed yet, so coverage and crash-free status are not yet established. The `plugin.yml` arm currently exercises YAML decoding only; UMMP does not migrate Spigot/Paper descriptors.
 - Incremental modpack migration remains unimplemented; the current Phase 13B cache reuses
   deterministic per-JAR analysis and scan results only.
