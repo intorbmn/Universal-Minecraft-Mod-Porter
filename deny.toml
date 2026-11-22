@@ -16,20 +16,13 @@ allow = [
   "Unicode-3.0",
   "Zlib",
   "CC0-1.0",
-  "MPL-2.0",
-  "OpenSSL",
-  "CDLA-Permissive-2.0",
-  "BSL-1.0",
-  "0BSD",
-  "Unlicense",
-  "MIT-0",
-  "Unicode-DFS-2016",
+  "CC0-1.0",
+  "bzip2-1.0.6",
 ]
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
-allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
