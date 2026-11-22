@@ -64,6 +64,11 @@ impl CliConfig {
             .or(config.ai_provider);
         config.openai_base_url =
             env_value(&mut env, "UMMP_OPENAI_BASE_URL").or(config.openai_base_url);
+        if let Some(value) = env_value(&mut env, "UMMP_CHECK_UPDATES") {
+            config.check_updates = value
+                .parse::<bool>()
+                .map_err(|_| "UMMP_CHECK_UPDATES must be 'true' or 'false'")?;
+        }
 
         Ok(config)
     }
