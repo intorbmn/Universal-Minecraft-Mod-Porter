@@ -323,7 +323,7 @@ fn plan_reads_a_zip_and_refuses_a_downgrade() {
     let zip = d.path().join("demo.zip");
     {
         let mut z = zip::ZipWriter::new(std::fs::File::create(&zip).unwrap());
-        let o = zip::write::FileOptions::default();
+        let o = zip::write::SimpleFileOptions::default();
         for (rel, data) in read_tree(&fixture("loader/fabric-src")) {
             z.start_file(rel.to_string_lossy().replace('\\', "/"), o)
                 .unwrap();
@@ -904,7 +904,7 @@ fn zip_bytes(entries: &[(&str, Vec<u8>)]) -> Vec<u8> {
     {
         let mut z = zip::ZipWriter::new(&mut buf);
         for (name, bytes) in entries {
-            z.start_file(*name, zip::write::FileOptions::default())
+            z.start_file(*name, zip::write::SimpleFileOptions::default())
                 .unwrap();
             z.write_all(bytes).unwrap();
         }

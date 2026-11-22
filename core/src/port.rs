@@ -71,10 +71,9 @@ fn extract(zip: &Path, dir: &Path) -> Result<(), PortError> {
     let mut archive = zip::ZipArchive::new(std::fs::File::open(zip)?)?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let name = entry.name().to_string();
+        let name = entry.name()?.into_owned();
         let safe = entry
             .enclosed_name()
-            .map(Path::to_path_buf)
             .and_then(|rel| resolve_within(dir, &rel).ok())
             .ok_or_else(|| PortError::Input(format!("unsafe path in zip: {name}")))?;
         if entry.is_dir() {
@@ -110,7 +109,7 @@ const fn loader_name(l: &Loader) -> Option<&'static str> {
 
 fn write_zip(root: &Path, zip: &Path) -> Result<(), PortError> {
     let mut z = zip::ZipWriter::new(std::fs::File::create(zip)?);
-    let options = zip::write::FileOptions::default();
+    let options = zip::write::SimpleFileOptions::default();
     for rel in collect_files(root)? {
         z.start_file(rel.to_string_lossy().replace('\\', "/"), options)?;
         z.write_all(&std::fs::read(root.join(&rel))?)?;

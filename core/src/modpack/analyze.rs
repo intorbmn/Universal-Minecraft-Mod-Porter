@@ -81,7 +81,6 @@ fn technologies(jar: &Path) -> Vec<String> {
         }
         let Some(dest) = entry
             .enclosed_name()
-            .map(Path::to_path_buf)
             .and_then(|rel| crate::filesystem::resolve_within(dir.path(), &rel).ok())
         else {
             continue;

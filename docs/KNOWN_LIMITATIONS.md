@@ -145,3 +145,11 @@ Phases 13-14 (production readiness, community) have no code yet.
 - Job reports expose the persisted job result and recent log tail only; they are not a full archival report store.
 - Local builds are permitted only when the application risk check allows Low risk, but build scripts still run with the user's OS permissions. Prefer GitHub Actions.
 - MCP uses the same canonical path validation as REST and therefore shares its time-of-check/time-of-use gap. No real Claude Code client smoke test has been recorded yet; see `docs/MCP.md`.
+
+## Phase 13 security review (in progress)
+- The RustSec and cargo-deny checks are being added to CI; their first results are pending.
+- The full repository security review is reserved for the release-candidate commit. No claim
+  of a completed security audit is made before that review.
+- Fuzz targets and regression fixtures for all untrusted-input parsers are not yet complete.
+- Incremental modpack migration remains unimplemented; the current Phase 13B cache reuses
+  deterministic per-JAR analysis and scan results only.

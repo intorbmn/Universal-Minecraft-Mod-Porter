@@ -60,7 +60,7 @@ fn read_small(archive: &mut ZipArchive<File>, name: &str) -> Result<Vec<u8>, Pac
 
 /// Copies one archive entry to `dest`, counting the bytes really read.
 fn copy_capped(
-    entry: &mut zip::read::ZipFile<'_>,
+    entry: &mut zip::read::ZipFile<'_, File>,
     dest: &Path,
     name: &str,
     budget: &mut Budget,
@@ -99,7 +99,7 @@ fn extract_prefix(
 ) -> Result<(), PackError> {
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let name = entry.name().to_string();
+        let name = entry.name()?.into_owned();
         let Some(rest) = name.strip_prefix(prefix) else {
             continue;
         };
@@ -118,6 +118,7 @@ fn extract_prefix(
 /// Names of entries under `prefix`, checked before anything is written.
 fn validate_prefix_names(archive: &ZipArchive<File>, prefix: &str) -> Result<(), PackError> {
     for name in archive.file_names() {
+        let name = name?;
         if let Some(rest) = name.strip_prefix(prefix) {
             if !rest.is_empty() && !name.ends_with('/') {
                 safe_rel(rest)?;
@@ -821,7 +822,7 @@ fn add_dir_to_zip(
     root: &Path,
     prefix: &str,
 ) -> Result<(), PackError> {
-    let options = zip::write::FileOptions::default();
+    let options = zip::write::SimpleFileOptions::default();
     for rel in walk_files(root)? {
         z.start_file(format!("{prefix}{}", rel_string(&rel)), options)?;
         std::io::copy(&mut File::open(root.join(&rel))?, z)?;
@@ -873,7 +874,10 @@ pub fn write_mrpack(out: &OutPack, instance: &Path, file: &Path) -> Result<(), P
         std::fs::create_dir_all(parent)?;
     }
     let mut z = zip::ZipWriter::new(File::create(file)?);
-    z.start_file("modrinth.index.json", zip::write::FileOptions::default())?;
+    z.start_file(
+        "modrinth.index.json",
+        zip::write::SimpleFileOptions::default(),
+    )?;
     z.write_all(
         serde_json::to_string_pretty(&index)
             .map_err(|e| PackError::Invalid(e.to_string()))?
@@ -928,7 +932,7 @@ pub fn write_curseforge(
         std::fs::create_dir_all(parent)?;
     }
     let mut z = zip::ZipWriter::new(File::create(file)?);
-    z.start_file("manifest.json", zip::write::FileOptions::default())?;
+    z.start_file("manifest.json", zip::write::SimpleFileOptions::default())?;
     z.write_all(
         serde_json::to_string_pretty(&manifest)
             .map_err(|e| PackError::Invalid(e.to_string()))?

@@ -202,10 +202,13 @@ pub fn import_with(path: &Path, work: &Path, opts: &ImportOptions) -> Result<Pac
         };
     }
     let archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
-    let names: Vec<&str> = archive.file_names().collect();
-    if names.contains(&"modrinth.index.json") {
+    let names: Vec<String> = archive
+        .file_names()
+        .map(|name| name.map(|name| name.into_owned()))
+        .collect::<Result<_, _>>()?;
+    if names.iter().any(|name| name == "modrinth.index.json") {
         formats::read_mrpack(archive, work, opts)
-    } else if names.contains(&"manifest.json") {
+    } else if names.iter().any(|name| name == "manifest.json") {
         formats::read_curseforge(archive, work, opts)
     } else {
         Err(PackError::Unsupported(format!(

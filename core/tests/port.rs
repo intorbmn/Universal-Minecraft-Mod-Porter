@@ -38,7 +38,7 @@ fn zip_of(root: &Path, prefix: &str, extra: &[(&str, &[u8])]) -> Vec<u8> {
     let mut buf = std::io::Cursor::new(Vec::new());
     {
         let mut z = zip::ZipWriter::new(&mut buf);
-        let o = zip::write::FileOptions::default();
+        let o = zip::write::SimpleFileOptions::default();
         for (rel, data) in read_tree(root) {
             let name = format!("{prefix}{}", rel.to_string_lossy().replace('\\', "/"));
             z.start_file(name, o).unwrap();

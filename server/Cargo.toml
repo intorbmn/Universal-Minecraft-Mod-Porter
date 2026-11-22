@@ -17,8 +17,8 @@ tracing = "0.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time", "io-std"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 uuid = { version = "1", features = ["serde", "v4"] }
-ummp-core = { path = "../core" }
-ummp-ai-providers = { path = "../providers" }
+ummp-core = { version = "0.1.0", path = "../core" }
+ummp-ai-providers = { version = "0.1.0", path = "../providers" }
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
