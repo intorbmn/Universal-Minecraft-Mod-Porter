@@ -201,7 +201,7 @@ pub fn import_with(path: &Path, work: &Path, opts: &ImportOptions) -> Result<Pac
             formats::read_folder(path, opts)
         };
     }
-    let mut archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
+    let archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
     let names: Vec<String> = archive.file_names()
         .map(|name| name.map(|name| name.into_owned()))
         .collect::<Result<_, _>>()?;
