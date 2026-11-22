@@ -874,7 +874,10 @@ pub fn write_mrpack(out: &OutPack, instance: &Path, file: &Path) -> Result<(), P
         std::fs::create_dir_all(parent)?;
     }
     let mut z = zip::ZipWriter::new(File::create(file)?);
-    z.start_file("modrinth.index.json", zip::write::SimpleFileOptions::default())?;
+    z.start_file(
+        "modrinth.index.json",
+        zip::write::SimpleFileOptions::default(),
+    )?;
     z.write_all(
         serde_json::to_string_pretty(&index)
             .map_err(|e| PackError::Invalid(e.to_string()))?
