@@ -13,6 +13,8 @@ concurrency:
 jobs:
   build-test-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +55,18 @@ jobs:
           name: ummp-phase12-cargo-lockfile
           path: Cargo.lock
           if-no-files-found: error
+      - name: Commit resolved workspace lockfile on phase branches
+        if: always() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase-13')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Cargo.lock is already current"
+            exit 0
+          fi
+          git commit -m "chore(lock): sync resolved workspace lockfile"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
   desktop:
     runs-on: ubuntu-latest
