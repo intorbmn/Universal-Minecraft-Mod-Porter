@@ -36,3 +36,31 @@ pub fn save_store(dir: &Path, store: &CheckpointStore) -> Result<(), AppError> {
     store.persist(dir)?;
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn truncated_checkpoint_manifest_is_rejected() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join(STORE_FILE), br#"{"checkpoints":["#).unwrap();
+
+        let error = load_store(dir.path()).unwrap_err();
+        assert!(matches!(error, AppError::Input(_)));
+    }
+
+    #[test]
+    fn save_store_replaces_manifest_atomically_and_round_trips() {
+        let dir = tempdir().unwrap();
+        let store = CheckpointStore::new();
+
+        save_store(dir.path(), &store).unwrap();
+
+        let loaded = load_store(dir.path()).unwrap();
+        assert!(loaded.checkpoints.is_empty());
+        assert!(dir.path().join(STORE_FILE).is_file());
+    }
+}
