@@ -629,11 +629,23 @@ pub fn fuzz_decode_mcp_request(tool: u8, input: &[u8]) {
         return;
     }
     match tool % 6 {
-        0 => { let _ = serde_json::from_slice::<PathArgs>(input); }
-        1 => { let _ = serde_json::from_slice::<PlanArgs>(input); }
-        2 => { let _ = serde_json::from_slice::<PortArgs>(input); }
-        3 => { let _ = serde_json::from_slice::<BuildArgs>(input); }
-        4 => { let _ = serde_json::from_slice::<JobArgs>(input); }
-        _ => { let _ = serde_json::from_slice::<RollbackArgs>(input); }
+        0 => {
+            let _ = serde_json::from_slice::<PathArgs>(input);
+        }
+        1 => {
+            let _ = serde_json::from_slice::<PlanArgs>(input);
+        }
+        2 => {
+            let _ = serde_json::from_slice::<PortArgs>(input);
+        }
+        3 => {
+            let _ = serde_json::from_slice::<BuildArgs>(input);
+        }
+        4 => {
+            let _ = serde_json::from_slice::<JobArgs>(input);
+        }
+        _ => {
+            let _ = serde_json::from_slice::<RollbackArgs>(input);
+        }
     }
 }
