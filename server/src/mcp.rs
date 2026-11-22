@@ -620,7 +620,6 @@ mod tests {
     }
 }
 
-
 /// Fuzz-only entry point for the actual MCP tool argument DTOs.
 #[cfg(feature = "fuzzing")]
 #[doc(hidden)]
