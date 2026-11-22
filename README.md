@@ -3,8 +3,10 @@
 A tool to analyze, plan, and migrate Minecraft mods across versions, mod loaders, and platforms.
 
 ## Status
-Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. PRs #14 (12.0 + 12.A), #16 (12.B REST), and #17 (12.C MCP) are merged. Phase 12.D is verified; Phase 12.E plugin system is verified (CI #697) on `phase-12d-action`; PR #21 remains Draft. Rough designs for 10-14 are in [docs/drafts](docs/drafts/README.md). Deferred work: [BACKLOG.md](docs/BACKLOG.md). See
-[PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+Phases 0–12 are complete. Phase 13 (Production Readiness) is in progress; see
+[PROJECT_STATUS.md](docs/PROJECT_STATUS.md), [FUZZING.md](docs/FUZZING.md), and
+[KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for current evidence and remaining checks.
+Phase 14 (Community & Ecosystem) has not started.
 
 ## Documentation
 | Doc | Purpose |
@@ -23,6 +25,7 @@ Phases 0-11 complete; Phase 12 (CLI and external integrations) is in progress. P
 | [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) | Testing strategy |
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
+| [FUZZING.md](docs/FUZZING.md) | Fuzz targets, local runs and crash triage |
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [API.md](docs/API.md) | Local REST API, authentication and routes |
 | [MCP.md](docs/MCP.md) | MCP tools, resources and client setup |
@@ -108,7 +111,8 @@ ummp pack export path/to/instance --to-format mrpack
 # exit codes: 0 done, 2 refused (High-risk JAR; review it, then --allow-risk), 3 done, mods left to you
 ummp adapters    # technologies UMMP detects or migrates (see docs/ADAPTER_SDK.md)
 ummp completions bash # also: zsh, fish, powershell
-ummp serve # local REST API at 127.0.0.1:7432\nummp mcp # MCP stdio server for a connected assistant
+ummp serve # local REST API at 127.0.0.1:7432
+ummp mcp # MCP stdio server for a connected assistant
 ummp plugins list # installed plugins
 ummp plugins check ./plugins/my-plugin
 # OpenAI-compatible/local model: --provider openai --base-url http://localhost:11434/v1
@@ -127,7 +131,6 @@ See [ROADMAP.md](docs/ROADMAP.md) for the development plan.
 
 Apache-2.0 (see [LICENSE](LICENSE) and ADR 0018). UMMP grants no rights to Minecraft, Mojang code, or the mods you port.
 
-
 ## GitHub Action
 
 Use UMMP from another repository's CI workflow:
@@ -142,5 +145,6 @@ Use UMMP from another repository's CI workflow:
     fail-on-risk: high
 ```
 
-The composite action also supports `analyze`, `port` and `build`. Plugins are discovered in `<data_dir>/plugins/`; validate an executable with `ummp plugins check DIR`. See
+The composite action also supports `analyze`, `port` and `build`. Plugins are discovered in
+`<data_dir>/plugins/`; validate an executable with `ummp plugins check DIR`. See
 [docs/CLI.md](docs/CLI.md#github-action-phase-12d) for inputs, risk thresholds and outputs.

@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Phase 13.D: nine nightly cargo-fuzz targets for class files, descriptors/YAML, Modrinth indexes, ZIP imports, Gradle logs, crash reports, plugin JSONL, REST request DTOs and MCP tool arguments. Fixture-seeded fuzz campaigns run separately from stable CI; see [docs/FUZZING.md](docs/FUZZING.md).
+
 ### Fixed
 - MCP server now reports its name as `ummp` (was the library default `rmcp`) in `initialize`.
 
 ### Changed
 - Desktop AI assist tab: the AI provider (Anthropic / OpenAI-compatible) can be switched on the tab itself; the choice is saved to settings before the key form changes, and a failed save keeps the previous provider.
 
-### Added
 - Phase 12.E: initial out-of-process plugin runtime, API 1 manifest and JSON Lines handshake, plugin discovery, CLI validation commands, scrubbed environment, timeout, stdout cap and returned-path validation.
 - Phase 12.D: root composite GitHub Action for analyze, scan, port and build, configurable risk gating, schema-1 JSON reports, GitHub Step Summary, report artifacts, and contract tests.
 - Phase 12.B: local Axum REST API, `ummp serve`, localhost binding, bearer-token authentication, allowed-root path validation, job SSE, OpenAPI contract and request-size limits. See ADR 0016 and `docs/API.md`.
@@ -57,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes Modrinth `.mrpack`, CurseForge zip, Prism/MultiMC instances and plain folders;
   analyses every JAR in parallel; dependency graph (missing, duplicate, cycle, side);
   per-mod plan (keep, update, port, replace, remove, manual) with a reason for each;
-  optional read-only Modrinth lookups with `--online` (cached as JSON); config key renames
+  optional read-only Modrinth lookups with `--online` (cached as JSON); config migration
   applied through `MigrationEngine` with a checkpoint; `UMMP_PACK_REPORT.md`. Exit codes:
   0 done, 2 refused for a High-risk JAR, 3 done with mods left to you. Archive reads are
   bounded and path-checked.
