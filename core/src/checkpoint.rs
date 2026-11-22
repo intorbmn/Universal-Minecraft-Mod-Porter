@@ -190,8 +190,11 @@ pub fn restore_from(snapshot: &Path, project_root: &Path) -> Result<(), Checkpoi
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(snapshot.join(rel), target)?;
+        fs::copy(snapshot.join(rel), &target)?;
+        fs::File::open(&target)?.sync_all()?;
     }
+    #[cfg(unix)]
+    sync_directories(&project)?;
     Ok(())
 }
 
@@ -336,6 +339,37 @@ mod tests {
             fs::read_to_string(checkpoint.snapshot_path.join("src/A.java")).unwrap(),
             "class A {}"
         );
+    }
+
+    #[test]
+    fn interrupted_session_can_be_restored_from_persisted_manifest() {
+        let proj = tempdir().unwrap();
+        let snaps = tempdir().unwrap();
+        write(&proj.path().join("src/A.java"), "class Original {}");
+        let session_id = Uuid::new_v4();
+        let mut store = CheckpointStore::new();
+        store
+            .snapshot(session_id, "pre-transform", proj.path(), snaps.path())
+            .unwrap();
+
+        write(&proj.path().join("src/A.java"), "class PartiallyChanged {}");
+        write(&proj.path().join("src/NEW.java"), "class NewFile {}");
+
+        let persisted: CheckpointStore =
+            serde_json::from_slice(&fs::read(snaps.path().join("checkpoints.json")).unwrap())
+                .unwrap();
+        let checkpoint = persisted
+            .checkpoints
+            .iter()
+            .find(|item| item.session_id == session_id)
+            .unwrap();
+        persisted.restore(checkpoint.id, proj.path()).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(proj.path().join("src/A.java")).unwrap(),
+            "class Original {}"
+        );
+        assert!(!proj.path().join("src/NEW.java").exists());
     }
 
     #[test]
