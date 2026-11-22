@@ -37,7 +37,6 @@ pub fn save_store(dir: &Path, store: &CheckpointStore) -> Result<(), AppError> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
