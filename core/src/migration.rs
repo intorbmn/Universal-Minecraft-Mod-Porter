@@ -1097,7 +1097,6 @@ impl MigrationEngine {
     /// prefix of edits, then return without rollback to model abrupt process death.
     #[cfg(test)]
     fn apply_with_interruption(
-        &self,
         set: &EditSet,
         project: &Project,
         store: &mut CheckpointStore,
@@ -1212,8 +1211,7 @@ mod tests {
         };
 
         let mut store = CheckpointStore::new();
-        let checkpoint_id = MigrationEngine::default()
-            .apply_with_interruption(&set, &project, &mut store, &opts, 1)
+        let checkpoint_id = MigrationEngine::apply_with_interruption(&set, &project, &mut store, &opts, 1)
             .unwrap();
 
         // One edit reached disk; the next process reloads only durable metadata.
