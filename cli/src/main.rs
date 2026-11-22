@@ -959,7 +959,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                     .start_migrate_in_place(request, true)
                     .map_err(|error| map_app_error(&error))?;
                 let migration = wait_for_job(&services, id, ExitCode::Error)?;
-                serde_json::json!({ "plan": plan, "migration": migration })
+                serde_json::json!({ "plan": plan, "session": id, "migration": migration })
             } else {
                 serde_json::to_value(&plan)?
             };
@@ -975,7 +975,8 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 output::set_result(result);
             } else if apply {
                 println!(
-                    "\nMigration completed. Checkpoint: {}",
+                    "\nMigration completed. Session: {}. Checkpoint: {}",
+                    result["session"].as_str().unwrap_or("unknown"),
                     result["migration"]["checkpoint"]
                         .as_str()
                         .unwrap_or("created")
