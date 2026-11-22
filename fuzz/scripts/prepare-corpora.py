@@ -90,16 +90,26 @@ def seed_logs() -> None:
 def seed_api_requests() -> None:
     rest = corpus("rest_request")
     mcp = corpus("mcp_request")
-    samples = {
-        "path.json": b'{"path":"/tmp/project"}',
-        "plan.json": b'{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
-        "port.json": b'{"path":"/tmp/project","to":"1.21.1","loader":"fabric","approve":false}',
-        "job.json": b'{"id":"00000000-0000-0000-0000-000000000000"}',
+    rest_samples = {
+        "path.json": b'\\x00{"path":"/tmp/project"}',
+        "plan.json": b'\\x01{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
+        "migrate.json": b'\\x02{"path":"/tmp/project","to":"1.21.1","loader":"fabric","reviewed":false}',
+        "port.json": b'\\x03{"input":"/tmp/project","output":"/tmp/output","to":"1.21.1","loader":"fabric"}',
+        "build.json": b'\\x05{"path":"/tmp/project"}',
+        "rollback.json": b'\\x06{"checkpoint":null}',
     }
-    for name, data in samples.items():
+    mcp_samples = {
+        "path.json": b'\\x00{"path":"/tmp/project"}',
+        "plan.json": b'\\x01{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
+        "port.json": b'\\x02{"path":"/tmp/project","to":"1.21.1","loader":"fabric","approve":false}',
+        "build.json": b'\\x03{"path":"/tmp/project","backend":"github"}',
+        "job.json": b'\\x04{"id":"00000000-0000-0000-0000-000000000000"}',
+        "rollback.json": b'\\x05{"project":"/tmp/project","confirm":false}',
+    }
+    for name, data in rest_samples.items():
         (rest / name).write_bytes(data)
+    for name, data in mcp_samples.items():
         (mcp / name).write_bytes(data)
-
 
 def seed_plugin_protocol() -> None:
     output = corpus("plugin_protocol")
