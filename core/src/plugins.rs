@@ -645,7 +645,7 @@ mod tests {
 
     #[test]
     fn plugin_protocol_decoder_rejects_multiple_lines_and_invalid_utf8() {
-        assert!(decode_plugin_response(b"{}\\n{}\\n").is_err());
+        assert!(decode_plugin_response(b"{}\n{}\n").is_err());
         assert!(decode_plugin_response(&[0xff]).is_err());
     }
 
