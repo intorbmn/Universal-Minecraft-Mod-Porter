@@ -6,3 +6,5 @@
 /ui/src-tauri/target/
 /ui/test-results/
 /ui/playwright-report/
+/fuzz/artifacts/
+/fuzz/corpus/
