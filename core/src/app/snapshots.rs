@@ -33,9 +33,6 @@ pub fn load_store(dir: &Path) -> Result<CheckpointStore, AppError> {
 /// # Errors
 /// Returns an I/O error when `dir` cannot be written.
 pub fn save_store(dir: &Path, store: &CheckpointStore) -> Result<(), AppError> {
-    std::fs::create_dir_all(dir)?;
-    let json = serde_json::to_vec_pretty(store)
-        .map_err(|e| AppError::Input(format!("cannot write checkpoint store: {e}")))?;
-    std::fs::write(dir.join(STORE_FILE), json)?;
+    store.persist(dir)?;
     Ok(())
 }
