@@ -26,6 +26,7 @@ Phase 14 (Community & Ecosystem) has not started.
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Risk register |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Progress tracking |
 | [FUZZING.md](docs/FUZZING.md) | Fuzz targets, local runs and crash triage |
+| [phase-13e-crash-recovery.md](docs/phase/phase-13e-crash-recovery.md) | Crash recovery protocol and verification |
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [API.md](docs/API.md) | Local REST API, authentication and routes |
 | [MCP.md](docs/MCP.md) | MCP tools, resources and client setup |
@@ -78,6 +79,8 @@ ummp migrate path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings map
 # Write it (a checkpoint is taken first), then undo if needed
 ummp migrate path/to/mod --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json --apply --report report.md
 ummp rollback path/to/mod
+# If an --apply migration is interrupted, restore its pre-transform snapshot:
+ummp recover path/to/mod --session <session-uuid>
 
 # JAR-only mod: remap class names into a new JAR (input is not modified)
 ummp remap-jar mod.jar mod-1.17.jar --from 1.16.5 --to 1.17.1 --loader forge --mappings mappings.json
