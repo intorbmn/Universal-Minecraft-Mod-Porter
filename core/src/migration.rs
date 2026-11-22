@@ -1211,11 +1211,14 @@ mod tests {
         };
 
         let mut store = CheckpointStore::new();
-        let checkpoint_id = MigrationEngine::apply_with_interruption(&set, &project, &mut store, &opts, 1)
-            .unwrap();
+        let checkpoint_id =
+            MigrationEngine::apply_with_interruption(&set, &project, &mut store, &opts, 1).unwrap();
 
         // One edit reached disk; the next process reloads only durable metadata.
-        assert_eq!(std::fs::read_to_string(&first).unwrap(), "class FirstChanged {}");
+        assert_eq!(
+            std::fs::read_to_string(&first).unwrap(),
+            "class FirstChanged {}"
+        );
         assert_eq!(std::fs::read_to_string(&second).unwrap(), "class Second {}");
         let recovered_store: CheckpointStore = serde_json::from_slice(
             &std::fs::read(snapshots_dir.path().join("checkpoints.json")).unwrap(),
@@ -1228,7 +1231,9 @@ mod tests {
             .unwrap();
         assert_eq!(checkpoint.id, checkpoint_id);
 
-        recovered_store.restore(checkpoint_id, &project.root).unwrap();
+        recovered_store
+            .restore(checkpoint_id, &project.root)
+            .unwrap();
         assert_eq!(std::fs::read_to_string(&first).unwrap(), "class First {}");
         assert_eq!(std::fs::read_to_string(&second).unwrap(), "class Second {}");
     }
