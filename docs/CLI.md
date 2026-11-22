@@ -48,15 +48,22 @@ sandbox_repo = "your-name/ummp-build-sandbox"
 ai_provider = "anthropic"
 openai_base_url = "http://localhost:11434/v1"
 allowed_roots = ["D:/Minecraft/mods", "D:/Minecraft/projects"]
+check_updates = true
 ```
 
 Precedence is CLI flag > `UMMP_*` environment variable > TOML > built-in default.
 Supported variables are `UMMP_OUTPUT_ROOT`, `UMMP_KB`, `UMMP_BUILD_REPO`,
-`UMMP_AI_PROVIDER`, and `UMMP_OPENAI_BASE_URL`. The optional `allowed_roots` list controls the REST API's filesystem boundary; if omitted, only the user's home directory is allowed. The previous
+`UMMP_AI_PROVIDER`, `UMMP_OPENAI_BASE_URL`, and `UMMP_CHECK_UPDATES`. The optional `allowed_roots` list controls the REST API's filesystem boundary; if omitted, only the user's home directory is allowed. The previous
 `UMMP_OUTPUT_DIR` and `UMMP_PROVIDER` names remain accepted for compatibility.
 
 API keys and other secrets are not valid TOML fields. Configure them with
 `ummp ai-key set`, never in `ummp.toml`.
+
+## Update checks
+
+Run `ummp update --check` to query the latest stable GitHub Release. UMMP prints the release tag and URL but never downloads or installs an update. The check uses the GitHub Releases API and sends no telemetry.
+
+Automatic checks are disabled by default. To opt in, set `check_updates = true` in `ummp.toml` or `UMMP_CHECK_UPDATES=true`. When enabled, UMMP checks at most once per 24 hours and only prints a message when a newer version exists. Network failures are silent for this background check. Disable it with `check_updates = false` or `UMMP_CHECK_UPDATES=false`.
 
 ## Exit codes
 
