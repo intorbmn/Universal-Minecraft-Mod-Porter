@@ -7,6 +7,16 @@ license = "Apache-2.0"
 authors = ["UMMP contributors"]
 repository = "https://github.com/intorbmn/Universal-Minecraft-Mod-Porter"
 default-run = "ummp"
+publish = false
+
+[package.metadata.dist]
+dist = true
+
+[package.metadata.wix]
+upgrade-guid = "e1458336-a9aa-492c-9a1b-07ec3c148c6b"
+path-guid = "01311969-0f49-4580-9567-67cd4ee589ba"
+license = false
+eula = false
 
 [dependencies]
 ummp-core = { version = "1.0.0-rc.1", path = "../core" }
