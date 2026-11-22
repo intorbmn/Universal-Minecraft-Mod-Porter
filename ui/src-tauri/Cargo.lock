@@ -4575,7 +4575,7 @@ dependencies = [
 
 [[package]]
 name = "ummp-ai-providers"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "serde_json",
  "ummp-core",
@@ -4584,7 +4584,7 @@ dependencies = [
 
 [[package]]
 name = "ummp-core"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "chrono",
  "rusqlite",
