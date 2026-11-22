@@ -129,11 +129,10 @@ impl CheckpointStore {
             created_at: chrono::Utc::now(),
         };
         self.add(cp.clone());
-        if let Err(error) = self.persist(&snap_root) {
-            self.checkpoints.retain(|item| item.id != cp.id);
-            let _ = fs::remove_dir_all(&dest);
-            return Err(error);
-        }
+        // Keep the completed snapshot if manifest publication reports an error:
+        // the rename may already have happened and the durable manifest may reference it.
+        // An orphaned snapshot is safe; a manifest pointing at a deleted snapshot is not.
+        self.persist(&snap_root)?;
         Ok(cp)
     }
 
