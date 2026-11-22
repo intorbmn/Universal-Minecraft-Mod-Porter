@@ -1,6 +1,8 @@
 name: Scheduled fuzzing
 
 on:
+  push:
+    branches: [phase-13d-fuzzing]
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
@@ -9,7 +11,38 @@ permissions:
   contents: read
 
 jobs:
+  build:
+    if: github.event_name == 'push'
+    name: build fuzz / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - class_file
+          - descriptor
+          - mrpack_index
+          - zip_import
+          - gradle_log
+          - crash_report
+          - plugin_protocol
+          - rest_request
+          - mcp_request
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly Rust
+        run: rustup toolchain install nightly --profile minimal
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Compile fuzz target
+        run: cargo +nightly fuzz build "${{ matrix.target }}"
+
   fuzz:
+    if: github.event_name != 'push'
     name: fuzz / ${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
