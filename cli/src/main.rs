@@ -899,7 +899,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
 
     match command {
         Commands::AiKey { cmd } => run_ai_key(cmd, json_mode)?,
-        Commands::Update { check } => {\n            exit_code = run_update_check(check, json_mode)?;\n        }
+        Commands::Update { check } => {
+            exit_code = run_update_check(check, json_mode)?;
+        }
         Commands::Plugins { cmd } => {
             let manager = PluginManager::new(PluginManager::default_dir()?);
             match cmd {
