@@ -11,6 +11,8 @@
 //! errors, logs or the audit trail.
 
 mod modrinth;
+mod releases;
+pub use releases::{check_for_update, check_for_update_at, ReleaseUpdate};
 pub use modrinth::ModrinthIndex;
 
 use serde_json::{json, Value};
