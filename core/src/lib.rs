@@ -10,6 +10,7 @@ pub mod app;
 pub mod build;
 pub mod build_script;
 pub mod bytecode;
+pub mod cache;
 pub mod checkpoint;
 pub mod config;
 pub mod descriptor;

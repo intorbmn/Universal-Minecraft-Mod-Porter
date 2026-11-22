@@ -8,8 +8,10 @@
 //! 5.5 Migration recipes (CRUD + versioning), 5.6 Knowledge search,
 //! 5.7 Schema versioning + seed data.
 
+use crate::cache::CacheKey;
 use crate::persistence::DbError;
 use rusqlite::{params, Connection};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
@@ -156,6 +158,16 @@ impl KnowledgeBase {
     pub fn open(path: &Path) -> Result<Self, DbError> {
         let conn = Connection::open(path)?;
         conn.execute_batch(SCHEMA)?;
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS analysis_cache (
+                cache_kind TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL,
+                ummp_version TEXT NOT NULL,
+                rules_sha256 TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                PRIMARY KEY (cache_kind, content_sha256, ummp_version, rules_sha256)
+            );",
+        )?;
         Ok(Self { conn })
     }
 
@@ -189,6 +201,75 @@ impl KnowledgeBase {
             }
         }
         Ok(applied)
+    }
+
+    /// Maximum serialized cache payload accepted from SQLite (64 MiB).
+    const MAX_CACHE_PAYLOAD_BYTES: i64 = 64 * 1024 * 1024;
+    const MAX_CACHE_PAYLOAD_BYTES_USIZE: usize = 64 * 1024 * 1024;
+
+    /// Read and deserialize a cache entry. Corrupt rows are deleted and treated as misses.
+    pub fn cache_get<T: DeserializeOwned>(&self, key: &CacheKey) -> Result<Option<T>, DbError> {
+        let payload = self.conn.query_row(
+            "SELECT payload FROM analysis_cache
+             WHERE cache_kind = ?1 AND content_sha256 = ?2 AND ummp_version = ?3
+               AND rules_sha256 = ?4 AND length(CAST(payload AS BLOB)) <= ?5",
+            params![
+                key.kind.as_str(),
+                key.content_sha256,
+                key.ummp_version,
+                key.rules_sha256,
+                Self::MAX_CACHE_PAYLOAD_BYTES,
+            ],
+            |row| row.get::<_, String>(0),
+        );
+        match payload {
+            Ok(json) => match serde_json::from_str(&json) {
+                Ok(value) => Ok(Some(value)),
+                Err(_) => {
+                    self.cache_delete(key)?;
+                    Ok(None)
+                }
+            },
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Store a complete result atomically. Oversized payloads are deliberately not cached.
+    pub fn cache_put<T: Serialize>(&self, key: &CacheKey, value: &T) -> Result<bool, DbError> {
+        let payload = serde_json::to_string(value)?;
+        if payload.len() > Self::MAX_CACHE_PAYLOAD_BYTES_USIZE {
+            return Ok(false);
+        }
+        self.conn.execute(
+            "INSERT OR REPLACE INTO analysis_cache
+             (cache_kind, content_sha256, ummp_version, rules_sha256, payload)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                key.kind.as_str(),
+                key.content_sha256,
+                key.ummp_version,
+                key.rules_sha256,
+                payload,
+            ],
+        )?;
+        Ok(true)
+    }
+
+    /// Remove a cache row.
+    pub fn cache_delete(&self, key: &CacheKey) -> Result<(), DbError> {
+        self.conn.execute(
+            "DELETE FROM analysis_cache
+             WHERE cache_kind = ?1 AND content_sha256 = ?2 AND ummp_version = ?3
+               AND rules_sha256 = ?4",
+            params![
+                key.kind.as_str(),
+                key.content_sha256,
+                key.ummp_version,
+                key.rules_sha256,
+            ],
+        )?;
+        Ok(())
     }
 
     // --- MAPPINGS ---
@@ -945,6 +1026,85 @@ mod tests {
         let dir = tempdir().unwrap();
         let kb = KnowledgeBase::open(&dir.path().join("test.db")).unwrap();
         (dir, kb)
+    }
+
+    #[test]
+    fn rule_change_invalidates_cache() {
+        use crate::cache::{CacheKey, CacheKind};
+        let (_dir, kb) = setup_kb();
+        let key = CacheKey::new(CacheKind::Analysis, b"jar bytes", "rules-a".into());
+        assert!(kb.cache_put(&key, &vec!["cached".to_string()]).unwrap());
+        let value: Option<Vec<String>> = kb.cache_get(&key).unwrap();
+        assert_eq!(value, Some(vec!["cached".to_string()]));
+        let changed_rules = CacheKey {
+            rules_sha256: "rules-b".into(),
+            ..key
+        };
+        let changed_content = CacheKey::new(CacheKind::Analysis, b"other bytes", "rules-a".into());
+        assert!(kb
+            .cache_get::<Vec<String>>(&changed_rules)
+            .unwrap()
+            .is_none());
+        assert!(kb
+            .cache_get::<Vec<String>>(&changed_content)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn ummp_version_change_invalidates_cache() {
+        use crate::cache::{CacheKey, CacheKind};
+        let (_dir, kb) = setup_kb();
+        let key = CacheKey::new(CacheKind::Analysis, b"jar bytes", "rules".into());
+        kb.cache_put(&key, &serde_json::json!({"value": 1}))
+            .unwrap();
+        let old_version = CacheKey {
+            ummp_version: "0.0.0".into(),
+            ..key
+        };
+        assert!(kb
+            .cache_get::<serde_json::Value>(&old_version)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn corrupt_cache_row_is_deleted_and_rebuilt() {
+        use crate::cache::{CacheKey, CacheKind};
+        let (_dir, kb) = setup_kb();
+        let key = CacheKey::new(CacheKind::Scan, b"jar bytes", "rules".into());
+        kb.conn.execute(
+            "INSERT INTO analysis_cache (cache_kind, content_sha256, ummp_version, rules_sha256, payload)
+             VALUES (?1, ?2, ?3, ?4, 'not-json')",
+            params![key.kind.as_str(), key.content_sha256, key.ummp_version, key.rules_sha256],
+        ).unwrap();
+        assert!(kb.cache_get::<serde_json::Value>(&key).unwrap().is_none());
+        assert!(kb
+            .cache_put(&key, &serde_json::json!({"rebuilt": true}))
+            .unwrap());
+        let value: Option<serde_json::Value> = kb.cache_get(&key).unwrap();
+        assert_eq!(value, Some(serde_json::json!({"rebuilt": true})));
+    }
+
+    #[test]
+    fn cache_table_is_added_to_existing_knowledge_database() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("existing.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(SCHEMA).unwrap();
+        }
+        let kb = KnowledgeBase::open(&path).unwrap();
+        let count: i64 = kb
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master
+                 WHERE type = 'table' AND name = 'analysis_cache'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]

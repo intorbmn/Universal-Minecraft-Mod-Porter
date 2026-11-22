@@ -17,7 +17,7 @@ pub enum Severity {
     High,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Finding {
     pub rule: String,
     pub severity: Severity,
@@ -25,7 +25,7 @@ pub struct Finding {
     pub evidence: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ScanReport {
     pub findings: Vec<Finding>,
 }
