@@ -91,20 +91,20 @@ def seed_api_requests() -> None:
     rest = corpus("rest_request")
     mcp = corpus("mcp_request")
     rest_samples = {
-        "path.json": b'\\x00{"path":"/tmp/project"}',
-        "plan.json": b'\\x01{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
-        "migrate.json": b'\\x02{"path":"/tmp/project","to":"1.21.1","loader":"fabric","reviewed":false}',
-        "port.json": b'\\x03{"input":"/tmp/project","output":"/tmp/output","to":"1.21.1","loader":"fabric"}',
-        "build.json": b'\\x05{"path":"/tmp/project"}',
-        "rollback.json": b'\\x06{"checkpoint":null}',
+        "path.json": b'\x00{"path":"/tmp/project"}',
+        "plan.json": b'\x01{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
+        "migrate.json": b'\x02{"path":"/tmp/project","to":"1.21.1","loader":"fabric","reviewed":false}',
+        "port.json": b'\x03{"input":"/tmp/project","output":"/tmp/output","to":"1.21.1","loader":"fabric"}',
+        "build.json": b'\x05{"path":"/tmp/project"}',
+        "rollback.json": b'\x06{"checkpoint":null}',
     }
     mcp_samples = {
-        "path.json": b'\\x00{"path":"/tmp/project"}',
-        "plan.json": b'\\x01{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
-        "port.json": b'\\x02{"path":"/tmp/project","to":"1.21.1","loader":"fabric","approve":false}',
-        "build.json": b'\\x03{"path":"/tmp/project","backend":"github"}',
-        "job.json": b'\\x04{"id":"00000000-0000-0000-0000-000000000000"}',
-        "rollback.json": b'\\x05{"project":"/tmp/project","confirm":false}',
+        "path.json": b'\x00{"path":"/tmp/project"}',
+        "plan.json": b'\x01{"path":"/tmp/project","to":"1.21.1","loader":"fabric"}',
+        "port.json": b'\x02{"path":"/tmp/project","to":"1.21.1","loader":"fabric","approve":false}',
+        "build.json": b'\x03{"path":"/tmp/project","backend":"github"}',
+        "job.json": b'\x04{"id":"00000000-0000-0000-0000-000000000000"}',
+        "rollback.json": b'\x05{"project":"/tmp/project","confirm":false}',
     }
     for name, data in rest_samples.items():
         (rest / name).write_bytes(data)
