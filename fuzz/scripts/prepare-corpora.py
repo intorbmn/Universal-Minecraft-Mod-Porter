@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build bounded seed corpora from checked-in fixtures for scheduled fuzz runs."""
-from pathlib import Path
 import json
 import zipfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -28,9 +28,8 @@ def corpus(name: str) -> Path:
 
 def seed_class_files() -> None:
     output = corpus("class_file")
-    jar = FIXTURES / "fabric-classes.jar"
-    with zipfile.ZipFile(jar) as archive:
-        classes = [n for n in archive.namelist() if n.endswith(".class")]
+    with zipfile.ZipFile(FIXTURES / "fabric-classes.jar") as archive:
+        classes = [name for name in archive.namelist() if name.endswith(".class")]
         for index, name in enumerate(classes[:16]):
             data = archive.read(name)
             if len(data) <= 1024 * 1024:
@@ -46,10 +45,7 @@ def seed_descriptors() -> None:
         b"\x02" + (FIXTURES / "forge-src-1.16/src/main/resources/META-INF/mods.toml").read_bytes()
     )
     (output / "plugin.yml").write_bytes(
-        b"\x04" + b"name: ExamplePlugin
-version: 1.0.0
-main: com.example.Plugin
-"
+        b"\x04" + b"name: ExamplePlugin\nversion: 1.0.0\nmain: com.example.Plugin\n"
     )
     with zipfile.ZipFile(FIXTURES / "quilt-a.jar") as archive:
         for name in archive.namelist():
@@ -111,14 +107,13 @@ def seed_api_requests() -> None:
     for name, data in mcp_samples.items():
         (mcp / name).write_bytes(data)
 
+
 def seed_plugin_protocol() -> None:
     output = corpus("plugin_protocol")
     (output / "hello.jsonl").write_text(
-        '{"ummp_api":1,"id":"fuzz-seed","result":{}}
-', encoding="utf-8"
+        '{"ummp_api":1,"id":"fuzz-seed","result":{}}\n', encoding="utf-8"
     )
-    (output / "empty-object.jsonl").write_text("{}
-", encoding="utf-8")
+    (output / "empty-object.jsonl").write_text("{}\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
