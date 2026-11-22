@@ -308,6 +308,17 @@ pub enum Commands {
         #[arg(long)]
         checkpoint: Option<Uuid>,
     },
+    /// Recover an interrupted migration by restoring its pre-transform checkpoint.
+    Recover {
+        /// Project root path.
+        path: PathBuf,
+        /// Session UUID printed by the interrupted migration.
+        #[arg(long)]
+        session: Uuid,
+        /// Checkpoint directory; defaults to the project's standard snapshot directory.
+        #[arg(long)]
+        snapshots: Option<PathBuf>,
+    },
 }
 
 #[derive(clap::Args)]
