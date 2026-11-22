@@ -770,7 +770,7 @@ fn app_services(
 
 
 /// Explicit, user-triggered update check. No download or install is ever performed.
-fn run_update_check(check: bool) -> Result<i32, Box<dyn std::error::Error>> {
+fn run_update_check(check: bool, json_mode: bool) -> Result<i32, Box<dyn std::error::Error>> {
     if !check {
         return Err(CliFailure::new(
             ExitCode::InvalidInput,
@@ -780,12 +780,29 @@ fn run_update_check(check: bool) -> Result<i32, Box<dyn std::error::Error>> {
     }
     match ummp_ai_providers::check_for_update(env!("CARGO_PKG_VERSION")) {
         Ok(Some(update)) => {
-            println!(
-                "Update available: {}\nRelease: {}\nDownload and install it manually.",
-                update.tag_name, update.html_url
-            );
+            if json_mode {
+                output::set_result(serde_json::json!({
+                    "update_available": true,
+                    "tag": update.tag_name,
+                    "release_url": update.html_url,
+                }));
+            } else {
+                println!(
+                    "Update available: {}\nRelease: {}\nDownload and install it manually.",
+                    update.tag_name, update.html_url
+                );
+            }
         }
-        Ok(None) => println!("UMMP is up to date ({})", env!("CARGO_PKG_VERSION")),
+        Ok(None) => {
+            if json_mode {
+                output::set_result(serde_json::json!({
+                    "update_available": false,
+                    "current_version": env!("CARGO_PKG_VERSION"),
+                }));
+            } else {
+                println!("UMMP is up to date ({})", env!("CARGO_PKG_VERSION"));
+            }
+        },
         Err(error) => {
             return Err(CliFailure::new(ExitCode::Error, error).into());
         }
@@ -794,7 +811,7 @@ fn run_update_check(check: bool) -> Result<i32, Box<dyn std::error::Error>> {
 }
 
 /// Opt-in background check, throttled to at most once per 24 hours. Network errors are silent.
-fn maybe_check_for_updates(config: &CliConfig, command: &Commands) {
+fn maybe_check_for_updates(config: &CliConfig, command: &Commands, json_mode: bool) {
     if !config.check_updates || matches!(command, Commands::Update { .. }) {
         return;
     }
@@ -815,10 +832,17 @@ fn maybe_check_for_updates(config: &CliConfig, command: &Commands) {
     let _ = std::fs::create_dir_all(&data_dir);
     let _ = std::fs::write(&state_path, now.to_string());
     if let Ok(Some(update)) = ummp_ai_providers::check_for_update(env!("CARGO_PKG_VERSION")) {
-        println!(
-            "Update available: {} ({})\nRun ummp update --check for details.",
-            update.tag_name, update.html_url
-        );
+        if json_mode {
+            eprintln!(
+                "Update available: {} ({})\nRun ummp update --check for details.",
+                update.tag_name, update.html_url
+            );
+        } else {
+            println!(
+                "Update available: {} ({})\nRun ummp update --check for details.",
+                update.tag_name, update.html_url
+            );
+        }
     }
 }
 
@@ -869,13 +893,13 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 )
             })?
     };
-    maybe_check_for_updates(&config, &command);
+    maybe_check_for_updates(&config, &command, json_mode);
     let pm = DefaultProjectManager;
     let mut exit_code = ExitCode::Ok.value();
 
     match command {
         Commands::AiKey { cmd } => run_ai_key(cmd, json_mode)?,
-        Commands::Update { check } => {\n            exit_code = run_update_check(check)?;\n        }
+        Commands::Update { check } => {\n            exit_code = run_update_check(check, json_mode)?;\n        }
         Commands::Plugins { cmd } => {
             let manager = PluginManager::new(PluginManager::default_dir()?);
             match cmd {
