@@ -143,7 +143,7 @@ jobs:
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.34.0/cargo-dist-installer.sh | sh
           dist --version
       - name: Regenerate cargo-dist workflow
-        run: dist generate-ci
+        run: dist init --yes
       - name: Upload generated release workflow
         if: always()
         uses: actions/upload-artifact@v4
