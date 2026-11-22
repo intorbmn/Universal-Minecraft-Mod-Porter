@@ -138,6 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install pinned cargo-dist
         run: |
           cargo install cargo-dist --locked --version 0.34.0
