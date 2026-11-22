@@ -14,7 +14,9 @@ TARGETS = (
     "zip_import",
     "gradle_log",
     "crash_report",
-    "plugin_protocol",\n    "rest_request",\n    "mcp_request",
+    "plugin_protocol",
+    "rest_request",
+    "mcp_request",
 )
 
 
@@ -44,7 +46,10 @@ def seed_descriptors() -> None:
         b"\x02" + (FIXTURES / "forge-src-1.16/src/main/resources/META-INF/mods.toml").read_bytes()
     )
     (output / "plugin.yml").write_bytes(
-        b"\x04" + b"name: ExamplePlugin\nversion: 1.0.0\nmain: com.example.Plugin\n"
+        b"\x04" + b"name: ExamplePlugin
+version: 1.0.0
+main: com.example.Plugin
+"
     )
     with zipfile.ZipFile(FIXTURES / "quilt-a.jar") as archive:
         for name in archive.namelist():
@@ -99,9 +104,11 @@ def seed_api_requests() -> None:
 def seed_plugin_protocol() -> None:
     output = corpus("plugin_protocol")
     (output / "hello.jsonl").write_text(
-        '{"ummp_api":1,"id":"fuzz-seed","result":{}}\n', encoding="utf-8"
+        '{"ummp_api":1,"id":"fuzz-seed","result":{}}
+', encoding="utf-8"
     )
-    (output / "empty-object.jsonl").write_text("{}\n", encoding="utf-8")
+    (output / "empty-object.jsonl").write_text("{}
+", encoding="utf-8")
 
 
 if __name__ == "__main__":
