@@ -23,6 +23,8 @@ pub enum CheckpointError {
     NotFound(Uuid),
     #[error("invalid checkpoint location: {0}")]
     InvalidLocation(String),
+    #[error("checkpoint metadata: {0}")]
+    Metadata(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +52,33 @@ impl CheckpointStore {
 
     pub fn latest(&self) -> Option<&Checkpoint> {
         self.checkpoints.last()
+    }
+
+    /// Persist checkpoint metadata atomically so an interrupted migration can be recovered.
+    pub fn persist(&self, dir: &Path) -> Result<(), CheckpointError> {
+        fs::create_dir_all(dir)?;
+        let bytes = serde_json::to_vec_pretty(self)
+            .map_err(|error| CheckpointError::Metadata(error.to_string()))?;
+        let destination = dir.join("checkpoints.json");
+        let temporary = dir.join(format!(".checkpoints-{}.tmp", Uuid::new_v4()));
+        let result = (|| {
+            use std::io::Write as _;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+            fs::rename(&temporary, &destination)?;
+            #[cfg(unix)]
+            fs::File::open(dir)?.sync_all()?;
+            Ok::<(), std::io::Error>(())
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+        result?;
+        Ok(())
     }
 
     pub fn get(&self, id: Uuid) -> Option<&Checkpoint> {
@@ -97,6 +126,11 @@ impl CheckpointStore {
             created_at: chrono::Utc::now(),
         };
         self.add(cp.clone());
+        if let Err(error) = self.persist(&snap_root) {
+            self.checkpoints.retain(|item| item.id != cp.id);
+            let _ = fs::remove_dir_all(&dest);
+            return Err(error);
+        }
         Ok(cp)
     }
 
