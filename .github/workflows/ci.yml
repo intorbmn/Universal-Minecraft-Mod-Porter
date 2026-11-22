@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, phase-11-ui, phase-12-api, phase-12b-rest, phase-12c-mcp, phase-12d-action, phase-13c-security-hardening, phase-13d-fuzzing, phase-13e-crash-recovery, phase-13f-distribution]
+    branches: [main, master, phase-11-ui, phase-12-api, phase-12b-rest, phase-12c-mcp, phase-12d-action, phase-13c-security-hardening, phase-13d-fuzzing, phase-13e-crash-recovery, phase-13f-distribution, phase-13g-update-check]
   pull_request:
     branches: [main, master, phase-13a-b-performance-cache, phase-13c-security-hardening, phase-13e-crash-recovery, phase-13f-distribution]
 
