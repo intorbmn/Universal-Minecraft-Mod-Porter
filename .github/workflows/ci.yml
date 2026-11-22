@@ -144,14 +144,5 @@ jobs:
           dist --version
       - name: Regenerate cargo-dist workflow
         run: dist init --yes
-      - name: Upload generated release workflow
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ummp-generated-release-workflow
-          path: |
-            .github/workflows/release.yml
-            cli/wix/main.wxs
-          if-no-files-found: error
       - name: Validate release configuration
         run: dist plan --output-format=json
