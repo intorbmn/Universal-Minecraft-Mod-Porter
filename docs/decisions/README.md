@@ -28,3 +28,4 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0018](0018-project-license.md) | Project license: Apache-2.0 core, separate proprietary Pro | Accepted |
 | [0019](0019-plugin-protocol.md) | Out-of-process plugin protocol and trust boundary | Accepted |
 | [0020](0020-sqlite-analysis-cache.md) | SQLite cache for deterministic per-JAR analysis | Accepted |
+| [0021](0021-crash-recovery-protocol.md) | Durable pre-transform checkpoint recovery | Accepted |
