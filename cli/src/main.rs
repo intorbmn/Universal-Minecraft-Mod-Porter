@@ -1299,7 +1299,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 .checkpoints
                 .iter()
                 .filter(|item| item.session_id == session)
-                .max_by_key(|item| item.created_at)
+                .max_by_key(|item| item.created_at.timestamp_millis())
                 .cloned()
                 .ok_or_else(|| {
                     format!("no recoverable checkpoint found for migration session {session}")
