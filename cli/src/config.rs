@@ -11,7 +11,9 @@ pub struct CliConfig {
     pub sandbox_repo: Option<String>,
     pub ai_provider: Option<String>,
     pub openai_base_url: Option<String>,
-    pub allowed_roots: Option<Vec<PathBuf>>,\n    /// Opt-in to a silent daily GitHub Releases check.\n    pub check_updates: bool,
+    pub allowed_roots: Option<Vec<PathBuf>>,
+    /// Opt-in to a silent daily GitHub Releases check.
+    pub check_updates: bool,
 }
 
 impl CliConfig {
@@ -311,7 +313,16 @@ allowed_roots = ["D:/Minecraft/mods"]
     }
 
     #[test]
-    fn environment_can_opt_in_to_update_checks() {\n        let dir = tempfile::tempdir().unwrap();\n        let path = dir.path().join("ummp.toml");\n        std::fs::write(&path, "check_updates = false").unwrap();\n        let config = load(Some(&path), dir.path(), None, &[( "UMMP_CHECK_UPDATES", "true" )]).unwrap();\n        assert!(config.check_updates);\n    }\n\n    #[test]\n    fn blank_environment_values_do_not_override_file() {
+    fn environment_can_opt_in_to_update_checks() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ummp.toml");
+        std::fs::write(&path, "check_updates = false").unwrap();
+        let config = load(Some(&path), dir.path(), None, &[("UMMP_CHECK_UPDATES", "true")]).unwrap();
+        assert!(config.check_updates);
+    }
+
+    #[test]
+    fn blank_environment_values_do_not_override_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("ummp.toml");
         std::fs::write(&path, "ai_provider = \"openai\"").unwrap();
