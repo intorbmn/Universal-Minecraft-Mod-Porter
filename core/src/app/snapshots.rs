@@ -58,6 +58,8 @@ mod tests {
         let store = CheckpointStore::new();
 
         save_store(dir.path(), &store).unwrap();
+        // Replacing an existing manifest must remain atomic on every supported platform.
+        save_store(dir.path(), &store).unwrap();
 
         let loaded = load_store(dir.path()).unwrap();
         assert!(loaded.checkpoints.is_empty());
