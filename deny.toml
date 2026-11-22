@@ -1,6 +1,9 @@
 [advisories]
 unmaintained = "workspace"
 yanked = "deny"
+ignore = [
+  { id = "RUSTSEC-2026-0543", reason = "chrono is currently required by rmcp; no safe upstream upgrade is available yet. Revisit before release." },
+]
 
 [licenses]
 confidence-threshold = 0.8
@@ -26,6 +29,7 @@ allow = [
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
