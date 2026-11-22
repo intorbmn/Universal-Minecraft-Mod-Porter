@@ -1,0 +1,2 @@
+- name: Generate WiX MSI template
+  run: dist init --yes
