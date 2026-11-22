@@ -15,5 +15,5 @@ unix-archive = ".tar.gz"
 install-path = "CARGO_HOME"
 auto-includes = true
 allow-dirty = ["msi"]
-github-build-setup = "dist-build-setup.yml"
+github-build-setup = "../../dist-build-setup.yml"
 pr-run-mode = "plan"
