@@ -23,7 +23,7 @@ jobs:
           - zip_import
           - gradle_log
           - crash_report
-          - plugin_protocol
+          - plugin_protocol\n          - rest_request\n          - mcp_request
     steps:
       - uses: actions/checkout@v4
 
