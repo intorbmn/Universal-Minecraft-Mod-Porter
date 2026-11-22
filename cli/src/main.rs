@@ -958,6 +958,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 let id = services
                     .start_migrate_in_place(request, true)
                     .map_err(|error| map_app_error(&error))?;
+                println!("Migration session: {id}");
                 let migration = wait_for_job(&services, id, ExitCode::Error)?;
                 serde_json::json!({ "plan": plan, "session": id, "migration": migration })
             } else {
