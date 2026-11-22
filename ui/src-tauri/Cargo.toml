@@ -1,6 +1,6 @@
 [package]
 name = "ummp-desktop"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 description = "UMMP desktop shell (Tauri 2). Calls ummp-core application services only."
 edition = "2024"
 rust-version = "1.90"
