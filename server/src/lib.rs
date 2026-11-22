@@ -634,13 +634,27 @@ pub fn fuzz_decode_rest_request(route: u8, input: &[u8]) {
         return;
     }
     match route % 7 {
-        0 => { let _ = serde_json::from_slice::<PathRequest>(input); }
-        1 => { let _ = serde_json::from_slice::<PlanBody>(input); }
-        2 => { let _ = serde_json::from_slice::<MigrateBody>(input); }
-        3 => { let _ = serde_json::from_slice::<PortRequest>(input); }
-        4 => { let _ = serde_json::from_slice::<PackRequest>(input); }
-        5 => { let _ = serde_json::from_slice::<BuildBody>(input); }
-        _ => { let _ = serde_json::from_slice::<RollbackBody>(input); }
+        0 => {
+            let _ = serde_json::from_slice::<PathRequest>(input);
+        }
+        1 => {
+            let _ = serde_json::from_slice::<PlanBody>(input);
+        }
+        2 => {
+            let _ = serde_json::from_slice::<MigrateBody>(input);
+        }
+        3 => {
+            let _ = serde_json::from_slice::<PortRequest>(input);
+        }
+        4 => {
+            let _ = serde_json::from_slice::<PackRequest>(input);
+        }
+        5 => {
+            let _ = serde_json::from_slice::<BuildBody>(input);
+        }
+        _ => {
+            let _ = serde_json::from_slice::<RollbackBody>(input);
+        }
     }
 }
 
