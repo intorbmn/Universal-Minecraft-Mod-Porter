@@ -12,7 +12,7 @@ is in `docs/SAD.md` and `docs/decisions/`.
    skills is part of starting the milestone, not optional.
 3. Work on a branch, never directly on `master`.
 4. For Phases 10–14, follow the detailed guide in `docs/guides/` (start with
-   `docs/guides/README.md`: workflow, environment quirks, entry points, definition of done).
+   `docs/guides/README.md`: workflow, environment quirks, APIs to reuse, milestones, definition of done).
 
 ## Commands (must all pass before a commit, same as CI)
 ```sh
@@ -36,7 +36,7 @@ CI has two independent jobs: the root Rust workspace and the desktop workspace (
   confirm the test goes red. Fixtures must look like real inputs: JARs contain binary
   `.class` files, and descriptors use real schemas.
 - **Do not move on to the next phase on your own** (master prompt §14). Finish the current
-  milestone, report it, and wait for the user to review.
+  milestone, report it, and wait for the user's review.
 - Every significant decision gets an ADR in `docs/decisions/` (next number: 0020).
 - Update `PROJECT_STATUS.md`, the phase file, `CHANGELOG.md`, and `KNOWN_LIMITATIONS.md`
   in the same change as the code.
@@ -84,5 +84,6 @@ skip the practice.
 | `action.yml` | Repository-root GitHub Composite Action; contract is tested by `cli/tests/action_contract.rs` |
 | `providers/` | HTTP AI providers (Anthropic, OpenAI-compatible); the only crate that talks to model APIs |
 | `server/` | Axum + Tokio REST adapter and official `rmcp` stdio MCP adapter; all domain work is delegated to `AppServices`, with shared canonical path policy |
+| `fuzz/` | Isolated `cargo-fuzz` workspace and fixture-seeded harnesses; nightly workflow is separate from stable CI |
 | `tests/fixtures/` | Mod corpus (`generate.py`), the `forge-src-1.16` project, and `golden/` expected outputs |
-| `docs/` | PRD, SAD, ROADMAP, phase files, ADRs, KNOWN_LIMITATIONS, PROJECT_STATUS |
+| `docs/` | PRD, SAD, ROADMAP, phase files, ADRs, KNOWN_LIMITATIONS, PROJECT_STATUS, FUZZING |
