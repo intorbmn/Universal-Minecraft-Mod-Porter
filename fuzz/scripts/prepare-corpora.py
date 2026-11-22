@@ -112,4 +112,5 @@ if __name__ == "__main__":
     seed_mrpack()
     seed_zip_import()
     seed_logs()
-    seed_plugin_protocol()\n    seed_api_requests()
+    seed_plugin_protocol()
+    seed_api_requests()
