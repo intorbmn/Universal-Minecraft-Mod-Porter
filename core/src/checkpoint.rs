@@ -115,8 +115,11 @@ impl CheckpointStore {
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::copy(project.join(&rel), target)?;
+            fs::copy(project.join(&rel), &target)?;
+            fs::File::open(&target)?.sync_all()?;
         }
+        #[cfg(unix)]
+        sync_directories(&dest)?;
 
         let cp = Checkpoint {
             id,
@@ -139,6 +142,27 @@ impl CheckpointStore {
         let cp = self.get(id).ok_or(CheckpointError::NotFound(id))?;
         restore_from(&cp.snapshot_path, project_root)
     }
+}
+
+#[cfg(unix)]
+fn sync_directories(root: &Path) -> Result<(), std::io::Error> {
+    let mut directories = vec![root.to_path_buf()];
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(directory) = stack.pop() {
+        for entry in fs::read_dir(&directory)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                let child = entry.path();
+                directories.push(child.clone());
+                stack.push(child);
+            }
+        }
+    }
+    directories.sort_by_key(|path| std::cmp::Reverse(path.components().count()));
+    for directory in directories {
+        fs::File::open(directory)?.sync_all()?;
+    }
+    Ok(())
 }
 
 /// Restore a project tree from a snapshot directory.
@@ -287,6 +311,30 @@ mod tests {
         assert_eq!(
             fs::read_to_string(p.join("build/out.class")).unwrap(),
             "binary"
+        );
+    }
+
+    #[test]
+    fn snapshot_persists_recovery_manifest_before_returning() {
+        let proj = tempdir().unwrap();
+        let snaps = tempdir().unwrap();
+        write(&proj.path().join("src/A.java"), "class A {}");
+        let session_id = Uuid::new_v4();
+        let mut store = CheckpointStore::new();
+
+        let checkpoint = store
+            .snapshot(session_id, "pre-transform", proj.path(), snaps.path())
+            .unwrap();
+
+        let persisted: CheckpointStore =
+            serde_json::from_slice(&fs::read(snaps.path().join("checkpoints.json")).unwrap())
+                .unwrap();
+        assert_eq!(persisted.checkpoints.len(), 1);
+        assert_eq!(persisted.checkpoints[0].id, checkpoint.id);
+        assert_eq!(persisted.checkpoints[0].session_id, session_id);
+        assert_eq!(
+            fs::read_to_string(checkpoint.snapshot_path.join("src/A.java")).unwrap(),
+            "class A {}"
         );
     }
 
