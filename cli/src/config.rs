@@ -322,7 +322,13 @@ allowed_roots = ["D:/Minecraft/mods"]
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("ummp.toml");
         std::fs::write(&path, "check_updates = false").unwrap();
-        let config = load(Some(&path), dir.path(), None, &[("UMMP_CHECK_UPDATES", "true")]).unwrap();
+        let config = load(
+            Some(&path),
+            dir.path(),
+            None,
+            &[("UMMP_CHECK_UPDATES", "true")],
+        )
+        .unwrap();
         assert!(config.check_updates);
     }
 
