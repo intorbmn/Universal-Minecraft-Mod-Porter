@@ -133,3 +133,14 @@ jobs:
         run: cargo audit
       - name: Check dependency policy
         run: cargo deny check
+
+  distribution-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned cargo-dist
+        run: |
+          cargo install cargo-dist --locked --version 0.34.0
+          dist --version
+      - name: Validate release configuration
+        run: dist plan --output-format=json
