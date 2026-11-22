@@ -1251,7 +1251,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "ummp"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "clap",
  "serde_json",
@@ -1265,7 +1265,7 @@ dependencies = [
 
 [[package]]
 name = "ummp-ai-providers"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "serde_json",
  "ummp-core",
@@ -1274,7 +1274,7 @@ dependencies = [
 
 [[package]]
 name = "ummp-core"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "chrono",
  "rusqlite",
