@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 13.H: English and Vietnamese user guides covering installation, porting, packs, reports, build backends, AI, recovery and troubleshooting.
+
+### Added
 - Phase 13.G: read-only `ummp update --check` and opt-in once-daily background release checks; no auto-download or telemetry.
 
 ### Added
