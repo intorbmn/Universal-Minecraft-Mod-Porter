@@ -440,6 +440,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fail_stale_jobs_marks_running_jobs_as_interrupted() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = JobDb::open(&dir.path().join("jobs.db")).unwrap();
+        let shared = Shared::new(db);
+        let session = Uuid::new_v4();
+        let mut job = Job::new(session, "migrate");
+        job.mark_running();
+        shared.save(&job).unwrap();
+
+        shared.fail_stale_jobs().unwrap();
+
+        let failed = shared
+            .db
+            .lock()
+            .unwrap()
+            .by_state(JobState::Failed)
+            .unwrap();
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0].session_id, session);
+        assert!(failed[0].log.iter().any(|line| line == INTERRUPTED));
+        assert_eq!(
+            failed[0].output,
+            Some(serde_json::json!({ "error": INTERRUPTED }))
+        );
+    }
+
+    #[test]
     fn limiter_lets_at_most_twenty_through_per_second() {
         let mut l = LogLimiter::new();
         let allowed = (0..10_000).filter(|_| l.allow()).count();
