@@ -138,10 +138,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
       - name: Install pinned cargo-dist
         run: |
-          cargo install cargo-dist --locked --version 0.34.0
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.34.0/cargo-dist-installer.sh | sh
           dist --version
       - name: Regenerate cargo-dist workflow
         run: dist generate-ci
