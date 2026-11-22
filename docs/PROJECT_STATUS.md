@@ -1,6 +1,6 @@
 # PROJECT_STATUS — UMMP Progress
 
-Last updated: 2026-11-21
+Last updated: 2026-11-22
 
 Status follows the rule in the master prompt: **COMPLETED only with test evidence
 against the phase's acceptance criteria.** Evidence = `cargo build`, `cargo test --all`
@@ -22,7 +22,7 @@ locally on branch `phase-10-modpack`.
 | 10 Modpack Migration | COMPLETED | `ummp pack inspect|migrate|export`: 4 pack formats read and written, parallel analysis, dependency graph, risk gate, planner, optional read-only Modrinth lookups, config migration through `MigrationEngine`, report. See `docs/phase/phase-10-modpack.md`, ADR 0013 |
 | 11 User Interface | COMPLETED | 11.A–11.F; both CI jobs green; Windows MSI/NSIS built (sandbox run 44718403971) and smoke-tested by the user on 2026-11-20 (main flow works; AI and job cancellation not tested by hand, covered by automated tests). Merged in PR #11. See `docs/phase/phase-11-ui.md` |
 | 12 CLI, API & External Integration | COMPLETED | 12.0 + 12.A (PR #14), 12.B REST (PR #16), 12.C MCP (PR #17), 12.D GitHub Action + 12.E plugins (PR #21) merged; CI green on both jobs; starred tests mutation-checked. 12.C verified over real stdio on 2026-11-21 (approve, confirm and allowed_roots gates refuse; approved port writes output, source untouched); the user connected it to Claude Code. See `docs/phase/phase-12-api.md`. |
-| 13 Optimization & Production Readiness | IN_PROGRESS | 13A–13C implemented on stacked draft PRs; 13D adds seven nightly fuzz targets and fixture-seeded scheduled runs. Stable CI remains separate. |
+| 13 Optimization & Production Readiness | IN_PROGRESS | 13A–13C implemented on stacked draft PRs; 13D adds nine nightly fuzz targets and fixture-seeded scheduled runs. Stable CI remains separate. |
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Current milestone
