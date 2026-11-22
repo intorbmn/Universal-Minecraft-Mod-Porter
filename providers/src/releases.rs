@@ -57,7 +57,8 @@ pub fn check_for_update_at(
 }
 
 fn parse_version(value: &str) -> Option<(Vec<u64>, Option<String>)> {
-    let value = value.trim().strip_prefix('v').unwrap_or(value.trim());
+    let value = value.trim();
+    let value = value.strip_prefix('v').unwrap_or(value);
     let (core, prerelease) = value
         .split_once('-')
         .map_or((value, None), |(core, pre)| (core, Some(pre.to_string())));
@@ -80,7 +81,7 @@ fn is_newer(candidate: &str, current: &str) -> bool {
         Ordering::Less => false,
         Ordering::Equal => match (candidate_pre, current_pre) {
             (None, Some(_)) => true,
-            (Some(_), None) | (None, None) => false,
+            (Some(_) | None, None) => false,
             (Some(candidate), Some(current)) => candidate > current,
         },
     }
