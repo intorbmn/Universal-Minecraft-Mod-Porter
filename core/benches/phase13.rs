@@ -51,7 +51,7 @@ fn five_mb_jar() -> (TempDir, PathBuf) {
     let mut zip = zip::ZipWriter::new(file);
     zip.start_file(
         "src/main/java/Large.java",
-        zip::write::FileOptions::default(),
+        zip::write::SimpleFileOptions::default(),
     )
     .expect("start JAR entry");
     let chunk = "public class Large { String payload = \"benchmark-data\"; }\n";
@@ -161,11 +161,15 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
     let mut class_bytes = Vec::new();
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index).expect("read fixture entry");
-        if std::path::Path::new(entry.name())
+        let entry_name = entry
+            .name()
+            .expect("valid fixture entry name")
+            .into_owned();
+        if std::path::Path::new(&entry_name)
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("class"))
         {
-            class_name = Some(entry.name().to_string());
+            class_name = Some(entry_name);
             entry
                 .read_to_end(&mut class_bytes)
                 .expect("read class bytes");
@@ -189,7 +193,7 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
     let input = dir.path().join("five-mib.jar");
     let mut jar = zip::ZipWriter::new(fs::File::create(&input).expect("create remap fixture"));
     let options =
-        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     jar.start_file(&class_name, options)
         .expect("write class entry");
     jar.write_all(&class_bytes).expect("write class bytes");
