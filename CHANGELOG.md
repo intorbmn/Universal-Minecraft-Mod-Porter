@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 13.E: durable checkpoint manifests are atomically persisted before migration writes; `ummp recover <project> --session <UUID>` restores an interrupted session to its pre-transform snapshot. Recovery is rollback-only until deterministic edit-plan replay is persisted.
 - Phase 13.D: nine nightly cargo-fuzz targets for class files, descriptors/YAML, Modrinth indexes, ZIP imports, Gradle logs, crash reports, plugin JSONL, REST request DTOs and MCP tool arguments. Fixture-seeded fuzz campaigns run separately from stable CI; see [docs/FUZZING.md](docs/FUZZING.md).
 
 ### Fixed
