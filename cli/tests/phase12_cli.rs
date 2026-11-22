@@ -517,7 +517,7 @@ fn remap_jar_json_matches_golden_result_shape() {
     let input = dir.path().join("input.jar");
     let mut archive = zip::ZipWriter::new(std::fs::File::create(&input).unwrap());
     archive
-        .start_file("META-INF/MANIFEST.MF", zip::write::FileOptions::default())
+        .start_file("META-INF/MANIFEST.MF", zip::write::SimpleFileOptions::default())
         .unwrap();
     archive.write_all(b"Manifest-Version: 1.0\n\n").unwrap();
     archive.finish().unwrap();
