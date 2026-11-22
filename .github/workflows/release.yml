@@ -143,8 +143,6 @@ jobs:
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
-      - name: Generate WiX installer template
-        run: dist init --yes
       - name: Build artifacts
         run: |
           # Actually do builds and make zips and whatnot
