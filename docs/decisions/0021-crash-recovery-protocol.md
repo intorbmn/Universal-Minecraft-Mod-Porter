@@ -29,7 +29,8 @@ Expose `ummp recover <project> --session <UUID>` to restore the latest checkpoin
 - A completed snapshot becomes recoverable before the first migration write.
 - A truncated manifest is rejected rather than silently treated as an empty store.
 - Recovery requires the session UUID printed by the CLI.
-- Continuation and automatic detection of dead sessions remain deferred.
+- Startup detects persisted `Running` jobs with no surviving process and marks them `Failed` with an interruption marker.
+- The CLI still requires the session UUID; it does not yet show an interactive recovery prompt.
 - The existing snapshot exclusions remain unchanged.
 
 ## Alternatives rejected
