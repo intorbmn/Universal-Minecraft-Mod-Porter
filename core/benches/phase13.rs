@@ -161,10 +161,7 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
     let mut class_bytes = Vec::new();
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index).expect("read fixture entry");
-        let entry_name = entry
-            .name()
-            .expect("valid fixture entry name")
-            .into_owned();
+        let entry_name = entry.name().expect("valid fixture entry name").into_owned();
         if std::path::Path::new(&entry_name)
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("class"))
