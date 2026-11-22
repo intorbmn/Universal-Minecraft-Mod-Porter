@@ -123,7 +123,12 @@ pub enum Commands {
         cmd: AiKeyCmd,
     },
     /// Check GitHub Releases for a newer UMMP version. This never downloads or installs it.
-    Update {\n        #[arg(long)]\n        check: bool,\n    },\n    /// Generate shell completions.\n    Completions { shell: Shell },
+    Update {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate shell completions.
+    Completions { shell: Shell },
     /// Start the local REST API (localhost only by default).
     Serve {
         #[arg(long, default_value = "127.0.0.1")]
