@@ -151,7 +151,7 @@ jobs:
           name: ummp-generated-release-workflow
           path: |
             .github/workflows/release.yml
-            wix/main.wxs
+            cli/wix/main.wxs
           if-no-files-found: error
       - name: Validate release configuration
         run: dist plan --output-format=json
