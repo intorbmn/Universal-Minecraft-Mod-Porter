@@ -70,8 +70,6 @@ jobs:
 
   desktop:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: ui
@@ -132,19 +130,6 @@ jobs:
         working-directory: ui/src-tauri
       - run: cargo fmt --check
         working-directory: ui/src-tauri
-      - name: Commit resolved desktop lockfile on phase branches
-        if: always() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase-13')
-        working-directory: .
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ui/src-tauri/Cargo.lock
-          if git diff --cached --quiet; then
-            echo "Desktop Cargo.lock is already current"
-            exit 0
-          fi
-          git commit -m "chore(lock): sync desktop Cargo.lock"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
 
   security-audit:
     runs-on: ubuntu-latest
