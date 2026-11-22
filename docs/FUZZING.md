@@ -14,7 +14,9 @@ started manually from GitHub Actions.
 | `zip_import` | ZIP source staging, including path validation |
 | `gradle_log` | Gradle/compiler log classification |
 | `crash_report` | Minecraft crash-report parsing |
-| `plugin_protocol` | Bounded UTF-8 and single-line JSON plugin response decoding |\n| `rest_request` | REST JSON request DTO deserialization for every endpoint body |\n| `mcp_request` | MCP tool argument DTO deserialization for every tool |
+| `plugin_protocol` | Bounded UTF-8 and single-line JSON plugin response decoding |
+| `rest_request` | REST JSON request DTO deserialization for every endpoint body |
+| `mcp_request` | MCP tool argument DTO deserialization for every tool |
 
 The descriptor target's YAML arm exercises YAML decoding for a Spigot/Paper-style
 `plugin.yml`; UMMP does not currently migrate that descriptor format.
@@ -30,7 +32,9 @@ python3 fuzz/scripts/prepare-corpora.py
 cargo +nightly fuzz run class_file fuzz/corpus/class_file -- -max_total_time=60
 ```
 
-Replace `class_file` with any target in the table. The REST and MCP targets call fuzz-only\nentry points that deserialize the same private request structs used by the live handlers;\nthey do not start a server or execute filesystem operations. The scheduled workflow uses
+Replace `class_file` with any target in the table. The REST and MCP targets call fuzz-only
+entry points that deserialize the same private request structs used by the live handlers;
+they do not start a server or execute filesystem operations. The scheduled workflow uses
 `-max_total_time=600` (10 minutes) per target. Input-size and archive-expansion bounds
 in the harnesses keep fuzz iterations resource-limited.
 
