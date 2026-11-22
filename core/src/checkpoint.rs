@@ -59,25 +59,16 @@ impl CheckpointStore {
         fs::create_dir_all(dir)?;
         let bytes = serde_json::to_vec_pretty(self)
             .map_err(|error| CheckpointError::Metadata(error.to_string()))?;
+        use std::io::Write as _;
         let destination = dir.join("checkpoints.json");
-        let temporary = dir.join(format!(".checkpoints-{}.tmp", Uuid::new_v4()));
-        let result = (|| {
-            use std::io::Write as _;
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)?;
-            file.write_all(&bytes)?;
-            file.sync_all()?;
-            fs::rename(&temporary, &destination)?;
-            #[cfg(unix)]
-            fs::File::open(dir)?.sync_all()?;
-            Ok::<(), std::io::Error>(())
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        result?;
+        let mut temporary = tempfile::NamedTempFile::new_in(dir)?;
+        temporary.write_all(&bytes)?;
+        temporary.as_file().sync_all()?;
+        temporary
+            .persist(&destination)
+            .map_err(|error| CheckpointError::Io(error.error))?;
+        #[cfg(unix)]
+        fs::File::open(dir)?.sync_all()?;
         Ok(())
     }
 
