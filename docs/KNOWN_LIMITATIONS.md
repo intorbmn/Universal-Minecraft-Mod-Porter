@@ -135,6 +135,18 @@ Each entry names the module and the phase expected to address it.
 - **REST job events are bounded in-memory replay.** Events older than the server's 4096-event buffer are not replayed to late subscribers; persisted job state remains available through `GET /v1/jobs/{id}`. Phase 12.B.
 - **REST path checks have a time-of-check/time-of-use gap.** A path is canonicalised and checked against `allowed_roots` before use; a local process that swaps a directory for a symlink in between could escape. The bearer token is printed once to the terminal when `ummp serve` starts.
 
+## Production readiness (Phase 13)
+- `ummp.exe` is a CLI. Double-clicking it opens a console that closes immediately, and the
+  MSI installs it on `PATH` without a Start-menu entry; the desktop app is a separate
+  installer. Users must run it from PowerShell.
+- Binaries and installers are unsigned; SmartScreen and Gatekeeper warnings are expected.
+- `ummp update --check` reports an error while the repository has no published release
+  (GitHub returns 404 for `/releases/latest`).
+- Benchmarks use tiny synthetic fixture JARs; there is no large real-mod benchmark yet.
+- Fuzzing has one completed 10-minute-per-target campaign; it shows no crash in that time,
+  not the absence of bugs.
+- Desktop CI runs `npm audit` without failing the job.
+
 ## Not started
 Phase 13 is in progress; Phase 14 (community) has not started.
 

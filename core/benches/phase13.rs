@@ -1,7 +1,7 @@
 //! Phase 13A reproducible microbenchmarks.
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
@@ -113,6 +113,8 @@ fn bench_plan_dry_run_port(c: &mut Criterion) {
             || {
                 let temp = tempdir().expect("port workspace");
                 let project_root = temp.path().join("project");
+                // `copy_project` copies into an existing directory, as `port` prepares it.
+                fs::create_dir_all(&project_root).expect("create port workspace");
                 copy_project(&source, &project_root).expect("copy source fixture");
                 let kb = KnowledgeBase::open(&temp.path().join("knowledge.db"))
                     .expect("open benchmark knowledge base");
@@ -153,33 +155,37 @@ fn bench_plan_dry_run_port(c: &mut Criterion) {
     });
 }
 
+/// Minimal valid class `com/example/old/DemoWidget` (same layout as the bytecode unit-test
+/// fixture). The checked-in `fabric-classes.jar` holds an 11-byte header stub that analysis
+/// accepts but the remapper rightly rejects, so it cannot drive this benchmark.
+fn demo_widget_class() -> Vec<u8> {
+    let mut b = vec![0xCA, 0xFE, 0xBA, 0xBE, 0, 0, 0, 52];
+    let utf8 = |b: &mut Vec<u8>, s: &str| {
+        b.push(1);
+        b.extend_from_slice(&u16::try_from(s.len()).expect("short name").to_be_bytes());
+        b.extend_from_slice(s.as_bytes());
+    };
+    b.extend_from_slice(&10u16.to_be_bytes());
+    utf8(&mut b, "com/example/old/DemoWidget");
+    b.extend_from_slice(&[7, 0, 1]);
+    utf8(&mut b, "java/lang/Object");
+    b.extend_from_slice(&[7, 0, 3]);
+    b.extend_from_slice(&[5, 0, 0, 0, 0, 0, 0, 0, 42]);
+    utf8(&mut b, "Lcom/example/old/DemoWidget;");
+    utf8(&mut b, "self");
+    utf8(&mut b, "com/example/old/DemoWidgetExtra");
+    b.extend_from_slice(&[0, 0x21, 0, 2, 0, 4, 0, 0]);
+    b.extend_from_slice(&[0, 1, 0, 0x02, 0, 8, 0, 7, 0, 0]);
+    b.extend_from_slice(&[0, 0, 0, 0]);
+    b
+}
+
 fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
-    let source = fixture_root().join("fabric-classes.jar");
-    let mut archive = zip::ZipArchive::new(fs::File::open(source).expect("open class fixture"))
-        .expect("read class fixture");
-    let mut class_name = None;
-    let mut class_bytes = Vec::new();
-    for index in 0..archive.len() {
-        let mut entry = archive.by_index(index).expect("read fixture entry");
-        let entry_name = entry.name().expect("valid fixture entry name").into_owned();
-        if std::path::Path::new(&entry_name)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("class"))
-        {
-            class_name = Some(entry_name);
-            entry
-                .read_to_end(&mut class_bytes)
-                .expect("read class bytes");
-            break;
-        }
-    }
-    let class_name = class_name.expect("fixture contains a class");
-    let from = class_name.trim_end_matches(".class").replace('/', ".");
-    let simple = from.rsplit('.').next().expect("class name");
-    let to = format!("benchmark.ported.{simple}");
+    let class_name = "com/example/old/DemoWidget.class".to_string();
+    let class_bytes = demo_widget_class();
     let rule = RenameRule {
-        from,
-        to,
+        from: "com.example.old.DemoWidget".into(),
+        to: "benchmark.ported.DemoGadget".into(),
         kind: "class".into(),
         confidence: 1.0,
         version: "1.20.1".into(),
@@ -204,6 +210,14 @@ fn remap_fixture_5mb() -> (TempDir, PathBuf, Vec<ClassMap>) {
 
 fn bench_remap_5mb(c: &mut Criterion) {
     let (_fixture_dir, input, stages) = remap_fixture_5mb();
+    let check = tempdir().expect("remap check directory");
+    let changed = remap_jar(&input, &check.path().join("remapped.jar"), &stages)
+        .expect("remap benchmark JAR")
+        .classes_changed;
+    assert_eq!(
+        changed, 1,
+        "the benchmark must exercise a real class rename"
+    );
     let mut group = c.benchmark_group("remap");
     group.throughput(criterion::Throughput::Bytes(5 * 1024 * 1024));
     group.bench_function("jar_5_mib", |b| {

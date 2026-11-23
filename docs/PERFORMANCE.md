@@ -24,19 +24,32 @@ cargo bench -p ummp-core --bench phase13
 
 Criterion output is written under `target/criterion`. Do not compare measurements across machines without recording the environment.
 
-## Baseline
+## Baseline (2026-11-23)
 
-<escape>**Pending.**</escape> The GitHub-only editing environment used for this implementation does not provide a local Rust toolchain or executable checkout, so benchmark timings have not been run. No performance numbers or targets are claimed.
+Environment: 2 vCPU Intel Xeon @ 2.10 GHz (cloud VM, 1 thread per core), 7 GiB RAM,
+Linux 6.18, `rustc 1.97.0`, commit `a73a9ec` plus the benchmark fixes in this change.
+Command: `cargo bench -p ummp-core --bench phase13`. Criterion lower / estimate / upper:
 
-Record the following when the benchmark is run on a development machine:
+| Workload | Time | Throughput |
+|---|---|---|
+| `analyze/one_jar` | 8.74 / 9.60 / 10.59 µs | |
+| `analyze/300_jars` | 8.69 / 9.21 / 9.82 ms | |
+| `scan/300_jars` | 2.62 / 2.76 / 2.91 ms | |
+| `pack/inspect_300_mods` | 146.6 / 152.3 / 158.5 ms | |
+| `port/plan_and_dry_run_forge_1_16` | 3.25 / 3.37 / 3.51 ms | |
+| `remap/jar_5_mib` | 2.78 / 2.84 / 2.90 ms | 1.72 GiB/s |
+| `scan/jar_entry/5_mib` | 26.6 / 27.2 / 27.8 ms | 184 MiB/s |
 
-- CPU model and physical/logical core count
-- RAM
-- OS and kernel
-- `rustc --version`
-- benchmark command
-- commit SHA and date
-- Criterion estimates for every workload
+The guide's example target (300-JAR analyze under 30 s on a 4-core laptop) is met by
+three orders of magnitude, but the corpus is copies of tiny synthetic fixture JARs, so
+these numbers measure UMMP's overhead, not real mods with thousands of classes. A real
+large-mod benchmark stays open (BACKLOG "Heavy test mod").
+
+Two benchmark bugs were fixed before these numbers could be taken: the port benchmark
+copied into a directory it had not created, and the remap benchmark used the 11-byte
+class header stub from `fabric-classes.jar`, which the remapper correctly rejects. It now
+builds a valid synthetic `DemoWidget` class and asserts that exactly one class is renamed.
+CI only compiles benchmarks, so neither bug was visible there.
 
 ## Deferred guide workloads
 

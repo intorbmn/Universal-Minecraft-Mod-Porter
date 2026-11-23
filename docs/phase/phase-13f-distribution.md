@@ -25,7 +25,7 @@
 
 ## Acceptance
 - [x] cargo-dist plan passes on the PR (integrated Release plan run [#67](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45117081636)).
-- [ ] RC dry-run/pre-release workflow completes and artifacts/checksums are attached.
-- [ ] User downloads and installs the Windows artifact on a machine without Rust.
+- [x] RC artifact build (user chose artifacts only, no GitHub Release): sandbox run [45168766639](https://github.com/intorbmn/ummp-build-sandbox/actions/runs/45168766639) built Windows `.zip` + `.msi` and Linux `.tar.gz` with `.sha256` files; extracted binaries print `ummp 1.0.0-rc.1` and ship `LICENSE`. It first exposed the missing `[profile.dist]` and WiX source (fixed in PR #31). A tagged pre-release with attached assets is still not done.
+- [x] User downloaded the Windows RC artifact, ran `ummp.exe` without Rust and analyzed a mod (2026-11-23). Double-clicking the exe opens and closes a console, and the MSI adds no Start-menu entry, because it is a CLI; see KNOWN_LIMITATIONS.
 - [ ] `claude mcp add ummp -- <path>\\ummp.exe mcp` connects successfully.
 - [ ] Demo mod port smoke test passes.

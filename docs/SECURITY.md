@@ -43,6 +43,22 @@ The trusted computing base includes the UMMP CLI/core, desktop shell, local REST
 - Fuzz targets cover bytecode/class parsing, descriptors, .mrpack indexes, ZIP import, Gradle logs, crash reports, and plugin protocol decoding. Fuzzing runs separately on nightly so stable CI remains deterministic.
 - Full repository security review is reserved for the release-candidate commit. Confirmed findings require a regression test and fix; unresolved findings must be documented in docs/KNOWN_LIMITATIONS.md.
 
+## Review on `a73a9ec` (2026-11-23)
+
+Scope: dependency audit, REST, MCP, GitHub Action, plugins, update check. Method: CI
+`security-audit` job (cargo audit + cargo deny: advisories, bans, licenses, sources all ok)
+and a manual read of each boundary. This is a targeted review, not a multi-agent scan of
+the whole tree.
+
+| Area | Result |
+|---|---|
+| REST (`server/src/lib.rs`) | Loopback by default; non-loopback needs `--i-understand-remote`. Every route except `/v1/health` needs the bearer token, compared by SHA-256; token file created `0600` with `create_new`; request body limit set. No finding. |
+| MCP | `approve`, `confirm` and `allowed_roots` gates verified over real stdio (Phase 12.C). No finding. |
+| GitHub Action | Inputs reach the shell only through `env:` (no expression injection). **Fixed:** the install step ran `cargo generate-lockfile` before `cargo install --locked`, so every run resolved the newest dependency versions and `--locked` pinned nothing. Removed now that `Cargo.lock` is current; `action_installs_from_the_committed_lockfile` went red before the fix. |
+| Plugins | Env scrub, 30 s timeout, 8 MiB output cap, path validation, edits through `MigrationEngine`. Not OS-sandboxed (documented). No new finding. |
+| Update check | Opt-in, throttled, no identifiers sent; verified with `strace`. No finding. |
+| Desktop CI | `npm audit` is non-blocking (`|| echo`). Recorded in KNOWN_LIMITATIONS; decide before 1.0 whether advisories should fail CI. |
+
 ## Incident response
 
 Report vulnerabilities privately using the process in the root SECURITY.md. Do not publish exploit details before maintainers have had a reasonable opportunity to investigate and coordinate a fix.

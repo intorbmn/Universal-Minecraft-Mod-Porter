@@ -1370,6 +1370,8 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
             session,
             snapshots,
         } => {
+            // Opening the services repairs jobs a killed process left `Running`.
+            app_services(&config)?;
             let project = pm.open(&path)?;
             let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
             let store = load_store(&snap_dir)?;

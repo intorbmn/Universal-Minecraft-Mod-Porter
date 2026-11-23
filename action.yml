@@ -57,9 +57,7 @@ runs:
         CARGO_TARGET_DIR: ${{ runner.temp }}/ummp-target
       run: |
         set -euo pipefail
-        # The checked-in workspace lockfile may predate server dependencies.
-        # Regenerate it in the action checkout, then install deterministically.
-        cargo generate-lockfile
+        # Install exactly the dependency versions pinned in the committed Cargo.lock.
         cargo install --path cli --locked --force --root "$RUNNER_TEMP/ummp-install"
         echo "$RUNNER_TEMP/ummp-install/bin" >> "$GITHUB_PATH"
 

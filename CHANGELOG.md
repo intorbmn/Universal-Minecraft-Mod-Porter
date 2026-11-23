@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- `ummp recover` now marks the interrupted job `Failed` (it stayed `Running` until another command ran).
+- GitHub Action installs from the committed `Cargo.lock` instead of regenerating it, so `--locked` pins dependencies again.
+- Benchmarks: the port workload creates its workspace before copying, and the remap workload uses a valid synthetic class (the old one was an 11-byte stub the remapper rejects).
+- `docs/CLI.md`: fixed a heading broken by a literal `\n`; documented `recover` and `plugins`.
+
+### Fixed
 - Release builds: added the `[profile.dist]` cargo-dist builds with and the generated WiX source `cli/wix/main.wxs`; `msi` is no longer `allow-dirty`, so `dist plan` in PR CI now fails when the installer source is missing or stale. Found by the first real `dist build` (PR CI only ran `dist plan`).
 
 ### Added

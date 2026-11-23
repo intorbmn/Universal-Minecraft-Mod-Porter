@@ -3,7 +3,11 @@
 UMMP's CLI is intended for interactive use, scripts and CI. The contract is versioned so
 external callers can detect incompatible output changes.
 
-## MCP server (Phase 12.C)\n\nStart the stdio MCP server for a compatible assistant with `ummp mcp`. The process uses the same `ummp.toml` and `allowed_roots` boundary as REST; stdout is protocol-only. Configure the MCP client to launch `ummp` with `mcp` as its argument. Porting is plan-only unless `approve=true`, rollback requires `confirm=true`, and local builds require Low risk. See [MCP.md](MCP.md) for tools, resource URI and client configuration. The long-running server cannot be combined with `--json`.\n\n## Local REST API (Phase 12.B)
+## MCP server (Phase 12.C)
+
+Start the stdio MCP server for a compatible assistant with `ummp mcp`. The process uses the same `ummp.toml` and `allowed_roots` boundary as REST; stdout is protocol-only. Configure the MCP client to launch `ummp` with `mcp` as its argument. Porting is plan-only unless `approve=true`, rollback requires `confirm=true`, and local builds require Low risk. See [MCP.md](MCP.md) for tools, resource URI and client configuration. The long-running server cannot be combined with `--json`.
+
+## Local REST API (Phase 12.B)
 
 Start the localhost API with `ummp serve --port 7432`. The bearer token is printed once and stored in the shared data directory as `server-token`. See [API.md](API.md) for routes, authentication, path rules and remote-bind acknowledgement.
 
@@ -58,6 +62,29 @@ Supported variables are `UMMP_OUTPUT_ROOT`, `UMMP_KB`, `UMMP_BUILD_REPO`,
 
 API keys and other secrets are not valid TOML fields. Configure them with
 `ummp ai-key set`, never in `ummp.toml`.
+
+## Crash recovery (Phase 13.E)
+
+`ummp migrate --apply` prints a `session: <UUID>` line before it changes any file. If the
+process is killed or the machine loses power, restore the pre-transform checkpoint:
+
+```sh
+ummp recover ./path/to/mod --session <session-uuid> [--snapshots <dir>]
+```
+
+Recovery is rollback-only (the edit plan is not durable, so UMMP never continues a half-done
+migration). The same command marks the interrupted job `Failed` with
+`interrupted (app closed)`.
+
+## Plugins (Phase 12.E)
+
+```sh
+ummp plugins list           # plugins installed in the UMMP data directory
+ummp plugins check <dir>    # validate manifest, executable and the hello handshake
+```
+
+Plugins run as separate processes with the user's permissions; they are not OS-sandboxed.
+See [PLUGIN_PROTOCOL.md](PLUGIN_PROTOCOL.md).
 
 ## Update checks
 
