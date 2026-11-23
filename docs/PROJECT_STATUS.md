@@ -26,4 +26,4 @@ locally on branch `phase-10-modpack`.
 | 14 Community & Ecosystem | NOT_STARTED | |
 
 ## Current milestone
-Phase 12 is COMPLETED. Phase 13 production readiness: 13A–13E implemented; 13F distribution configuration added for 1.0.0-rc.1, pending cargo-dist plan/CI and real pre-release artifact validation. 13G update check and 13H bilingual user guides remain.
+Phase 12 is COMPLETED. Phase 13 production readiness: 13A–13E implemented; 13F distribution configuration added for 1.0.0-rc.1, pending cargo-dist plan/CI and real pre-release artifact validation. 13G update check is implemented on `phase-13g-update-check`; CI verification pending. 13H bilingual user guides remain.

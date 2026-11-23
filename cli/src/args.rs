@@ -122,6 +122,11 @@ pub enum Commands {
         #[command(subcommand)]
         cmd: AiKeyCmd,
     },
+    /// Check GitHub Releases for a newer UMMP version. This never downloads or installs it.
+    Update {
+        #[arg(long)]
+        check: bool,
+    },
     /// Generate shell completions.
     Completions { shell: Shell },
     /// Start the local REST API (localhost only by default).

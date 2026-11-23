@@ -11,7 +11,9 @@
 //! errors, logs or the audit trail.
 
 mod modrinth;
+mod releases;
 pub use modrinth::ModrinthIndex;
+pub use releases::{check_for_update, check_for_update_at, ReleaseUpdate};
 
 use serde_json::{json, Value};
 use std::time::Duration;
