@@ -141,7 +141,7 @@ jobs:
       - name: Resolve patched RustSec dependency
         run: cargo update -p url --precise 2.5.9
       - name: Audit RustSec advisories
-        run: cargo audit --locked
+        run: cargo audit
       - name: Check dependency policy
         run: cargo deny check
 
