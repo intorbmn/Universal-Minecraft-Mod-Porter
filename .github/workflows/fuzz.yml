@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: phase13-fuzz-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/phase-13d-fuzzing'
