@@ -1,14 +1,27 @@
 [package]
 name = "ummp"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 edition = "2021"
 description = "Universal Minecraft Mod Porter — CLI"
 license = "Apache-2.0"
+authors = ["UMMP contributors"]
+repository = "https://github.com/intorbmn/Universal-Minecraft-Mod-Porter"
+default-run = "ummp"
+publish = false
+
+[package.metadata.dist]
+dist = true
+
+[package.metadata.wix]
+upgrade-guid = "e1458336-a9aa-492c-9a1b-07ec3c148c6b"
+path-guid = "01311969-0f49-4580-9567-67cd4ee589ba"
+license = false
+eula = false
 
 [dependencies]
-ummp-core = { version = "0.1.0", path = "../core" }
-ummp-ai-providers = { version = "0.1.0", path = "../providers" }
-ummp-server = { version = "0.1.0", path = "../server" }
+ummp-core = { version = "1.0.0-rc.1", path = "../core" }
+ummp-ai-providers = { version = "1.0.0-rc.1", path = "../providers" }
+ummp-server = { version = "1.0.0-rc.1", path = "../server" }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 serde = { version = "1", features = ["derive"] }

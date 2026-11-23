@@ -1,12 +1,12 @@
 [package]
 name = "ummp-ai-providers"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 edition = "2021"
 description = "HTTP AI providers (Anthropic, OpenAI-compatible) for UMMP"
 license = "Apache-2.0"
 
 [dependencies]
-ummp-core = { version = "0.1.0", path = "../core" }
+ummp-core = { version = "1.0.0-rc.1", path = "../core" }
 serde_json = "1"
 ureq = { version = "2", features = ["json"] }
 

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master, phase-11-ui, phase-12-api, phase-12b-rest, phase-12c-mcp, phase-12d-action, phase-13c-security-hardening, phase-13d-fuzzing]
+    branches: [main, master, phase-11-ui, phase-12-api, phase-12b-rest, phase-12c-mcp, phase-12d-action, phase-13c-security-hardening, phase-13d-fuzzing, phase-13e-crash-recovery, phase-13f-distribution]
   pull_request:
-    branches: [main, master, phase-13a-b-performance-cache, phase-13c-security-hardening]
+    branches: [main, master, phase-13a-b-performance-cache, phase-13c-security-hardening, phase-13e-crash-recovery, phase-13f-distribution]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +13,8 @@ concurrency:
 jobs:
   build-test-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +55,18 @@ jobs:
           name: ummp-phase12-cargo-lockfile
           path: Cargo.lock
           if-no-files-found: error
+      - name: Commit resolved workspace lockfile on phase branches
+        if: always() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase-13')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Cargo.lock is already current"
+            exit 0
+          fi
+          git commit -m "chore(lock): sync resolved workspace lockfile"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
   desktop:
     runs-on: ubuntu-latest
@@ -133,3 +147,16 @@ jobs:
         run: cargo audit
       - name: Check dependency policy
         run: cargo deny check
+
+  distribution-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned cargo-dist
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.34.0/cargo-dist-installer.sh | sh
+          dist --version
+      - name: Regenerate cargo-dist workflow
+        run: dist init --yes
+      - name: Validate release configuration
+        run: dist plan --output-format=json
