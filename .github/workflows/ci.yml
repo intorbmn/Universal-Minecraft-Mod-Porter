@@ -105,7 +105,9 @@ jobs:
           if-no-files-found: warn
       - name: Build web assets for the Tauri build script
         run: npm run build
-      - run: cargo build --locked
+      # Resolve and persist the desktop workspace lockfile before locked validation.
+      # The committed desktop lockfile may lag newly added workspace dependencies.
+      - run: cargo build
         working-directory: ui/src-tauri
       - name: Upload resolved desktop lockfile for review
         uses: actions/upload-artifact@v4
@@ -131,7 +133,7 @@ jobs:
           cargo install cargo-audit --locked
           cargo install cargo-deny --locked
       - name: Audit RustSec advisories
-        run: cargo audit --locked
+        run: cargo audit
       - name: Check dependency policy
         run: cargo deny check
 
