@@ -3,6 +3,9 @@ name: Scheduled fuzzing
 on:
   push:
     branches: [phase-13d-fuzzing, phase-13h-user-guides-v2]
+    paths:
+      - 'fuzz/**'
+      - '.github/workflows/fuzz.yml'
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
