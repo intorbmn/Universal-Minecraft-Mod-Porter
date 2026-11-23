@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Release builds: added the `[profile.dist]` cargo-dist builds with and the generated WiX source `cli/wix/main.wxs`; `msi` is no longer `allow-dirty`, so `dist plan` in PR CI now fails when the installer source is missing or stale. Found by the first real `dist build` (PR CI only ran `dist plan`).
+
 ### Added
 - Phase 13.H: English and Vietnamese user guides covering installation, porting, packs, reports, build backends, AI, recovery and troubleshooting.
 
