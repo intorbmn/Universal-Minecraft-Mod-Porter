@@ -19,6 +19,15 @@ The snapshot excludes the existing `SKIP_DIRS` (`.git`, build output, etc.), mat
 
 The integrated Phase 13H head passed build/test/lint, desktop and security-audit checks in CI run [#971](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45117075173). Do not mark Phase 13.E complete until those checks pass on the final updated commit and the CLI recovery path passes a real process-kill smoke test on a disposable project.
 
+### Process-kill smoke test (2026-11-23)
+On a disposable copy of `forge-src-1.16` grown to 6,002 synthetic `DemoWidget` Java files
+(165 MB), `ummp migrate --apply` was `SIGKILL`ed after it had rewritten 1,502 files.
+`ummp recover --session <uuid>` restored every file byte-identical (sha256 of all files
+before vs after). Finding fixed in this change: `recover` did not open the application
+services, so the killed job stayed `Running` until some other command ran. It now repairs
+it to `Failed: interrupted (app closed)`; `cli/tests/recover_cli.rs` went red before the
+fix and green after.
+
 ## Usage
 
 After an interrupted `ummp migrate --apply`:

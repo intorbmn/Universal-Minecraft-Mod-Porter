@@ -30,7 +30,7 @@ nightly Rust in a separate workflow so the required stable CI remains unchanged.
   `build-test-lint`, `desktop`, and `security-audit` all completed successfully.
 - The stable run validates the normal workspaces; it is not evidence that the separate
   nightly fuzz campaign has completed.
-- The fuzz workflow is configured for a weekly Monday 03:17 UTC schedule and manual dispatch. The Phase 13H branch runs the campaign when `fuzz/**` or the workflow changes, avoiding repeated campaigns for documentation-only commits. The first completed 10-minute-per-target campaign remains pending; no crash-free claim is made.
+- The fuzz workflow is configured for a weekly Monday 03:17 UTC schedule and manual dispatch. The Phase 13H branch runs the campaign when `fuzz/**` or the workflow changes, avoiding repeated campaigns for documentation-only commits. The first full campaign completed on 2026-11-23: scheduled run [45176081919](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45176081919) on `a73a9ec`, all nine targets 601 s each, no crash artifacts. Executions: class_file 45.2 M, rest_request 48.3 M, mcp_request 42.5 M, plugin_protocol 39.0 M, crash_report 24.2 M, gradle_log 11.6 M, descriptor 6.7 M, mrpack_index 2.7 M, zip_import 2.5 M. This is evidence of no crash in 10 minutes per target, not proof of absence.
 - The `plugin.yml` harness currently exercises YAML decoding only. UMMP does not yet migrate
   Spigot/Paper descriptors.
 

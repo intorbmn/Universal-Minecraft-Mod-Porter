@@ -16,5 +16,5 @@
 
 ## Acceptance
 - [x] Stable CI passes provider tests, CLI tests, Clippy and formatting (latest integrated run [#971](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45117075173)).
-- [ ] Verify `ummp update --check` against GitHub Releases.
-- [ ] Verify automatic checks make no request when disabled and are throttled when enabled.
+- [ ] Verify `ummp update --check` against GitHub Releases. Not possible yet: the repository has no published release (`/releases/latest` returns 404, which the CLI reports as an error), and the build sandbox proxy breaks TLS for the bundled root store. Re-run after the first tagged release.
+- [x] Verified with `strace` on the release binary (2026-11-23): disabled = 0 `connect` calls and no state file; enabled first run connects and writes `last-update-check`; second run within 24 h = 0 `connect` calls.

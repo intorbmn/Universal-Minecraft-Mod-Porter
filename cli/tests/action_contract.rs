@@ -26,6 +26,16 @@ fn action_declares_all_phase_12d_inputs_and_outputs() {
 }
 
 #[test]
+fn action_installs_from_the_committed_lockfile() {
+    // Regenerating the lock in the action resolves the newest dependency versions on every
+    // run, which makes `--locked` pin nothing.
+    assert!(
+        !ACTION.contains("generate-lockfile") && !ACTION.contains("cargo update"),
+        "action.yml must install from the committed Cargo.lock, not regenerate it"
+    );
+}
+
+#[test]
 fn action_installs_cli_and_publishes_ci_report() {
     for contract in [
         "actions-rust-lang/setup-rust-toolchain@v1",
