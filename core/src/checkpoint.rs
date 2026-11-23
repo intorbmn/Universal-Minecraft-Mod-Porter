@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use uuid::Uuid;
@@ -23,6 +24,8 @@ pub enum CheckpointError {
     NotFound(Uuid),
     #[error("invalid checkpoint location: {0}")]
     InvalidLocation(String),
+    #[error("checkpoint metadata: {0}")]
+    Metadata(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +53,23 @@ impl CheckpointStore {
 
     pub fn latest(&self) -> Option<&Checkpoint> {
         self.checkpoints.last()
+    }
+
+    /// Persist checkpoint metadata atomically so an interrupted migration can be recovered.
+    pub fn persist(&self, dir: &Path) -> Result<(), CheckpointError> {
+        fs::create_dir_all(dir)?;
+        let bytes = serde_json::to_vec_pretty(self)
+            .map_err(|error| CheckpointError::Metadata(error.to_string()))?;
+        let destination = dir.join("checkpoints.json");
+        let mut temporary = tempfile::NamedTempFile::new_in(dir)?;
+        temporary.write_all(&bytes)?;
+        temporary.as_file().sync_all()?;
+        temporary
+            .persist(&destination)
+            .map_err(|error| CheckpointError::Io(error.error))?;
+        #[cfg(unix)]
+        fs::File::open(dir)?.sync_all()?;
+        Ok(())
     }
 
     pub fn get(&self, id: Uuid) -> Option<&Checkpoint> {
@@ -86,8 +106,11 @@ impl CheckpointStore {
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::copy(project.join(&rel), target)?;
+            fs::copy(project.join(&rel), &target)?;
+            fs::File::open(&target)?.sync_all()?;
         }
+        #[cfg(unix)]
+        sync_directories(&dest)?;
 
         let cp = Checkpoint {
             id,
@@ -97,6 +120,10 @@ impl CheckpointStore {
             created_at: chrono::Utc::now(),
         };
         self.add(cp.clone());
+        // Keep the completed snapshot if manifest publication reports an error:
+        // the rename may already have happened and the durable manifest may reference it.
+        // An orphaned snapshot is safe; a manifest pointing at a deleted snapshot is not.
+        self.persist(&snap_root)?;
         Ok(cp)
     }
 
@@ -105,6 +132,27 @@ impl CheckpointStore {
         let cp = self.get(id).ok_or(CheckpointError::NotFound(id))?;
         restore_from(&cp.snapshot_path, project_root)
     }
+}
+
+#[cfg(unix)]
+fn sync_directories(root: &Path) -> Result<(), std::io::Error> {
+    let mut directories = vec![root.to_path_buf()];
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(directory) = stack.pop() {
+        for entry in fs::read_dir(&directory)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                let child = entry.path();
+                directories.push(child.clone());
+                stack.push(child);
+            }
+        }
+    }
+    directories.sort_by_key(|path| std::cmp::Reverse(path.components().count()));
+    for directory in directories {
+        fs::File::open(directory)?.sync_all()?;
+    }
+    Ok(())
 }
 
 /// Restore a project tree from a snapshot directory.
@@ -132,8 +180,11 @@ pub fn restore_from(snapshot: &Path, project_root: &Path) -> Result<(), Checkpoi
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(snapshot.join(rel), target)?;
+        fs::copy(snapshot.join(rel), &target)?;
+        fs::File::open(&target)?.sync_all()?;
     }
+    #[cfg(unix)]
+    sync_directories(&project)?;
     Ok(())
 }
 
@@ -254,6 +305,61 @@ mod tests {
             fs::read_to_string(p.join("build/out.class")).unwrap(),
             "binary"
         );
+    }
+
+    #[test]
+    fn snapshot_persists_recovery_manifest_before_returning() {
+        let proj = tempdir().unwrap();
+        let snaps = tempdir().unwrap();
+        write(&proj.path().join("src/A.java"), "class A {}");
+        let session_id = Uuid::new_v4();
+        let mut store = CheckpointStore::new();
+
+        let checkpoint = store
+            .snapshot(session_id, "pre-transform", proj.path(), snaps.path())
+            .unwrap();
+
+        let persisted: CheckpointStore =
+            serde_json::from_slice(&fs::read(snaps.path().join("checkpoints.json")).unwrap())
+                .unwrap();
+        assert_eq!(persisted.checkpoints.len(), 1);
+        assert_eq!(persisted.checkpoints[0].id, checkpoint.id);
+        assert_eq!(persisted.checkpoints[0].session_id, session_id);
+        assert_eq!(
+            fs::read_to_string(checkpoint.snapshot_path.join("src/A.java")).unwrap(),
+            "class A {}"
+        );
+    }
+
+    #[test]
+    fn interrupted_session_can_be_restored_from_persisted_manifest() {
+        let proj = tempdir().unwrap();
+        let snaps = tempdir().unwrap();
+        write(&proj.path().join("src/A.java"), "class Original {}");
+        let session_id = Uuid::new_v4();
+        let mut store = CheckpointStore::new();
+        store
+            .snapshot(session_id, "pre-transform", proj.path(), snaps.path())
+            .unwrap();
+
+        write(&proj.path().join("src/A.java"), "class PartiallyChanged {}");
+        write(&proj.path().join("src/NEW.java"), "class NewFile {}");
+
+        let persisted: CheckpointStore =
+            serde_json::from_slice(&fs::read(snaps.path().join("checkpoints.json")).unwrap())
+                .unwrap();
+        let checkpoint = persisted
+            .checkpoints
+            .iter()
+            .find(|item| item.session_id == session_id)
+            .unwrap();
+        persisted.restore(checkpoint.id, proj.path()).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(proj.path().join("src/A.java")).unwrap(),
+            "class Original {}"
+        );
+        assert!(!proj.path().join("src/NEW.java").exists());
     }
 
     #[test]

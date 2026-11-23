@@ -1093,6 +1093,29 @@ impl MigrationEngine {
         Ok(Some(cp.id))
     }
 
+    /// Test-only fault injection: persist the pre-transform checkpoint, apply a
+    /// prefix of edits, then return without rollback to model abrupt process death.
+    #[cfg(test)]
+    fn apply_with_interruption(
+        set: &EditSet,
+        project: &Project,
+        store: &mut CheckpointStore,
+        opts: &RunOptions<'_>,
+        edits_before_interruption: usize,
+    ) -> Result<Uuid, MigrationError> {
+        let checkpoint = store.snapshot(
+            opts.session_id,
+            "pre-transform",
+            &project.root,
+            opts.snapshot_root,
+        )?;
+        for edit in set.edits.iter().take(edits_before_interruption) {
+            let path = resolve_within(&project.root, &edit.path)?;
+            project.fs.write(&path, edit.updated.as_bytes())?;
+        }
+        Ok(checkpoint.id)
+    }
+
     /// Run Transform (+ Apply unless `dry_run`). On apply, a checkpoint is
     /// taken first; if any write or move fails the project is restored from it.
     pub fn run(
@@ -1150,6 +1173,69 @@ mod tests {
 
     fn rewrite(src: &str, rules: &[RenameRule]) -> String {
         TokenRenameTransformer.transform(src, rules).0
+    }
+
+    #[test]
+    fn interrupted_apply_recovers_original_tree_from_durable_manifest() {
+        let project_dir = tempfile::tempdir().unwrap();
+        let snapshots_dir = tempfile::tempdir().unwrap();
+        let first = project_dir.path().join("src/First.java");
+        let second = project_dir.path().join("src/Second.java");
+        std::fs::create_dir_all(first.parent().unwrap()).unwrap();
+        std::fs::write(&first, "class First {}").unwrap();
+        std::fs::write(&second, "class Second {}").unwrap();
+
+        let project = Project::new(project_dir.path().to_path_buf());
+        let session_id = Uuid::new_v4();
+        let opts = RunOptions {
+            dry_run: false,
+            snapshot_root: snapshots_dir.path(),
+            session_id,
+        };
+        let set = EditSet {
+            edits: vec![
+                FileEdit {
+                    path: PathBuf::from("src/First.java"),
+                    original: "class First {}".into(),
+                    updated: "class FirstChanged {}".into(),
+                    replacements: Vec::new(),
+                },
+                FileEdit {
+                    path: PathBuf::from("src/Second.java"),
+                    original: "class Second {}".into(),
+                    updated: "class SecondChanged {}".into(),
+                    replacements: Vec::new(),
+                },
+            ],
+            ..EditSet::default()
+        };
+
+        let mut store = CheckpointStore::new();
+        let checkpoint_id =
+            MigrationEngine::apply_with_interruption(&set, &project, &mut store, &opts, 1).unwrap();
+
+        // One edit reached disk; the next process reloads only durable metadata.
+        assert_eq!(
+            std::fs::read_to_string(&first).unwrap(),
+            "class FirstChanged {}"
+        );
+        assert_eq!(std::fs::read_to_string(&second).unwrap(), "class Second {}");
+        let recovered_store: CheckpointStore = serde_json::from_slice(
+            &std::fs::read(snapshots_dir.path().join("checkpoints.json")).unwrap(),
+        )
+        .unwrap();
+        let checkpoint = recovered_store
+            .checkpoints
+            .iter()
+            .find(|item| item.session_id == session_id)
+            .unwrap();
+        assert_eq!(checkpoint.id, checkpoint_id);
+
+        recovered_store
+            .restore(checkpoint_id, &project.root)
+            .unwrap();
+        assert_eq!(std::fs::read_to_string(&first).unwrap(), "class First {}");
+        assert_eq!(std::fs::read_to_string(&second).unwrap(), "class Second {}");
     }
 
     #[test]

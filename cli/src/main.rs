@@ -786,6 +786,7 @@ const fn command_name(command: &Commands) -> &'static str {
         Commands::Adapters => "adapters",
         Commands::Pack { .. } => "pack",
         Commands::Rollback { .. } => "rollback",
+        Commands::Recover { .. } => "recover",
     }
 }
 
@@ -957,8 +958,9 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 let id = services
                     .start_migrate_in_place(request, true)
                     .map_err(|error| map_app_error(&error))?;
+                println!("Migration session: {id}");
                 let migration = wait_for_job(&services, id, ExitCode::Error)?;
-                serde_json::json!({ "plan": plan, "migration": migration })
+                serde_json::json!({ "plan": plan, "session": id, "migration": migration })
             } else {
                 serde_json::to_value(&plan)?
             };
@@ -974,7 +976,8 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 output::set_result(result);
             } else if apply {
                 println!(
-                    "\nMigration completed. Checkpoint: {}",
+                    "\nMigration completed. Session: {}. Checkpoint: {}",
+                    result["session"].as_str().unwrap_or("unknown"),
                     result["migration"]["checkpoint"]
                         .as_str()
                         .unwrap_or("created")
@@ -1281,6 +1284,46 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
                 output::set_result(result);
             } else {
                 println!("Restored {} to checkpoint {id}", path.display());
+            }
+        }
+
+        Commands::Recover {
+            path,
+            session,
+            snapshots,
+        } => {
+            let project = pm.open(&path)?;
+            let snap_dir = snapshots.unwrap_or_else(|| default_snapshots(&project.root));
+            let store = load_store(&snap_dir)?;
+            let checkpoint = store
+                .checkpoints
+                .iter()
+                .filter(|item| item.session_id == session)
+                .max_by_key(|item| item.created_at.timestamp_millis())
+                .cloned()
+                .ok_or_else(|| {
+                    format!("no recoverable checkpoint found for migration session {session}")
+                })?;
+
+            // Recovery is intentionally rollback-only: the migration plan is not yet durable,
+            // so replaying or continuing it would risk applying a different edit set.
+            store.restore(checkpoint.id, &project.root)?;
+            save_store(&snap_dir, &store)?;
+            let result = serde_json::json!({
+                "recovered": true,
+                "strategy": "rollback",
+                "project": path,
+                "session": session,
+                "checkpoint": checkpoint.id,
+            });
+            if json_mode {
+                output::set_result(result);
+            } else {
+                println!(
+                    "Recovered interrupted session {session}: restored {} to checkpoint {}",
+                    path.display(),
+                    checkpoint.id
+                );
             }
         }
     }

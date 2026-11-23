@@ -146,10 +146,11 @@ Phase 13 is in progress; Phase 14 (community) has not started.
 - Local builds are permitted only when the application risk check allows Low risk, but build scripts still run with the user's OS permissions. Prefer GitHub Actions.
 - MCP uses the same canonical path validation as REST and therefore shares its time-of-check/time-of-use gap. No real Claude Code client smoke test has been recorded yet; see `docs/MCP.md`.
 
-## Phase 13 security review (in progress)
-- The RustSec and cargo-deny checks are being added to CI; their first results are pending.
+## Phase 13 production readiness (in progress)
+- RustSec and cargo-deny checks are enabled in CI; the full repository security review is still reserved for the release-candidate commit.
 - The full repository security review is reserved for the release-candidate commit. No claim
   of a completed security audit is made before that review.
-- Phase 13D adds nine fuzz targets (class files, descriptors/YAML, mrpack, ZIP source import, Gradle logs, crash reports, plugin protocol, REST request DTOs, MCP tool arguments). They run for 10 minutes each in a separate scheduled nightly workflow; no fuzz campaign has completed yet, so coverage and crash-free status are not yet established. The `plugin.yml` arm currently exercises YAML decoding only; UMMP does not migrate Spigot/Paper descriptors.
+- Phase 13D adds nine fuzz targets (class files, descriptors/YAML, mrpack, ZIP source import, Gradle logs, crash reports, plugin protocol, REST request DTOs, MCP tool arguments). The workflow is configured for 10-minute campaigns, but no completed campaign has yet established coverage or crash-free status. The `plugin.yml` arm currently exercises YAML decoding only; UMMP does not migrate Spigot/Paper descriptors.
+- Phase 13E recovery restores the latest pre-transform checkpoint for a supplied session UUID. It does not continue/replay an interrupted migration because the exact edit plan is not persisted, and the CLI does not offer an interactive recovery prompt. `AppServices::open` does mark persisted `Running` jobs as interrupted on startup. Snapshots still exclude `.git`, build output, and other `SKIP_DIRS`; those paths are outside rollback guarantees. A real process-kill smoke test remains pending.
 - Incremental modpack migration remains unimplemented; the current Phase 13B cache reuses
   deterministic per-JAR analysis and scan results only.
