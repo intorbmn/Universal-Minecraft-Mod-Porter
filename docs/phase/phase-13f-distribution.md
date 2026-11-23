@@ -24,7 +24,7 @@
 - Windows code signing and macOS notarization remain out of scope until credentials are provided.
 
 ## Acceptance
-- [ ] cargo-dist plan passes on the PR.
+- [x] cargo-dist plan passes on the PR (integrated Release plan run [#67](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45117081636)).
 - [ ] RC dry-run/pre-release workflow completes and artifacts/checksums are attached.
 - [ ] User downloads and installs the Windows artifact on a machine without Rust.
 - [ ] `claude mcp add ummp -- <path>\\ummp.exe mcp` connects successfully.
