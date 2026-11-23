@@ -28,6 +28,7 @@ Phase 14 (Community & Ecosystem) has not started.
 | [FUZZING.md](docs/FUZZING.md) | Fuzz targets, local runs and crash triage |
 | [phase-13e-crash-recovery.md](docs/phase/phase-13e-crash-recovery.md) | Crash recovery protocol and verification |\n| [phase-13f-distribution.md](docs/phase/phase-13f-distribution.md) | CLI release packaging and RC acceptance |
 | [phase-13g-update-check.md](docs/phase/phase-13g-update-check.md) | Explicit and opt-in release update checks |
+| [phase-13h-user-guides.md](docs/phase/phase-13h-user-guides.md) | Bilingual user guides and troubleshooting |
 | [CLI.md](docs/CLI.md) | CLI contract, configuration, exit codes and completions |
 | [API.md](docs/API.md) | Local REST API, authentication and routes |
 | [MCP.md](docs/MCP.md) | MCP tools, resources and client setup |
@@ -66,6 +67,11 @@ Installers are emitted under `ui/src-tauri/target/release/bundle/`. The manual r
 is [Desktop release](.github/workflows/desktop-release.yml). Do not install an unsigned
 installer on a production machine. Runtime screenshots and the Windows smoke-test record will
 be added after the first verified Windows launch.
+
+## User guides
+
+- [English user guide](docs/USER_GUIDE.md)
+- [Hướng dẫn tiếng Việt](docs/USER_GUIDE.vi.md)
 
 ## Install the CLI (release candidate)
 

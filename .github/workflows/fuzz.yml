@@ -2,7 +2,10 @@ name: Scheduled fuzzing
 
 on:
   push:
-    branches: [phase-13d-fuzzing]
+    branches: [phase-13d-fuzzing, phase-13h-user-guides-v2]
+    paths:
+      - 'fuzz/**'
+      - '.github/workflows/fuzz.yml'
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
@@ -10,9 +13,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: phase13-fuzz-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/phase-13d-fuzzing'
     name: build fuzz / ${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -42,7 +49,7 @@ jobs:
         run: cargo +nightly fuzz build "${{ matrix.target }}"
 
   fuzz:
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' || github.ref == 'refs/heads/phase-13h-user-guides-v2'
     name: fuzz / ${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 20

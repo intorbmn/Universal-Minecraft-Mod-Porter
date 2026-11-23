@@ -15,6 +15,6 @@
 - Configuration defaults to disabled and supports explicit opt-in.
 
 ## Acceptance
-- [ ] Stable CI passes provider tests, CLI tests, Clippy and formatting.
+- [x] Stable CI passes provider tests, CLI tests, Clippy and formatting (latest integrated run [#971](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45117075173)).
 - [ ] Verify `ummp update --check` against GitHub Releases.
 - [ ] Verify automatic checks make no request when disabled and are throttled when enabled.

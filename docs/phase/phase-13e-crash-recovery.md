@@ -17,7 +17,7 @@ The snapshot excludes the existing `SKIP_DIRS` (`.git`, build output, etc.), mat
 
 ## Validation
 
-CI for this branch is the validation gate. Do not mark Phase 13.E complete until build, tests, Clippy, formatting, desktop checks, and security audit all pass on the final commit. The CLI recovery path still needs a real process-kill smoke test on a disposable project.
+The integrated Phase 13H head passed build/test/lint, desktop and security-audit checks in CI run [#971](https://github.com/intorbmn/Universal-Minecraft-Mod-Porter/actions/runs/45117075173). Do not mark Phase 13.E complete until those checks pass on the final updated commit and the CLI recovery path passes a real process-kill smoke test on a disposable project.
 
 ## Usage
 
