@@ -37,6 +37,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Resolve patched RustSec dependency
+        run: cargo update -p url --precise 2.5.9
+
       - name: Build
         run: cargo build --all --verbose --locked
 
@@ -107,7 +110,10 @@ jobs:
         run: npm run build
       # Resolve and persist the desktop workspace lockfile before locked validation.
       # The committed desktop lockfile may lag newly added workspace dependencies.
-      - run: cargo build
+      - name: Resolve patched desktop URL dependency
+        run: cargo update -p url --precise 2.5.9
+        working-directory: ui/src-tauri
+      - run: cargo build --locked
         working-directory: ui/src-tauri
       - name: Upload resolved desktop lockfile for review
         uses: actions/upload-artifact@v4
@@ -132,8 +138,10 @@ jobs:
         run: |
           cargo install cargo-audit --locked
           cargo install cargo-deny --locked
+      - name: Resolve patched RustSec dependency
+        run: cargo update -p url --precise 2.5.9
       - name: Audit RustSec advisories
-        run: cargo audit
+        run: cargo audit --locked
       - name: Check dependency policy
         run: cargo deny check
 
