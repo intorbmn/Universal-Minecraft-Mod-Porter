@@ -19,8 +19,7 @@ nightly Rust in a separate workflow so the required stable CI remains unchanged.
 
 - Added `fuzz/Cargo.toml`, nine `cargo-fuzz` targets, and
   `fuzz/scripts/prepare-corpora.py` to generate seed corpora from checked-in fixtures.
-- Added `.github/workflows/fuzz.yml`: push builds the harness matrix; scheduled/manual
-  runs execute each target for 600 seconds and upload crash artifacts.
+- Added `.github/workflows/fuzz.yml`: push to the original fuzz branch builds the harness matrix; scheduled/manual runs execute each target for 600 seconds and upload crash artifacts. The Phase 13H integration branch also runs campaigns when fuzz harnesses or this workflow change.
 - Added fuzz-only REST/MCP decoder entry points that deserialize the same request DTOs as
   production handlers without starting a server or invoking filesystem operations.
 - Extracted the bounded plugin response decoder so it can be exercised directly.
@@ -31,8 +30,7 @@ nightly Rust in a separate workflow so the required stable CI remains unchanged.
   `build-test-lint`, `desktop`, and `security-audit` all completed successfully.
 - The stable run validates the normal workspaces; it is not evidence that the separate
   nightly fuzz campaign has completed.
-- The fuzz workflow is configured for a weekly Monday 03:17 UTC schedule and manual dispatch.
-  The first 10-minute-per-target campaign remains pending; no crash-free claim is made.
+- The fuzz workflow is configured for a weekly Monday 03:17 UTC schedule and manual dispatch. The Phase 13H branch runs the campaign when `fuzz/**` or the workflow changes, avoiding repeated campaigns for documentation-only commits. The first completed 10-minute-per-target campaign remains pending; no crash-free claim is made.
 - The `plugin.yml` harness currently exercises YAML decoding only. UMMP does not yet migrate
   Spigot/Paper descriptors.
 
