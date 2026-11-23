@@ -126,7 +126,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install pinned Rust toolchain
         run: rustup toolchain install && rustc -V
-      - name: Resolve complete workspace lockfile
       - name: Install Rust security tools
         run: |
           cargo install cargo-audit --locked
