@@ -3,7 +3,8 @@
 UMMP keeps fuzzing separate from the required stable CI. The scheduled workflow uses
 nightly Rust and runs each target for 10 minutes every Monday (UTC); it can also be
 started manually from GitHub Actions. The Phase 13H integration branch additionally runs
-the campaign on each push, allowing the unmerged stacked work to collect fuzz evidence.
+the campaign when fuzz harnesses or this workflow change, allowing the unmerged stacked work
+to collect fuzz evidence without repeating campaigns for documentation-only commits.
 
 ## Targets
 
