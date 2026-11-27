@@ -2,7 +2,8 @@
 
 Requested by the user on 2026-11-27. Start only after Phases 13 and 14 are COMPLETED and the
 user says so. This file records the request; it is not an approved design. Design it with
-brainstorming and an ADR before any code.
+brainstorming and an ADR before any code. Step-by-step guide:
+[`docs/guides/phase-15-mod-creator.md`](../guides/phase-15-mod-creator.md).
 
 ## What the user asked for
 - **Create a simple mod by picking features.** The user chooses features from a list; UMMP

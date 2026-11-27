@@ -11,6 +11,7 @@ They replace the rough drafts in `docs/drafts/` (kept for history).
 | 12 CLI, API & Integration | [phase-12-api.md](phase-12-api.md) | application services, 8 |
 | 13 Production Readiness | [phase-13-production.md](phase-13-production.md) | everything |
 | 14 Community & Ecosystem | [phase-14-community.md](phase-14-community.md) | 12 (plugin interface), 13 (releases) |
+| 15 Mod Creator | [phase-15-mod-creator.md](phase-15-mod-creator.md) | 7, 8, 9, 11, 13 (installer); starts after 14 |
 | Backlog | [`../BACKLOG.md`](../BACKLOG.md) | the phase each item came from |
 
 **Order.** Do the phases in order. One phase per branch and per PR. Never start the next
