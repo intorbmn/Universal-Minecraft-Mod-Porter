@@ -29,3 +29,4 @@ Each ADR has: **Status**, **Context**, **Problem**, **Options**, **Decision**,
 | [0019](0019-plugin-protocol.md) | Out-of-process plugin protocol and trust boundary | Accepted |
 | [0020](0020-sqlite-analysis-cache.md) | SQLite cache for deterministic per-JAR analysis | Accepted |
 | [0021](0021-crash-recovery-protocol.md) | Durable pre-transform checkpoint recovery | Accepted |
+| [0022](0022-plugin-sdk-protocol-contract.md) | Plugin SDK crate and golden-file protocol contract | Accepted |

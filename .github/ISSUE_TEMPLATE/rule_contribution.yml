@@ -1,0 +1,51 @@
+name: Rule contribution
+description: Propose a mapping, compatibility note, replacement or config rule
+labels: ["rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every rule needs a test case (an input and the expected output). Rules that cannot be
+        tested are not accepted. Real API names are fine here; they are not allowed in this
+        repository's tests and fixtures, so a maintainer will adapt the test data.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of rule
+      options:
+        - Mapping (rename)
+        - Compatibility
+        - Replacement
+        - Config
+    validations:
+      required: true
+  - type: input
+    id: pair
+    attributes:
+      label: Applies to
+      placeholder: Forge 1.20.1 to NeoForge 1.21.1
+    validations:
+      required: true
+  - type: textarea
+    id: rule
+    attributes:
+      label: The rule
+      description: Paste the TOML rows if you have them, otherwise describe the change.
+      render: toml
+    validations:
+      required: true
+  - type: textarea
+    id: case
+    attributes:
+      label: Test case
+      description: A short input snippet and the output you expect.
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: license
+    attributes:
+      label: License
+      options:
+        - label: I agree that this rule may be published under CC0 (public domain dedication).
+          required: true

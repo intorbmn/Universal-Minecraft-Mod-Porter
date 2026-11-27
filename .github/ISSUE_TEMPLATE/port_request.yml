@@ -1,0 +1,32 @@
+name: Port request or port problem
+description: A mod would not port, or you need a loader/version pair UMMP does not support yet
+labels: ["port"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the mod; do not upload it unless its license allows redistribution.
+  - type: input
+    id: source
+    attributes:
+      label: Source (loader and Minecraft version)
+      placeholder: Forge 1.20.1
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Target (loader and Minecraft version)
+      placeholder: NeoForge 1.21.1
+    validations:
+      required: true
+  - type: textarea
+    id: technologies
+    attributes:
+      label: Technologies the mod uses
+      description: Mixins, access transformers, capabilities, data generation, native libraries, and so on.
+  - type: textarea
+    id: result
+    attributes:
+      label: What `ummp analyze` or `ummp port` reported
+      render: text

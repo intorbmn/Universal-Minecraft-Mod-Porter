@@ -1,5 +1,7 @@
 # UMMP Plugin Protocol — API 1
 
+Writing a plugin in Rust? Use `ummp-plugin-sdk` and read [PLUGIN_SDK.md](PLUGIN_SDK.md). The golden files in `tests/fixtures/golden/plugin-protocol/` are the executable form of this document (ADR 0022).
+
 Plugins are untrusted, out-of-process executables. Install only plugins you trust. The protocol has no file-write operation; UMMP validates and applies proposed edits through MigrationEngine.
 
 ## Discovery and manifest

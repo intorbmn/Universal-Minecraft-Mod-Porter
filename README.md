@@ -17,7 +17,8 @@ Phase 14 (Community & Ecosystem) has not started.
 | [MODULES.md](docs/MODULES.md) | Module catalog |
 | [DEPENDENCY_GRAPH.md](docs/DEPENDENCY_GRAPH.md) | Module dependencies |
 | [TECH_STACK.md](docs/TECH_STACK.md) | Technology decisions |
-| [PLUGIN_SDK.md](docs/PLUGIN_SDK.md) | Plugin architecture |
+| [PLUGIN_SDK.md](docs/PLUGIN_SDK.md) | Extending UMMP: rules, adapters, plugins and the plugin SDK |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) | AI agent architecture |
 | [MIGRATION_PIPELINE.md](docs/MIGRATION_PIPELINE.md) | Migration workflow |
 | [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | Data model |

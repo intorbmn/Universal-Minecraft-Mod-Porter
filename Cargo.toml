@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "cli", "providers", "server"]
+members = ["core", "cli", "providers", "server", "plugin-sdk", "templates/plugin"]
 resolver = "2"
 exclude = ["ui/src-tauri"]
 default-members = ["cli"]

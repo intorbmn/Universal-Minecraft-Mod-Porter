@@ -2242,6 +2242,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ummp-plugin-sdk"
+version = "1.0.0-rc.1"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ummp-plugin-template"
+version = "1.0.0-rc.1"
+dependencies = [
+ "ummp-plugin-sdk",
+]
+
+[[package]]
 name = "ummp-server"
 version = "1.0.0-rc.1"
 dependencies = [
