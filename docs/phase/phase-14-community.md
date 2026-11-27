@@ -36,8 +36,11 @@ fixtures, synthetic names, ADR process, PR flow), `.github/PULL_REQUEST_TEMPLATE
 (Contributor Covenant 2.1 by reference). The old `CONTRIBUTING.md` had a wrong repository URL and
 a false line-limit rule; both are gone.
 
-Verification: the commands written in the tutorial were run (see 14.B). The clean-clone review
-required by the guide is recorded in the section below once it has run.
+Verification: the commands written in the tutorial were run (see 14.B). Clean-clone review
+(2026-11-27, done by the same agent that wrote the file, so not independent): a fresh `git clone`
+of the branch from GitHub, then `cargo build --all` (1m18s), `cargo fmt --all -- --check`, the SDK
+and template tests and `core/tests/plugin_template.rs` all passed exactly as `CONTRIBUTING.md`
+says. An independent follow-through by the maintainer is still wanted.
 
 ## 14.B Plugin SDK
 
