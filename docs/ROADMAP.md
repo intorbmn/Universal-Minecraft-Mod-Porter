@@ -19,6 +19,7 @@ Status legend: NOT_STARTED | PLANNED | IN_PROGRESS | BLOCKED | NEEDS_REVIEW | TE
 | 12 | CLI, API & External Integration | IN_PROGRESS | M |
 | 13 | Optimization & Production Readiness | PLANNED | L |
 | 14 | Community & Ecosystem | PLANNED | XL |
+| 15 | Mod Creator (pick features, templates or AI, edit, build to .jar, all versions) | PLANNED (after 14) | XL |
 
 ## MVP scope (Phase 2-4 + partial 5/6)
 Import a Forge/Fabric mod project, detect version+loader+deps, produce an analysis report and dependency graph, and suggest a migration plan. No AI, no build, no GUI — CLI only.
