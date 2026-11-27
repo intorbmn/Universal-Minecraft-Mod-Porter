@@ -67,6 +67,14 @@ is now a pointer), ADR 0022.
 | template `TO` changed to another name | `template_plugin_passes_check_and_its_edit_is_applied_by_the_engine` (left/right mismatch) |
 | template `id` differs from the manifest name | same test: "hello id does not match manifest name" |
 
+## CI finding
+
+The first CI run of PR #34 failed in `cargo deny check` (`bans`: wildcard dependency for
+`ummp-plugin-template`, because its path dependency on the SDK had no `version`). Fixed by adding
+`version = "1.0.0-rc.1"`, the same pattern `cli/Cargo.toml` uses for `ummp-core`. Lesson: new
+workspace crates need versioned path dependencies; `cargo deny` is not installed in the sandbox,
+so only CI catches this.
+
 ## Open items
 
 - Clean-clone review of `CONTRIBUTING.md` (14.A) and the maintainer's review of all user-facing

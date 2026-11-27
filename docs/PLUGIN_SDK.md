@@ -76,7 +76,7 @@ synthetic names. `ummp adapters` prints the live list.
 The template in `templates/plugin/` renames the synthetic type `DemoWidget` to `DemoGadget`.
 
 1. Copy `templates/plugin/` to a new folder and edit `Cargo.toml`: change the package name and
-   replace the `ummp-plugin-sdk` path with a version (`ummp-plugin-sdk = "1"`).
+   replace the `ummp-plugin-sdk` path with a version (the published SDK version).
 2. Change `name` in `ummp-plugin.toml` and `Renamer::id` in `src/main.rs`. They must be equal,
    or `ummp plugins check` fails with "hello id does not match manifest name".
 3. Edit `findings` and `edits` in `src/main.rs`. Both receive the project files UMMP chose to

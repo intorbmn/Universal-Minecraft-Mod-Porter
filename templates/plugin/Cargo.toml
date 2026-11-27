@@ -12,8 +12,8 @@ path = "src/main.rs"
 
 [dependencies]
 # When you copy this folder out of the UMMP repository, replace the path with a version:
-#   ummp-plugin-sdk = "1"
-ummp-plugin-sdk = { path = "../../plugin-sdk" }
+#   ummp-plugin-sdk = "<version of the published SDK>"
+ummp-plugin-sdk = { version = "1.0.0-rc.1", path = "../../plugin-sdk" }
 
 [lints]
 workspace = true
