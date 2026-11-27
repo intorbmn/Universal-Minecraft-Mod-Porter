@@ -1,0 +1,22 @@
+[package]
+name = "ummp-plugin-template"
+version = "1.0.0-rc.1"
+edition = "2021"
+description = "Template UMMP plugin: renames DemoWidget to DemoGadget"
+license = "Apache-2.0"
+publish = false
+
+[[bin]]
+name = "demo-renamer"
+path = "src/main.rs"
+
+[dependencies]
+# When you copy this folder out of the UMMP repository, replace the path with a version:
+#   ummp-plugin-sdk = "1"
+ummp-plugin-sdk = { path = "../../plugin-sdk" }
+
+[lints]
+workspace = true
+
+[package.metadata.dist]
+dist = false

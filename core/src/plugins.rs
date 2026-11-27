@@ -63,6 +63,18 @@ struct PluginFile {
     path: String,
     content: String,
 }
+fn hello_request() -> Value {
+    json!({"method":"hello"})
+}
+
+fn findings_request(files: &[PluginFile]) -> Value {
+    json!({"method":"findings","files":files})
+}
+
+fn edits_request(files: &[PluginFile], minecraft: &str, loader: &str) -> Value {
+    json!({"method":"edits","files":files,"target":{"minecraft":minecraft,"loader":loader}})
+}
+
 #[derive(Deserialize)]
 struct PluginEdit {
     path: PathBuf,
@@ -251,7 +263,7 @@ impl PluginAdapter {
     }
 
     fn hello(&self) -> Result<(), PluginError> {
-        let reply = self.invoke(&json!({"method":"hello"}))?;
+        let reply = self.invoke(&hello_request())?;
         let api = reply
             .get("ummp_api")
             .and_then(Value::as_u64)
@@ -391,7 +403,7 @@ impl TechAdapter for PluginAdapter {
     fn findings(&self, cx: &AdapterContext<'_>) -> Vec<TechFinding> {
         let result = (|| {
             let files = Self::files(cx)?;
-            let value = self.invoke(&json!({"method":"findings","files":files}))?;
+            let value = self.invoke(&findings_request(&files))?;
             let findings: Vec<TechFinding> =
                 serde_json::from_value(value).map_err(|e| PluginError::Protocol(e.to_string()))?;
             for finding in &findings {
@@ -416,9 +428,11 @@ impl TechAdapter for PluginAdapter {
         };
         let files = Self::files(cx).map_err(|e| MigrationError::InvalidRequest(e.to_string()))?;
         let value = self
-            .invoke(&json!({"method":"edits","files":files,"target":{
-                "minecraft":plan.request.target_minecraft,"loader":plan.request.target_loader
-            }}))
+            .invoke(&edits_request(
+                &files,
+                &plan.request.target_minecraft,
+                &plan.request.target_loader,
+            ))
             .map_err(|e| MigrationError::InvalidRequest(e.to_string()))?;
         let edits: Vec<PluginEdit> = serde_json::from_value(value)
             .map_err(|e| MigrationError::InvalidRequest(format!("invalid plugin edits: {e}")))?;
@@ -633,6 +647,40 @@ mod tests {
         assert!(
             PluginAdapter::validate_path(root.path(), Path::new("../../outside"), &files).is_err()
         );
+    }
+
+    fn golden(name: &str) -> Value {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/golden/plugin-protocol")
+            .join(name);
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn core_requests_match_golden_protocol_files() {
+        let files = vec![PluginFile {
+            path: "src/main/java/Demo.java".into(),
+            content: "class DemoWidget {}".into(),
+        }];
+        assert_eq!(hello_request(), golden("hello.request.json"));
+        assert_eq!(findings_request(&files), golden("findings.request.json"));
+        assert_eq!(
+            edits_request(&files, "1.21.1", "fabric"),
+            golden("edits.request.json")
+        );
+    }
+
+    #[test]
+    fn core_parses_golden_plugin_responses() {
+        let findings: Vec<TechFinding> =
+            serde_json::from_value(golden("findings.response.json")).unwrap();
+        assert_eq!(findings.len(), 2);
+        assert_eq!(findings[0].line, Some(1));
+        assert_eq!(findings[1].line, None);
+        assert_eq!(findings[1].handling, Handling::Manual);
+        let edits: Vec<PluginEdit> = serde_json::from_value(golden("edits.response.json")).unwrap();
+        assert_eq!(edits[0].updated, "class DemoGadget {}");
+        assert_eq!(edits[0].path, PathBuf::from("src/main/java/Demo.java"));
     }
 
     #[test]

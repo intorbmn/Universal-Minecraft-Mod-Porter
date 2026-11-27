@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Phase 14.A: rewritten `CONTRIBUTING.md`, PR template, issue forms (bug, port request, rule contribution) and `CODE_OF_CONDUCT.md`.
+- Phase 14.B: `ummp-plugin-sdk` crate, `templates/plugin` (built and checked end to end in CI), golden protocol files shared by SDK and core (ADR 0022), rewritten `docs/PLUGIN_SDK.md`. `docs/ADAPTER_SDK.md` is now a pointer into it.
+
 ### Fixed
 - `ummp recover` now marks the interrupted job `Failed` (it stayed `Running` until another command ran).
 - GitHub Action installs from the committed `Cargo.lock` instead of regenerating it, so `--locked` pins dependencies again.

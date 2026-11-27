@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in UMMP does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach mod source code or JARs you do not have the right to share.
+        Security problems: do not use this form, see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: UMMP version
+      description: Output of `ummp --version`
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 / macOS 15 / Ubuntu 24.04
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      description: The exact command, or the screen and buttons you used in the app.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or report excerpt
+      description: Remove anything private. Paths under your home folder are fine to shorten to `~`.
+      render: text

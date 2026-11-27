@@ -1,0 +1,1 @@
+{"method":"edits","files":[{"path":"src/main/java/Demo.java","content":"class DemoWidget {}"}],"target":{"minecraft":"1.21.1","loader":"fabric"}}

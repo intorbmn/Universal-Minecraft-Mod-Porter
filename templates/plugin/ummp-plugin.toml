@@ -1,0 +1,6 @@
+name = "demo-renamer"
+version = "1.0.0"
+kind = "rules"
+# Path of the executable relative to this folder (an argument array, not a shell string).
+command = ["demo-renamer"]
+ummp_api = 1

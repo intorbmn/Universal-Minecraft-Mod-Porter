@@ -1,0 +1,1 @@
+[{"tech":"demo-renamer","handling":"assisted","file":"src/main/java/Demo.java","line":1,"message":"Demo type found"},{"tech":"demo-renamer","handling":"manual","file":"src/main/java/Demo.java","line":null,"message":"Whole-file note"}]
