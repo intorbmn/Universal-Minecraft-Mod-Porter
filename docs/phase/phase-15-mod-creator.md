@@ -21,10 +21,18 @@ brainstorming and an ADR before any code.
 - **Bundled toolchain.** Software needed to build (JDK, and anything else) is installed with
   the app, so users do not set it up by hand.
 
+## Decided by the user (2026-11-27)
+- **Loaders:** Forge, NeoForge and Fabric.
+- **JDK at install:** the installer shows a step asking whether to install a JDK; the user
+  may skip it.
+- **JDK manager in Settings:** after install, Settings lists installed JDK versions and lets
+  the user add more or remove some, like NI Package Manager for LabVIEW.
+- **No Free/Pro split for now.** All Mod Creator features are in the open-source app.
+
 ## Points to settle in the design
 - "Every moddable version" is very large (each loader × version needs its own templates and
   APIs). Decide the first set and how templates are generated, tested and kept current.
-- Bundling JDKs: which JDK versions (Minecraft versions need different Java versions),
+- JDK manager details: which JDK versions (Minecraft versions need different Java versions),
   installer size, license of the bundled JDK (for example an OpenJDK build such as
   Temurin), and update path. Gradle still downloads Minecraft and loader libraries on the
   first build, so a network connection is needed at least once.
@@ -32,4 +40,3 @@ brainstorming and an ADR before any code.
 - Templates must use synthetic sample names in repo fixtures (CLAUDE.md) and must not
   contain Mojang code.
 - Mods users create are their own; UMMP does not publish them.
-- Free vs Pro split (BACKLOG monetization) for templates or AI features: ask the user.
